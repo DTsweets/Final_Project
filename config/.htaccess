@@ -1,0 +1,5 @@
+# Block direct HTTP access to config/
+<Files "*.php">
+    Order Deny,Allow
+    Deny from all
+</Files>

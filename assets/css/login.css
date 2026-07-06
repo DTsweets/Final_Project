@@ -1,0 +1,655 @@
+:root {
+    --bg-sky: linear-gradient(180deg, #DCEEF5 0%, #FFFFFF 100%);
+    --card-bg: #FCFCFC;
+    --purple: #62368B;
+    --purple-light: #7E51A9;
+    --gold: #A57C58;
+    --gold-light: #B7906B;
+    --inner-box: #F4ECE3;
+    --inner-border: #E8DDCE;
+    --input-bg: #FFFFFF;
+    --text-dark: #333333;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body, input, button, select, textarea {
+    font-family: 'Kanit', sans-serif;
+}
+
+body {
+    background: #DCEEF5 url('../images/island_bg.webp') no-repeat center center fixed;
+    background-size: cover;
+    height: 100vh;
+    /* ใช้ height แทน min-height เพื่อคุมระดับหน้าจอ */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* จัดกลาง */
+    overflow: hidden;
+    /* ปิดไม่ให้เลื่อน */
+    position: relative;
+}
+
+/* ─── SCENERY BACKGROUND (CSS Island & Clouds) ─── */
+.sky-clouds {
+    position: fixed;
+    /* Fixed so clouds stay during scroll */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.cloud {
+    position: absolute;
+    background: #FFFFFF;
+    border-radius: 100px;
+    filter: blur(6px);
+    opacity: 0.8;
+    animation: drift 60s linear infinite;
+}
+
+.cloud:nth-child(1) {
+    width: 150px;
+    height: 50px;
+    top: 20%;
+    left: -10%;
+    animation-duration: 45s;
+}
+
+.cloud:nth-child(2) {
+    width: 200px;
+    height: 70px;
+    top: 60%;
+    left: 80%;
+    opacity: 0.6;
+    animation-duration: 70s;
+}
+
+.cloud:nth-child(3) {
+    width: 120px;
+    height: 40px;
+    top: 80%;
+    left: 20%;
+    opacity: 0.5;
+    animation-duration: 50s;
+}
+
+@keyframes drift {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(110vw);
+    }
+}
+
+/* 3D Isometric Island representing the Figma Map */
+.island-wrapper {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -40%);
+    z-index: 2;
+    width: 1000px;
+    height: 750px;
+    pointer-events: none;
+    /* ลบรูปซ้ำออกเพื่อให้เบราว์เซอร์ไม่โหลดรูปสองรอบซึ่งทำให้กระพริบ */
+    background-image: none;
+    transition: transform 0.3s ease;
+}
+
+/* CSS Fallback Island if image is not present */
+.css-island {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 700px;
+    height: 500px;
+    background: linear-gradient(135deg, #6BCB4A 0%, #4AA62B 100%);
+    transform: translate(-50%, -30%) rotateX(60deg) rotateZ(-40deg);
+    border-radius: 80px 40px 100px 30px;
+    /* Using deep brown for the soil shadow */
+    box-shadow:
+        -1px 1px 0 #5E3E26, -2px 2px 0 #55351D, -3px 3px 0 #4C2B14,
+        -4px 4px 0 #4A2812, -5px 5px 0 #48240D, -6px 6px 0 #3C1E0A,
+        -7px 7px 0 #331807, -8px 8px 0 #2A1304, -9px 9px 0 #210D02,
+        -10px 10px 0 #180800,
+        -20px 20px 40px rgba(0, 0, 0, 0.25);
+    animation: float 6s ease-in-out infinite;
+}
+
+/* Winding mock road */
+.css-road {
+    position: absolute;
+    border: 10px solid #9BA2A6;
+    border-radius: 40px;
+    border-top: none;
+    border-right: none;
+    width: 300px;
+    height: 200px;
+    top: 40%;
+    left: 30%;
+}
+
+@keyframes float {
+    0% {
+        transform: translate(-50%, -30%) rotateX(60deg) rotateZ(-40deg);
+    }
+
+    50% {
+        transform: translate(-50%, -32%) rotateX(60deg) rotateZ(-40deg);
+    }
+
+    100% {
+        transform: translate(-50%, -30%) rotateX(60deg) rotateZ(-40deg);
+    }
+}
+
+/* ─── MAIN LOGIN CARD ─── */
+.login-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* จัดกลางเป๊ะๆ */
+    z-index: 10;
+    height: 100%;
+    /* ปิดการ "เลื่อน" (Slide) เปลี่ยนเป็นแค่ค่อยๆ จางปรากฏ (Fade In) */
+    animation: fadeIn 0.2s ease-out forwards;
+}
+
+.login-card {
+    position: relative;
+    background: var(--card-bg);
+    width: 92%;
+    max-width: 500px;
+    border-radius: 36px;
+    padding: 55px 45px 45px 45px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.08), 0 10px 15px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Shake animation for errors */
+.login-card.shake-err {
+    animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes shake {
+
+    10%,
+    90% {
+        transform: translate3d(-1px, 0, 0);
+    }
+
+    20%,
+    80% {
+        transform: translate3d(2px, 0, 0);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translate3d(-4px, 0, 0);
+    }
+
+    40%,
+    60% {
+        transform: translate3d(4px, 0, 0);
+    }
+}
+
+/* Logo Area */
+.logo-area {
+    text-align: center;
+    margin-bottom: 25px;
+    width: 100%;
+}
+
+.up-logo-img {
+    width: auto;
+    height: 135px;
+    margin-bottom: 20px;
+}
+
+.brand-title {
+    font-family: 'Kanit', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin: 0 0 6px 0;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    /* Ensure long words wrap */
+}
+
+.brand-up {
+    color: var(--purple);
+}
+
+.brand-netzero {
+    color: var(--gold);
+}
+
+.brand-subtitle {
+    font-size: 16px;
+    color: var(--purple-light);
+    margin: 0;
+    font-weight: 400;
+}
+
+/* Form Container (Beige Box) */
+.form-wrapper {
+    background: var(--inner-box);
+    border: 1px solid var(--inner-border);
+    border-radius: 20px;
+    padding: 35px 40px;
+    width: 100%;
+    margin-bottom: 35px;
+}
+
+.form-title {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gold-light);
+    margin: 0 0 25px 0;
+}
+
+/* Form Group & Inputs */
+.form-group {
+    margin-bottom: 18px;
+    width: 100%;
+}
+
+.form-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--gold);
+    margin-bottom: 6px;
+    padding-left: 4px;
+}
+
+.input-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--input-bg);
+    border: 1px solid var(--inner-border);
+    border-radius: 12px;
+    height: 50px;
+    padding: 0 18px;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.input-box:focus-within {
+    border-color: var(--purple-light);
+    box-shadow: 0 0 0 3px rgba(98, 54, 139, 0.1);
+}
+
+.icon-svg {
+    width: 20px;
+    height: 20px;
+    color: var(--purple);
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.input-box input {
+    border: none;
+    background: transparent;
+    width: 100%;
+    height: 100%;
+    outline: none;
+    font-family: inherit;
+    color: var(--purple);
+    font-size: 16px;
+}
+
+.input-box input::placeholder {
+    color: rgba(98, 54, 139, 0.5);
+    /* Soft purple placeholder */
+}
+
+/* Checkbox */
+.remember-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 15px;
+    gap: 8px;
+    width: 100%;
+}
+
+.remember-row label {
+    font-size: 12px;
+    color: var(--gold);
+    cursor: pointer;
+    user-select: none;
+}
+
+.custom-checkbox {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #D7CCD6;
+    /* Pale purple/grey background */
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+    transition: 0.2s;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.custom-checkbox:checked {
+    background: var(--purple-light);
+}
+
+.custom-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 2px;
+    width: 4px;
+    height: 7px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* Submit Button (Outside Inner Box) */
+.btn-submit {
+    background: var(--purple);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 30px;
+    padding: 15px 50px;
+    font-family: inherit;
+    font-size: 18px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(98, 54, 139, 0.25);
+    width: auto;
+}
+
+.btn-submit:hover {
+    background: #502A75;
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(98, 54, 139, 0.4);
+}
+
+.btn-submit:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Alerts */
+.alert {
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    margin-bottom: 20px;
+    text-align: center;
+    background: #FEE2E2;
+    color: #DC2626;
+    border: 1px solid #FECACA;
+    width: 100%;
+
+    /* Smooth fade in */
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.error-border {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+.error-border input::placeholder {
+    color: rgba(220, 38, 38, 0.4) !important;
+}
+
+.alert-warning {
+    background: #FEF3C7;
+    color: #D97706;
+    border: 1px solid #FDE68A;
+}
+
+/* ─── RESPONSIVE DESIGN (MOBILE & TABLETS) ─── */
+
+@media (max-width: 1024px) {
+    .island-wrapper {
+        transform: translate(-50%, -40%) scale(0.85);
+        /* Scale down map purely for aesthetics */
+    }
+
+    .login-card {
+        max-width: 410px;
+        padding: 42px 34px 34px 34px;
+    }
+}
+
+@media (max-width: 768px) {
+    .island-wrapper {
+        transform: translate(-50%, -40%) scale(0.65);
+    }
+
+    .login-card {
+        max-width: 380px;
+        padding: 38px 24px 24px 24px;
+    }
+
+    .up-logo-img {
+        height: 110px;
+    }
+
+    .brand-title {
+        font-size: 26px;
+    }
+
+    .form-wrapper {
+        padding: 25px 20px;
+    }
+
+    .input-box {
+        height: 46px;
+    }
+
+    .btn-submit {
+        padding: 14px 40px;
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .island-wrapper {
+        transform: translate(-50%, -35%) scale(0.45);
+        /* Way smaller island */
+        opacity: 0.6;
+        /* Dim the island not to interfere */
+    }
+
+    body {
+        padding: 15px 0;
+    }
+
+    .login-card {
+        padding: 30px 20px 20px 20px;
+        border-radius: 28px;
+    }
+
+    .up-logo-img {
+        height: 90px;
+        margin-bottom: 15px;
+    }
+
+    .brand-title {
+        font-size: 22px;
+    }
+
+    .brand-subtitle {
+        font-size: 13px;
+    }
+
+    .form-wrapper {
+        padding: 20px 15px;
+        border-radius: 16px;
+        margin-bottom: 25px;
+    }
+
+    .input-box {
+        height: 44px;
+    }
+
+    .btn-submit {
+        width: 100%;
+        /* Full width button on very small screens feels better */
+        padding: 14px;
+        font-size: 16px;
+    }
+}
+
+/* ─── ULTRA-WIDE & HIGH-RES DISPLAYS (1960px+) ─── */
+@media (min-width: 1960px) {
+    .island-wrapper {
+        width: 92vh;
+        height: 69vh;
+    }
+
+    .css-island {
+        width: 65vh;
+        height: 46vh;
+        border-radius: 7.4vh 3.7vh 9.2vh 2.7vh;
+        box-shadow:
+            -0.1vh 0.1vh 0 #5E3E26, -0.2vh 0.2vh 0 #55351D, -0.3vh 0.3vh 0 #4C2B14,
+            -0.4vh 0.4vh 0 #4A2812, -0.5vh 0.5vh 0 #48240D, -0.6vh 0.6vh 0 #3C1E0A,
+            -0.7vh 0.7vh 0 #331807, -0.8vh 0.8vh 0 #2A1304, -0.9vh 0.9vh 0 #210D02,
+            -1vh 1vh 0 #180800,
+            -1.8vh 1.8vh 3.7vh rgba(0, 0, 0, 0.25);
+    }
+
+    .css-road {
+        border-width: 0.9vh;
+        width: 27vh;
+        height: 18vh;
+    }
+
+    .login-card {
+        max-width: 46vh;
+        border-radius: 3.3vh;
+        padding: 5vh 4.1vh 4.1vh 4.1vh;
+        box-shadow: 0 2.3vh 4.6vh rgba(0, 0, 0, 0.08), 0 0.9vh 1.4vh rgba(0, 0, 0, 0.03);
+    }
+
+    .up-logo-img {
+        height: 12.5vh;
+        margin-bottom: 1.8vh;
+    }
+
+    .brand-title {
+        font-size: 3vh;
+        gap: 0.7vh;
+        margin-bottom: 0.6vh;
+    }
+
+    .brand-subtitle {
+        font-size: 1.5vh;
+    }
+
+    .form-wrapper {
+        border-radius: 1.8vh;
+        padding: 3.2vh 3.7vh;
+        margin-bottom: 3.2vh;
+    }
+
+    .form-title {
+        font-size: 1.3vh;
+        margin-bottom: 2.3vh;
+    }
+
+    .form-group {
+        margin-bottom: 1.6vh;
+    }
+
+    .form-group label {
+        font-size: 1vh;
+        margin-bottom: 0.5vh;
+        padding-left: 0.4vh;
+    }
+
+    .input-box {
+        height: 4.6vh;
+        border-radius: 1.1vh;
+        padding: 0 1.6vh;
+    }
+
+    .icon-svg {
+        width: 1.8vh;
+        height: 1.8vh;
+        margin-right: 1.1vh;
+    }
+
+    .input-box input {
+        font-size: 1.5vh;
+    }
+
+    .remember-row {
+        margin-top: 1.4vh;
+        gap: 0.7vh;
+    }
+
+    .remember-row label {
+        font-size: 1.1vh;
+    }
+
+    .custom-checkbox {
+        width: 1.3vh;
+        height: 1.3vh;
+        border-radius: 0.4vh;
+    }
+
+    .btn-submit {
+        border-radius: 2.8vh;
+        padding: 1.4vh 4.6vh;
+        font-size: 1.7vh;
+    }
+}

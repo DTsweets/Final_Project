@@ -1,0 +1,299 @@
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    /* Branding Colors */
+    --purple: #62368B;
+    --purple-light: rgba(98, 54, 139, 0.1);
+    --purple-hover: #502A75;
+
+    --gold: #F1A12A;
+    --gold-hover: #D98C1F;
+
+    --bg-page: #FDFCF8;
+    /* Very light beige/white tint */
+    --bg-surface: #FFFFFF;
+
+    --border-color: #E8DDCE;
+
+    --text-main: #333333;
+    --text-muted: #888888;
+
+    --sidebar-w: 260px;
+    --header-h: 70px;
+
+    /* Theme consistency */
+    --clr-primary: #62368B;
+    --border: #E8DDCE;
+    --text-primary: #333333;
+    --text-secondary: #6B7280;
+}
+
+/* ── Premium Tab Navigation ──────────────────────── */
+.tab-nav {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 2rem;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.tab-nav::-webkit-scrollbar { display: none; }
+
+.tab-item {
+    padding: 10px 24px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    background: white;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+.tab-item:hover {
+    background: #F9FAFB;
+    border-color: var(--clr-primary);
+    color: var(--clr-primary);
+    transform: translateY(-2px);
+}
+
+.tab-item.active {
+    background: var(--clr-primary);
+    color: white;
+    border-color: var(--clr-primary);
+    box-shadow: 0 8px 20px rgba(98, 54, 139, 0.25);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body, input, button, select, textarea {
+    font-family: 'Kanit', sans-serif;
+}
+
+body.light-theme {
+    background:
+        linear-gradient(rgba(253, 252, 248, 0.92), rgba(253, 252, 248, 0.92)),
+        url('../images/island_bg_opt.webp') no-repeat center center fixed;
+    background-size: cover;
+    color: var(--text-main);
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ─── SIDEBAR & MAIN CONTENT ─── */
+/* (Styles moved to admin/includes/sidebar.php to prevent CSS overlapping) */
+
+/* ─── HEADER ─── */
+.top-header {
+    height: var(--header-h);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+}
+
+.breadcrumb {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+}
+
+.bc-divider {
+    margin: 0 10px;
+    color: #D1C5B4;
+}
+
+.bc-highlight {
+    color: var(--purple);
+    font-weight: 600;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-avatar-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--purple-light);
+    color: var(--purple);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-avatar-circle svg {
+    width: 20px;
+    height: 20px;
+}
+
+.user-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #FEE2E2;
+    color: #DC2626;
+    text-decoration: none;
+    transition: 0.2s;
+    margin-left: 10px;
+}
+
+.logout-btn:hover {
+    background: #DC2626;
+    color: white;
+}
+
+/* ─── PAGE CONTENT (CARDS) ─── */
+.page-content {
+    padding: 40px;
+}
+
+.year-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+}
+
+.year-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.year-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(98, 54, 139, 0.08);
+    border-color: rgba(98, 54, 139, 0.2);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.icon-circle {
+    width: 48px;
+    height: 48px;
+    background: var(--purple);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    box-shadow: 0 4px 12px rgba(98, 54, 139, 0.3);
+}
+
+.icon-circle .chart-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.card-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.card-body {
+    flex: 1;
+    margin-bottom: 30px;
+}
+
+.emission-value {
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--purple);
+    line-height: 1;
+}
+
+.emission-value .unit {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: 5px;
+}
+
+.card-footer {
+    display: flex;
+}
+
+.btn-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gold);
+    color: #FFFFFF;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 12px 0;
+    border-radius: 12px;
+    width: 100%;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(241, 161, 42, 0.3);
+}
+
+.btn-edit:hover {
+    background: var(--gold-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(241, 161, 42, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    .top-header {
+        padding: 0 20px;
+    }
+
+    .page-content {
+        padding: 20px;
+    }
+}
