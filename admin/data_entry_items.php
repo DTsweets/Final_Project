@@ -48,7 +48,7 @@ if (!empty($scope_groups_ids)) {
     $stmt = $pdo->prepare("SELECT ai.*, ag.id as group_id 
                            FROM admin_item ai 
                            JOIN admin_g ag ON ag.id = ai.scope
-                           WHERE ai.year_id = ? AND ai.scope IN ($in) 
+                           WHERE ai.year_id = ? AND ai.scope IN ($in) AND ai.data_source = 'officer' 
                            ORDER BY ai.id ASC");
     $stmt->execute(array_merge([$selected_year], $scope_groups_ids));
     $all_items = $stmt->fetchAll();
@@ -168,8 +168,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css?v=3">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <style>
         :root {
             --bg-page: #F8FAFC;
@@ -646,7 +646,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <!-- Modal: เลือกกิจกรรมขอบเขตใหม่ -->
     <div class="modal-overlay" id="modal-add-new-scope">
         <div class="modal-box" style="max-width: 1200px; padding: 2rem; border-radius: 20px;">
-            <button type="button" onclick="closeModal('modal-add-new-scope')"
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-add-new-scope')"
                 style="position: absolute; top: 10px; right: 10px; background: #FF4747; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -735,7 +735,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <!-- Modal: แก้ไขกิจกรรม (Edit Item) -->
     <div class="modal-overlay" id="modal-edit-item">
         <div class="modal-box" style="max-width: 500px; padding: 2.5rem; border-radius: 20px;">
-            <button type="button" onclick="closeModal('modal-edit-item')"
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-edit-item')"
                 style="position: absolute; top: 10px; right: 10px; background: #FF4747; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -750,13 +750,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <input type="hidden" name="item_id" id="edit_item_id">
                 <div class="form-group-dark" style="margin-bottom: 1.5rem;">
                     <label class="form-label-dark">ขอบเขต :</label>
-                    <select name="scope_id" id="edit_scope_id" class="form-control-dark" required>
-                        <?php foreach ($groups as $g): ?>
-                            <option value="<?= $g['id'] ?>">ขอบเขตที่ <?= $g['scope'] ?>
-                                <?= htmlspecialchars($g['name_tiem']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php
+                    // ใช้ component dropdown กลาง (components/dropdown.php) แทน <select> เดิม
+                    $dd_id          = 'editScopeDropdown';
+                    $dd_name        = 'scope_id';
+                    $dd_options     = array_map(fn($g) => ['value' => $g['id'], 'label' => 'ขอบเขตที่ ' . $g['scope'] . ' ' . $g['name_tiem']], $groups);
+                    $dd_selected    = '';
+                    $dd_placeholder = 'เลือกขอบเขต';
+                    $dd_required    = true;
+                    $dd_class       = 'dd-field';
+                    include __DIR__ . '/../components/dropdown.php';
+                    ?>
                 </div>
                 <div class="form-group-dark" style="margin-bottom: 1.5rem;">
                     <label class="form-label-dark">รายการ :</label>
@@ -780,7 +784,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     </div>
     <div class="modal-overlay" id="modal-custom-item">
         <div class="modal-box" style="max-width: 500px; padding: 2.5rem; border-radius: 20px;">
-            <button type="button" onclick="closeModal('modal-custom-item')"
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-custom-item')"
                 style="position: absolute; top: 10px; right: 10px; background: #FF4747; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -794,14 +798,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <input type="hidden" name="action" value="add_custom_item">
                 <div class="form-group-dark" style="margin-bottom: 1.5rem;">
                     <label class="form-label-dark">ขอบเขต :</label>
-                    <select name="scope_id" class="form-control-dark" required>
-                        <option value="" disabled selected>เลือกขอบเขต</option>
-                        <?php foreach ($groups as $g): ?>
-                            <option value="<?= $g['id'] ?>">ขอบเขตที่ <?= $g['scope'] ?>
-                                <?= htmlspecialchars($g['name_tiem']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php
+                    // ใช้ component dropdown กลาง (components/dropdown.php) แทน <select> เดิม
+                    $dd_id          = 'customScopeDropdown';
+                    $dd_name        = 'scope_id';
+                    $dd_options     = array_map(fn($g) => ['value' => $g['id'], 'label' => 'ขอบเขตที่ ' . $g['scope'] . ' ' . $g['name_tiem']], $groups);
+                    $dd_selected    = '';
+                    $dd_placeholder = 'เลือกขอบเขต';
+                    $dd_required    = true;
+                    $dd_class       = 'dd-field';
+                    include __DIR__ . '/../components/dropdown.php';
+                    ?>
                 </div>
                 <div class="form-group-dark" style="margin-bottom: 1.5rem;">
                     <label class="form-label-dark">รายการ :</label>
@@ -846,7 +853,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         function openEditModal(id, scopeId, name, unit, ad) {
             document.getElementById('edit_item_id').value = id;
-            document.getElementById('edit_scope_id').value = scopeId;
+            // ตั้งค่า component dropdown (หา label จาก option ตาม value)
+            const scopeLabel = document.querySelector('#editScopeDropdown_menu .dd-option[data-value="' + scopeId + '"]')?.textContent.trim() || '';
+            ddSetValue('editScopeDropdown', scopeId, scopeLabel);
             document.getElementById('edit_name_tiem').value = name;
             document.getElementById('edit_unit').value = unit;
             document.getElementById('edit_AD').value = ad;

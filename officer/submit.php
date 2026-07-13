@@ -2,7 +2,7 @@
 /**
  * USER — Submit / Edit Data (submit.php)
  * ----------------------------------------
- * สิทธิ์: user เท่านั้น (user_n ดูได้อย่างเดียว)
+ * สิทธิ์: user เท่านั้น (dean ดูได้อย่างเดียว)
  * กรอกและอัพเดทข้อมูล Vol ใน user_item
  * แต่ละรายการ = admin_item ที่ admin กำหนดไว้ต่อปี
  */
@@ -10,7 +10,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 
-require_role(['user']); // user_n ไม่มีสิทธิ์กรอกข้อมูล
+require_role(['officer']); // dean ไม่มีสิทธิ์กรอกข้อมูล
 
 $pdo      = getDB();
 $root     = '../';
@@ -83,7 +83,7 @@ $items_sql = '
         ON ui.admin_item_id = ai.id
         AND ui.affiliation_id = :affil
         AND ui.year_id = :year
-    WHERE ai.year_id = :year2
+    WHERE ai.year_id = :year2 AND ai.data_source = \x27officer\x27
     ORDER BY ag.scope, ai.id
 ';
 $stmt = $pdo->prepare($items_sql);
@@ -114,8 +114,8 @@ foreach ($years as $y) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/user-new.css">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/user-new.css<?= asset_v('assets/css/user-new.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <style>
         /* Specific Styles for Form matching Figma Light Theme */
         .form-section {

@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/ghg_report.php';
-require_role(['admin', 'user_n']);
+require_role(['admin', 'dean']);
 
 $pdo  = getDB();
 $root = '../';
@@ -47,16 +47,16 @@ $dl = 'view=' . $view . '&year=' . $selected_year;
     <title>รายงาน GHG (คณบดี) — UP Net Zero</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css?v=1">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
 </head>
 <body class="light-theme">
 
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
-        <?php include __DIR__ . '/../user/includes/header.php'; ?>
+        <?php include __DIR__ . '/../officer/includes/header.php'; ?>
 
         <div class="page-content">
             <div class="db-topbar">
@@ -152,7 +152,7 @@ $dl = 'view=' . $view . '&year=' . $selected_year;
             </div>
         </div>
 
-        <script src="<?= $root ?>assets/js/ghg-charts.js"></script>
+        <script src="<?= $root ?>assets/js/ghg-charts.js<?= asset_v('assets/js/ghg-charts.js') ?>"></script>
         <script>
             window.__SCOPE = <?= json_encode([$scope[1], $scope[2], $scope[3]]) ?>;
             window.__SERIES = <?= json_encode($series, JSON_UNESCAPED_UNICODE) ?>;

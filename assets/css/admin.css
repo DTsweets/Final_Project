@@ -371,6 +371,18 @@ body {
     transition: all 0.3s;
 }
 
+/* ── Unified modal close (X) button effect — เหมือนหน้า admin dashboard ──
+   ใส่ class="modal-close-btn" ที่ปุ่มปิด modal ทุกหน้าเพื่อให้ได้ hover เหมือนกัน
+   (scale ขึ้น + สว่างขึ้นเล็กน้อย) โดยไม่กระทบ base style ที่ปุ่มกำหนดไว้เอง */
+.modal-close-btn {
+    transition: all 0.3s ease;
+}
+
+.modal-close-btn:hover {
+    transform: scale(1.2);
+    filter: brightness(1.1);
+}
+
 .btn-primary {
     background: var(--clr-primary);
     color: white;

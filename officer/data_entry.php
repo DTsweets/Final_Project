@@ -8,7 +8,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 
-require_role(['user']);
+require_role(['officer']);
 
 $pdo = getDB();
 $root = '../';
@@ -42,8 +42,8 @@ $page_title3 = "เลือกขอบเขตกิจกรรม $year_nam
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css?v=3">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
 </head>
 
 <body>
@@ -234,6 +234,17 @@ $page_title3 = "เลือกขอบเขตกิจกรรม $year_nam
         <?php include_once __DIR__ . '/includes/header.php'; ?>
 
         <div class="data-entry-container">
+            <a href="items.php"
+                style="display: inline-flex; align-items: center; gap: 8px; color: #6B7280; text-decoration: none; font-weight: 600; margin-bottom: 1.5rem; transition: all 0.2s; font-size: 0.95rem;"
+                onmouseover="this.style.color='var(--clr-primary)'; this.style.transform='translateX(-4px)';"
+                onmouseout="this.style.color='#6B7280'; this.style.transform='none'">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                ย้อนกลับไปหน้าเลือกปีงบประมาณ
+            </a>
             <h1 class="main-heading">เลือกขอบเขตกิจกรรม</h1>
 
             <div class="entry-card">

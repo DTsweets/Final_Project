@@ -1,11 +1,11 @@
 <?php
 /**
  * USER DASHBOARD — index.php (view-only)
- * สิทธิ์: admin_c, user, user_n — แสดงข้อมูลเฉพาะคณะของตนเอง
+ * สิทธิ์: user — แสดงข้อมูลเฉพาะคณะของตนเอง (dean ดูผ่านโซน /dean/)
  */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
-require_role(['user']);
+require_role(['officer']);
 
 $pdo  = getDB();
 $root = '../';
@@ -16,7 +16,7 @@ $page_title = "Dashboard";
 // ปีที่มีข้อมูลของคณะนี้ (สำหรับ dropdown เลือกปี)
 $stmt_years = $pdo->prepare("
     SELECT y.id AS year_id, y.year,
-           COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+           COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM admin_year y
     INNER JOIN user_item ui ON ui.year_id = y.id
     INNER JOIN admin_item ai ON ai.id = ui.admin_item_id
@@ -37,7 +37,7 @@ foreach ($year_data as $y) {
 $stmt_detail = $pdo->prepare("
     SELECT ag.scope AS scope_no, ai.name_tiem, ai.unit,
            COALESCE(ui.Vol, 0) AS vol,
-           COALESCE(ui.Vol, 0) * ai.AD AS emission
+           (COALESCE(ui.Vol, 0) * ai.AD)/1000 AS emission
     FROM admin_item ai
     JOIN admin_g ag ON ai.scope = ag.id
     LEFT JOIN user_item ui
@@ -74,9 +74,9 @@ $total_emission = $scope1 + $scope2 + $scope3;
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css?v=1">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <link rel="preload" href="<?= $root ?>assets/images/island_bg_opt.webp" as="image">
     <link rel="preload" href="<?= $root ?>assets/images/logol.webp" as="image">
 </head>
@@ -101,17 +101,16 @@ $total_emission = $scope1 + $scope2 + $scope3;
                 <h2 class="db-title">ภาพรวมการปล่อยก๊าซเรือนกระจก (<?= htmlspecialchars($affil_name) ?>)</h2>
                 <div class="db-year-select-wrap">
                     <span class="db-year-label">ผลรวมของปี</span>
-                    <div class="db-year-dropdown" id="yearDropdownWrap">
-                        <button class="db-year-btn" onclick="toggleYearDrop(event)">
-                            <?= htmlspecialchars($year_label) ?>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-                        </button>
-                        <div class="db-year-menu" id="yearMenu">
-                            <?php foreach ($year_data as $yd): ?>
-                                <a href="?year=<?= $yd['year_id'] ?>" class="db-year-option <?= $yd['year_id'] == $selected_year ? 'active' : '' ?>"><?= htmlspecialchars($yd['year']) ?></a>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
+                    <?php
+                        // ใช้ component dropdown กลาง (components/dropdown.php) แทน dropdown เฉพาะกิจ
+                        $dd_id       = 'yearSelect';
+                        $dd_name     = 'year';
+                        $dd_options  = array_map(fn($yd) => ['value' => $yd['year_id'], 'label' => $yd['year']], $year_data);
+                        $dd_selected = $selected_year;
+                        $dd_required = false;
+                        $dd_class    = 'dd-pill';
+                        include __DIR__ . '/../components/dropdown.php';
+                    ?>
                 </div>
             </div>
 
@@ -212,7 +211,7 @@ $total_emission = $scope1 + $scope2 + $scope3;
             <div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeDetailModal()">
                 <div class="modal-box" style="max-width:780px; padding:0; overflow:hidden;">
                     <div id="detailModalHeader" style="padding:2rem 2.5rem; color:#fff;">
-                        <button onclick="closeDetailModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
+                        <button class="modal-close-btn" onclick="closeDetailModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
                         <div style="font-size:.8rem; opacity:.8; text-transform:uppercase; letter-spacing:.05em;">รายละเอียดการปล่อยก๊าซเรือนกระจก</div>
                         <h3 id="detailModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">—</h3>
                     </div>
@@ -238,11 +237,10 @@ $total_emission = $scope1 + $scope2 + $scope3;
                     3: 'linear-gradient(135deg, #3B82F6, #1D4ED8)'
                 };
 
-                window.toggleYearDrop = function (e) {
-                    e.stopPropagation();
-                    document.getElementById('yearMenu').classList.toggle('open');
-                    document.getElementById('yearDropdownWrap').classList.toggle('open');
-                };
+                // component dropdown ยิง event 'dd:change' เมื่อเลือกปี → โหลดหน้าใหม่ตาม ?year=
+                document.getElementById('yearSelect')?.addEventListener('dd:change', function (e) {
+                    window.location = '?year=' + e.detail.value;
+                });
 
                 window.openDetailModal = function (scope) {
                     const title = scope === 0 ? 'การปล่อยก๊าซเรือนกระจกทั้งหมด' : ('Scope ' + scope);
@@ -273,10 +271,6 @@ $total_emission = $scope1 + $scope2 + $scope3;
                 // ผูก listener ระดับ document ครั้งเดียว (กันซ้อนตอน SPA สลับหน้า)
                 if (!window.__userDashBound) {
                     window.__userDashBound = true;
-                    document.addEventListener('click', () => {
-                        document.getElementById('yearMenu')?.classList.remove('open');
-                        document.getElementById('yearDropdownWrap')?.classList.remove('open');
-                    });
                     document.addEventListener('keydown', e => { if (e.key === 'Escape') window.closeDetailModal(); });
                 }
             </script>

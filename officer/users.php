@@ -9,7 +9,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 
-require_role(['user']);
+require_role(['officer']);
 
 $pdo  = getDB();
 $root = '../';
@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $position  = trim($_POST['position'] ?? '');
         $affil     = (int)($_POST['affiliation'] ?? 0);
         $email     = trim($_POST['email'] ?? '');
-        $role_new  = 'user'; // Default role, or can be added to form later if needed
+        $role_new  = 'officer'; // ค่าเริ่มต้น (ไม่มี role นักศึกษาแล้ว)
 
         try {
             $stmt = $pdo->prepare(
@@ -113,7 +113,7 @@ $page_title = "ข้อมูลผู้ใช้งาน";
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <style>
         :root {
             --bg-body: #F3F6F9;

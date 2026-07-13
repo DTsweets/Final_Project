@@ -37,7 +37,7 @@ $total_entries = (int) $pdo->query('
 
 // ── total emission ของปีที่เลือก ─────────────────────────────────────────
 $summary = $pdo->prepare('
-    SELECT COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+    SELECT COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM user_item ui
     JOIN admin_item ai ON ai.id = ui.admin_item_id
     WHERE ui.year_id = :y
@@ -47,7 +47,7 @@ $sum = $summary->fetch();
 
 // ── total emission สะสมทุกปี ──────────────────────────────────────────────
 $cumulative_emission = (float) $pdo->query('
-    SELECT COALESCE(SUM(ui.Vol * ai.AD), 0)
+    SELECT COALESCE(SUM(ui.Vol * ai.AD)/1000, 0)
     FROM user_item ui
     JOIN admin_item ai ON ai.id = ui.admin_item_id
 ')->fetchColumn();
@@ -57,7 +57,7 @@ $sum['total_entries'] = $total_entries;
 $cumul_affil_rows = $pdo->query('
     SELECT a.id AS affil_id,
            a.affiliation_item,
-           COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+           COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM affiliation_id a
     LEFT JOIN user_item ui  ON ui.affiliation_id  = a.id
     LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
@@ -68,7 +68,7 @@ $cumul_affil_rows = $pdo->query('
 // ── Scope 1, 2, 3 ────────────────────────────────────
 $scope_sql = '
     SELECT ag.scope,
-           COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+           COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM admin_g ag
     LEFT JOIN admin_item ai ON ai.scope = ag.id AND ai.year_id = :y1
     LEFT JOIN user_item ui ON ui.admin_item_id = ai.id AND ui.year_id = :y2
@@ -88,7 +88,7 @@ $scope_affil_sql = '
     SELECT ag.scope,
            a.id          AS affil_id,
            a.affiliation_item,
-           COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+           COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM   affiliation_id a
     CROSS  JOIN admin_g ag
     LEFT   JOIN admin_item  ai ON ai.scope = ag.id AND ai.year_id = :y1
@@ -115,7 +115,7 @@ foreach ($scope_affil_rows as $r) {
 $affil_sql = '
     SELECT a.id AS affil_id,
            a.affiliation_item,
-           COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission,
+           COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission,
            COUNT(DISTINCT ui.id)             AS entry_count
     FROM affiliation_id a
     LEFT JOIN user_item ui  ON ui.affiliation_id  = a.id AND ui.year_id = :y
@@ -138,18 +138,18 @@ $affil_rows = $stmt_affil->fetchAll();
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <link rel="preload" href="<?= $root ?>assets/css/admin.css" as="style">
-    <link rel="preload" href="<?= $root ?>assets/css/sidebar.css" as="style">
-    <link rel="preload" href="<?= $root ?>assets/css/dashboard.css" as="style">
+    <link rel="preload" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>" as="style">
+    <link rel="preload" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>" as="style">
+    <link rel="preload" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>" as="style">
     <link rel="preload" href="<?= $root ?>assets/images/island_bg_opt.webp" as="image">
     <link rel="preload" href="<?= $root ?>assets/images/logol.webp" as="image">
     <?php if(!empty($_SESSION['profile_image'])): ?>
     <link rel="preload" href="<?= $root ?>assets/images/profiles/<?= htmlspecialchars(pathinfo($_SESSION['profile_image'], PATHINFO_FILENAME) . '.webp') ?>" as="image">
     <?php endif; ?>
 
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>">
 </head>
 
 <body class="light-theme">

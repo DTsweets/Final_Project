@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $firstname = trim($_POST['firstname'] ?? '');
         $lastname = trim($_POST['lastname'] ?? '');
         $email = trim($_POST['email'] ?? '');
-        $role = $_POST['role'] ?? 'user';
+        $role = $_POST['role'] ?? 'officer';
         $affiliation = !empty($_POST['affiliation']) ? (int) $_POST['affiliation'] : null;
 
         try {
@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $firstname = trim($_POST['firstname'] ?? '');
         $lastname = trim($_POST['lastname'] ?? '');
         $email = trim($_POST['email'] ?? '');
-        $role = $_POST['role'] ?? 'user';
+        $role = $_POST['role'] ?? 'officer';
         $affiliation = !empty($_POST['affiliation']) ? (int) $_POST['affiliation'] : null;
 
         // Retrieve current profile_image in order to fallback
@@ -201,9 +201,9 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap"
         rel="stylesheet">
     <!-- Use the premium admin CSS -->
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css?v=4">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/settings.css?v=1">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/settings.css<?= asset_v('assets/css/settings.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
 </head>
 
 <body style="background-color: var(--bg-base);">
@@ -606,8 +606,8 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                                     <div class="form-group-light">
                                         <label class="form-label-light">สิทธิ์การใช้งาน *</label>
                                         <select name="role" class="form-control-light" required>
-                                            <option value="user">เจ้าหน้าที่บันทึกข้อมูล</option>
-                                            <option value="user_n">บุคลากร/คณบดี</option>
+                                            <option value="officer">เจ้าหน้าที่บันทึกข้อมูล</option>
+                                            <option value="dean">บุคลากร/คณบดี</option>
                                             <option value="admin">ผู้ดูแลระบบ</option>
                                         </select>
                                     </div>
@@ -1490,8 +1490,8 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                             <div class="form-group-light">
                                 <label class="form-label-light">สิทธิ์การใช้งาน *</label>
                                 <select name="role" id="edit_role" class="form-control-light" required>
-                                    <option value="user">เจ้าหน้าที่บันทึกข้อมูล</option>
-                                    <option value="user_n">บุคลากร/คณบดี</option>
+                                    <option value="officer">เจ้าหน้าที่บันทึกข้อมูล</option>
+                                    <option value="dean">บุคลากร/คณบดี</option>
                                     <option value="admin">ผู้ดูแลระบบ</option>
                                 </select>
                             </div>
@@ -1582,7 +1582,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                         document.getElementById('edit_username').value = btn.getAttribute('data-username') || '';
                         document.getElementById('edit_password').value = btn.getAttribute('data-password') || '';
                         document.getElementById('edit_email').value = btn.getAttribute('data-email') || '';
-                        document.getElementById('edit_role').value = btn.getAttribute('data-role') || 'user';
+                        document.getElementById('edit_role').value = btn.getAttribute('data-role') || 'officer';
                         document.getElementById('edit_affiliation').value = btn.getAttribute('data-affiliation') || '';
 
                         // Fire change events for custom selects

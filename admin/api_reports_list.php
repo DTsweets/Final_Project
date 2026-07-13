@@ -25,7 +25,7 @@ if ($mode === 'years') {
             ay.id   AS year_id,
             ay.year AS year_label,
             COUNT(DISTINCT ui.id) AS item_count,
-            COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+            COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
         FROM user_item ui
         JOIN admin_year ay ON ay.id  = ui.year_id
         JOIN admin_item ai ON ai.id  = ui.admin_item_id
@@ -46,7 +46,7 @@ $sql = '
         a.affiliation_item                                  AS affil_name,
         COUNT(DISTINCT ui.year_id)                          AS year_count,
         GROUP_CONCAT(DISTINCT ay.year ORDER BY ay.year DESC) AS years_list,
-        COALESCE(SUM(ui.Vol * ai.AD), 0)                    AS total_emission
+        COALESCE(SUM(ui.Vol * ai.AD)/1000, 0)                    AS total_emission
     FROM affiliation_id a
     LEFT JOIN user_item  ui ON ui.affiliation_id = a.id
     LEFT JOIN admin_year ay ON ay.id = ui.year_id

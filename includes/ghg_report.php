@@ -22,7 +22,7 @@ function ghg_scope_totals(PDO $pdo, int $year, ?int $affil = null): array
 {
     $affilCond = $affil !== null ? ' AND ui.affiliation_id = :aff' : '';
     $sql = "
-        SELECT ag.scope, COALESCE(SUM(ui.Vol * ai.AD), 0) AS e
+        SELECT ag.scope, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS e
         FROM admin_g ag
         LEFT JOIN admin_item ai ON ai.scope = ag.id AND ai.year_id = :y1
         LEFT JOIN user_item  ui ON ui.admin_item_id = ai.id AND ui.year_id = :y2 $affilCond
@@ -54,7 +54,7 @@ function ghg_by_affiliation(PDO $pdo, ?int $year = null): array
     if ($year === null) {
         $sql = '
             SELECT a.id AS affil_id, a.affiliation_item,
-                   COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+                   COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
             FROM affiliation_id a
             LEFT JOIN user_item  ui ON ui.affiliation_id = a.id
             LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
@@ -64,7 +64,7 @@ function ghg_by_affiliation(PDO $pdo, ?int $year = null): array
     }
     $stmt = $pdo->prepare('
         SELECT a.id AS affil_id, a.affiliation_item,
-               COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+               COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
         FROM affiliation_id a
         LEFT JOIN user_item  ui ON ui.affiliation_id = a.id AND ui.year_id = :y
         LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
@@ -82,7 +82,7 @@ function ghg_affil_detail(PDO $pdo, int $affil, int $year): array
     $stmt = $pdo->prepare('
         SELECT ag.name_tiem AS activity_type, ag.scope,
                ai.name_tiem, ai.unit,
-               ui.Vol AS vol, (ui.Vol * ai.AD) AS emission
+               ui.Vol AS vol, (ui.Vol * ai.AD)/1000 AS emission
         FROM user_item ui
         JOIN admin_item ai ON ai.id = ui.admin_item_id
         JOIN admin_g    ag ON ag.id = ai.scope
@@ -98,7 +98,7 @@ function ghg_affil_yearly(PDO $pdo, int $affil): array
     $stmt = $pdo->prepare('
         SELECT y.id AS year_id, y.year,
                COUNT(DISTINCT ui.id) AS entry_count,
-               COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+               COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
         FROM admin_year y
         LEFT JOIN user_item  ui ON ui.year_id = y.id AND ui.affiliation_id = :aff
         LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id

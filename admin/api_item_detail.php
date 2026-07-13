@@ -28,7 +28,7 @@ $sql = '
         ai.unit,
         ai.AD            AS emission_factor,
         ui.Vol,
-        (ui.Vol * ai.AD) AS emission,
+        (ui.Vol * ai.AD)/1000 AS emission,
         a.affiliation_item,
         ay.year          AS year_label
     FROM user_item ui

@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rel="stylesheet">
 
     <!-- External Stylesheet -->
-    <link rel="stylesheet" href="assets/css/login.css">
+    <link rel="stylesheet" href="assets/css/login.css<?= asset_v('assets/css/login.css') ?>">
     
     <!-- Preload Critical Assets (Point 6: Preload & Priority) -->
     <link rel="preload" as="image" href="assets/images/island_bg.webp">

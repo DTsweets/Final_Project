@@ -20,13 +20,13 @@ $msg_type = 'success';
 
 // ── Masters ───────────────────────────────────────
 $fetch_years_sql = '
-    SELECT y.id, y.year, COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+    SELECT y.id, y.year, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM admin_year y
     LEFT JOIN user_item ui ON ui.id = (SELECT id FROM user_item WHERE year_id = y.id AND affiliation_id = ui.affiliation_id LIMIT 1) -- Fixed JOIN to prevent duplication if multiple affiliations exist? Wait, no.
 ';
 // Actually, the user wants the GLOBAL total emission on the cards.
 $fetch_years_sql = '
-    SELECT y.id, y.year, COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+    SELECT y.id, y.year, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM admin_year y
     LEFT JOIN user_item ui ON ui.year_id = y.id
     LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role === 'admin') {
                     INSERT IGNORE INTO admin_item (year_id, scope, name_tiem, unit, AD)
                     SELECT :tgt_year, scope, name_tiem, unit, AD
                     FROM admin_item
-                    WHERE year_id = :src_year
+                    WHERE year_id = :src_year AND data_source = \x27officer\x27
                 ');
                 $copy_stmt->execute([':tgt_year' => $target_year_id, ':src_year' => $source_year_id]);
                 $copied = $copy_stmt->rowCount();
@@ -295,7 +295,7 @@ $items_sql = '
     SELECT ai.*, ag.scope AS scope_group, ag.name_tiem AS group_name
     FROM admin_item ai
     JOIN admin_g ag ON ag.id = ai.scope
-    WHERE ai.year_id = :year
+    WHERE ai.year_id = :year AND ai.data_source = \'officer\'
     ORDER BY ai.scope, ai.id
 ';
 $stmt = $pdo->prepare($items_sql);
@@ -321,8 +321,8 @@ $page_title2 = "UP Net Zero";
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css?v=2">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
 </head>
 
 <body>
@@ -1024,7 +1024,7 @@ $page_title2 = "UP Net Zero";
 
     </main>
 
-    <script src="<?= $root ?>assets/js/session-timer.js"></script>
+    <script src="<?= $root ?>assets/js/session-timer.js<?= asset_v('assets/js/session-timer.js') ?>"></script>
 </body>
 
 </html>

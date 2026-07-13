@@ -51,8 +51,8 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // ===== Column Definitions =====
 $roleLabel = [
     'admin'   => 'ผู้ดูแลระบบ',
-    'user'    => 'เจ้าหน้าที่บันทึกข้อมูล',
-    'user_n'  => 'บุคลากร/คณบดี',
+    'officer' => 'เจ้าหน้าที่บันทึกข้อมูล',
+    'dean'    => 'บุคลากร/คณบดี',
 ];
 $colDef = [
     'col_no'          => ['header' => '#',                  'width' => 40,  'key' => null,              'type' => 'Number', 'style' => 'sNum'],

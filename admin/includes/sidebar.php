@@ -84,7 +84,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
 
         <!-- Category: กรอกข้อมูล -->
         <div class="nav-category">กรอกข้อมูล</div>
-        <?php $is_data_entry_active = ($current_page == 'items.php' || $current_page == 'data_entry.php' || $current_page == 'data_entry_items.php' || $current_page == 'ghg.php' || $current_page == 'calculation.php'); ?>
+        <?php $is_data_entry_active = ($current_page == 'items.php' || $current_page == 'data_entry.php' || $current_page == 'data_entry_items.php' || $current_page == 'ghg.php' || $current_page == 'collect.php'); ?>
         <a href="<?= $root ?? '../' ?>admin/items.php" id="data-entry-toggle"
             class="nav-item <?= $is_data_entry_active ? 'active' : '' ?>">
             <div class="nav-icon-box">
@@ -100,7 +100,8 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
         </a>
 
         <!-- Sub menu items (Accordion Container) -->
-        <div class="sub-nav-wrapper <?= $is_data_entry_active ? 'expanded' : '' ?>" id="data-entry-submenu">
+        <div class="sub-nav-wrapper <?= $is_data_entry_active ? 'expanded' : '' ?>" id="data-entry-submenu"
+            style="<?= $is_data_entry_active ? 'display:block !important;max-height:1000px !important;opacity:1 !important;overflow:visible !important;' : '' ?>">
             <div class="sub-nav">
                 <!-- 1. UP Net Zero -->
                 <a href="<?= $root ?? '../' ?>admin/items.php"
@@ -116,7 +117,20 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                     </svg>
                     UP Net Zero
                 </a>
-                <!-- 2. GHG -->
+                <!-- 2. แบบสอบถาม & กิจกรรม (รวม 3 แท็บ) -->
+                <a href="<?= $root ?? '../' ?>admin/collect.php"
+                    class="sub-item <?= ($current_page == 'collect.php') ? 'active' : '' ?>">
+                    <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
+                        <path d="M12 2.5C17 4.5 20 9 20 14C20 18.5 16 21.5 12 22.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
+                        <path d="M12 2.5V22.5" stroke="#BC8E5C" stroke-width="1.8" />
+                        <path d="M12 7.5L17 6.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
+                        <path d="M12 12.5L18.5 10.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
+                        <path d="M12 17.5L16.5 15.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                    แบบสอบถาม &amp; กิจกรรม
+                </a>
+                <!-- 3. GHG -->
                 <a href="<?= $root ?? '../' ?>admin/ghg.php"
                     class="sub-item <?= ($current_page == 'ghg.php') ? 'active' : '' ?>">
                     <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -129,20 +143,6 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                         <path d="M12 17.5L16.5 15.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
                     </svg>
                     GHG Removal
-                </a>
-                <!-- 3. การคำนวณกิจกรรม -->
-                <a href="<?= $root ?? '../' ?>admin/calculation.php"
-                    class="sub-item <?= ($current_page == 'calculation.php') ? 'active' : '' ?>">
-                    <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
-                        <path d="M12 2.5C17 4.5 20 9 20 14C20 18.5 16 21.5 12 22.5" stroke="#BC8E5C" stroke-width="1.8"
-                            stroke-linecap="round" />
-                        <path d="M12 2.5V22.5" stroke="#BC8E5C" stroke-width="1.8" />
-                        <path d="M12 7.5L17 6.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
-                        <path d="M12 12.5L18.5 10.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
-                        <path d="M12 17.5L16.5 15.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
-                    </svg>
-                    การคำนวณกิจกรรม
                 </a>
             </div>
         </div>
@@ -229,15 +229,27 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                 const hasSubmenu = nextEl && nextEl.classList.contains('sub-nav-wrapper');
                 const isSubItem = this.classList.contains('sub-item');
 
+                // helper: กาง/พับ พร้อม inline style (กัน CSS ถูก cache/ไม่โหลด)
+                const ddExpand = (w) => {
+                    w.classList.add('expanded');
+                    w.style.setProperty('display', 'block', 'important');
+                    w.style.setProperty('max-height', '1000px', 'important');
+                    w.style.setProperty('opacity', '1', 'important');
+                    w.style.setProperty('overflow', 'visible', 'important');
+                };
+                const ddCollapseOthers = (keep) => document.querySelectorAll('.sub-nav-wrapper').forEach(w => {
+                    if (w !== keep) {
+                        w.classList.remove('expanded');
+                        ['display','max-height','opacity','overflow'].forEach(p => w.style.removeProperty(p));
+                    }
+                });
+
                 if (this.classList.contains('active')) {
+                    e.preventDefault();
                     if (hasSubmenu) {
-                        e.preventDefault();
-                        document.querySelectorAll('.sub-nav-wrapper').forEach(w => {
-                            if (w !== nextEl) w.classList.remove('expanded');
-                        });
-                        nextEl.classList.toggle('expanded');
-                    } else {
-                        e.preventDefault();
+                        // อยู่ในกลุ่มนี้อยู่แล้ว → คงเมนูย่อยให้ "กางไว้เสมอ" (ไม่ toggle พับปิด)
+                        ddCollapseOthers(nextEl);
+                        ddExpand(nextEl);
                     }
                     return;
                 }
@@ -249,12 +261,8 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                     const url = this.getAttribute('href');
                     if (!url || url === '#') return;
 
-                    if (hasSubmenu) nextEl.classList.add('expanded');
-                    if (!isSubItem) {
-                        document.querySelectorAll('.sub-nav-wrapper').forEach(w => {
-                            if (w !== nextEl) w.classList.remove('expanded');
-                        });
-                    }
+                    if (hasSubmenu) ddExpand(nextEl);
+                    if (!isSubItem) ddCollapseOthers(nextEl);
 
                     isNavigating = true;
                     overlay.style.display = 'block';

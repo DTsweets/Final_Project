@@ -26,6 +26,27 @@ if (file_exists($env_path)) {
 define('DB_CHARSET', 'utf8mb4');
 
 /**
+ * Cache-busting helper — คืน "?v=<filemtime>" ของไฟล์ asset โดยอัตโนมัติ
+ * ทำให้ browser cache ไฟล์ CSS/JS ได้ยาว (ลดจำนวน request) แต่พอแก้ไฟล์ mtime เปลี่ยน
+ * URL จะเปลี่ยนตาม → browser โหลดใหม่ให้เองโดยไม่ต้อง hard-refresh
+ *
+ * ใช้: <link href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
+ * @param string $rel path เทียบจาก project root เช่น 'assets/css/sidebar.css'
+ */
+if (!function_exists('asset_v')) {
+    function asset_v(string $rel): string
+    {
+        static $cache = [];
+        if (!array_key_exists($rel, $cache)) {
+            $abs = dirname(__DIR__) . '/' . ltrim($rel, '/'); // config/ -> project root
+            $m = @filemtime($abs);
+            $cache[$rel] = $m ? ('?v=' . $m) : '';
+        }
+        return $cache[$rel];
+    }
+}
+
+/**
  * สร้าง PDO connection (Singleton)
  */
 function getDB(): PDO

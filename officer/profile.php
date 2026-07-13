@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
-require_role(['user']);
+require_role(['officer']);
 
 $root = '../';
 $pdo = getDB();
@@ -129,8 +129,8 @@ $page_title = "แก้ไขโปรไฟล์ส่วนตัว";
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css?v=2">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
 </head>
 
 <body style="background-color: #F8F9FA;">
@@ -138,7 +138,7 @@ $page_title = "แก้ไขโปรไฟล์ส่วนตัว";
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
-        <link rel="stylesheet" href="<?= $root ?>assets/css/profile.css?v=2">
+        <link rel="stylesheet" href="<?= $root ?>assets/css/profile.css<?= asset_v('assets/css/profile.css') ?>">
         <?php include_once __DIR__ . '/includes/header.php'; ?>
 
         <div class="page-content" style="background-color: transparent;">

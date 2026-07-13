@@ -327,9 +327,9 @@ $affiliation_name = $_SESSION['affiliation_name'] ?? 'ADMIN(คณะ)';
 
     function initTheme() {
         const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        // ค่าเริ่มต้น = Light เสมอ; จะเป็น Dark เฉพาะเมื่อผู้ใช้เคยกดสลับเป็น dark เอง
+        if (savedTheme === 'dark') {
             document.documentElement.classList.add('dark-theme');
         } else {
             document.documentElement.classList.remove('dark-theme');

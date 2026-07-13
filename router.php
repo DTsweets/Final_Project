@@ -23,13 +23,13 @@ if ($role === 'admin') {
     // ผู้ดูแลระบบ: แดชบอร์ดส่วนกลาง
     header('Location: admin/');
     exit;
-} elseif ($role === 'user_n') {
+} elseif ($role === 'dean') {
     // บุคลากร/คณบดี: โซนดูอย่างเดียว + รายงาน
     header('Location: dean/');
     exit;
-} elseif ($role === 'user') {
+} elseif ($role === 'officer') {
     // เจ้าหน้าที่บันทึกข้อมูล: โซนกรอกข้อมูลของคณะ
-    header('Location: user/');
+    header('Location: officer/');
     exit;
 } else {
     // สิทธิ์ไม่ถูกต้อง ลบ session ทิ้งแล้วกลับไปหน้าล็อกอิน

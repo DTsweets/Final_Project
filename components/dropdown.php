@@ -37,6 +37,8 @@ $dd_placeholder = $dd_placeholder ?? '-- กรุณาเลือก --';
 $dd_required    = $dd_required ?? true;
 $dd_disabled    = $dd_disabled ?? false;
 $dd_style       = $dd_style ?? '';
+// class เสริม เช่น variant 'dd-field' (ฟอร์ม), 'dd-pill' (ปุ่มบน dashboard), 'dd-compact'
+$dd_class       = $dd_class ?? '';
 
 // แปลง options ให้เป็นรูปแบบเดียวกันเสมอ: [['value' => ..., 'label' => ...], ...]
 $dd_normalized = [];
@@ -69,7 +71,7 @@ if ($dd_selected !== '' && $dd_selected !== null) {
 $dd_has_options = count($dd_normalized) > 0;
 ?>
 
-<div class="dd-component" id="<?= htmlspecialchars($dd_id) ?>"
+<div class="dd-component <?= htmlspecialchars($dd_class) ?>" id="<?= htmlspecialchars($dd_id) ?>"
     data-empty-label="<?= htmlspecialchars($dd_placeholder) ?>"
     <?= $dd_style !== '' ? 'style="' . htmlspecialchars($dd_style) . '"' : '' ?>>
     <input type="hidden" name="<?= htmlspecialchars($dd_name) ?>" id="<?= htmlspecialchars($dd_id) ?>_input"
@@ -231,6 +233,55 @@ $dd_has_options = count($dd_normalized) > 0;
             padding: 6px 10px;
             font-size: 0.9rem;
         }
+
+        /* ── Variant: dd-field ── ใช้ใน form/modal: label ชิดซ้าย, chevron ชิดขวา
+           (ทรง/ขนาด base มาจาก .form-control-dark ของแต่ละหน้า) */
+        .dd-component.dd-field .dd-trigger {
+            justify-content: space-between;
+            text-align: left;
+        }
+
+        /* ── Variant: dd-pill ── ปุ่มเลือกปีบน dashboard (ทรงแคปซูล + glass) */
+        .dd-component.dd-pill {
+            width: auto;
+            display: inline-block;
+        }
+        .dd-component.dd-pill .dd-trigger {
+            box-sizing: border-box;
+            height: 45px;
+            border-radius: 14px;
+            padding: 0 18px;
+            min-width: 100px;
+            gap: 8px;
+            line-height: 1;
+            font-family: 'Kanit', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            background: var(--glass-bg);
+        }
+        .dd-component.dd-pill .dd-trigger:hover {
+            background: #fff;
+            border-color: var(--clr-primary);
+            box-shadow: 0 10px 20px rgba(98, 54, 139, 0.1);
+        }
+        .dd-component.dd-pill .dd-label { color: var(--text-primary) !important; }
+        .dd-component.dd-pill .dd-menu { min-width: 130px; border-radius: 14px; }
+        .dd-component.dd-pill .dd-option { font-weight: 600; }
+        .dd-component.dd-pill .dd-option.active { background: var(--clr-primary); color: #fff; }
+
+        /* ── Dark mode (built-in) ── ทุก dropdown รองรับอัตโนมัติเมื่อ html.dark-theme */
+        html.dark-theme .dd-component .dd-trigger,
+        html.dark-theme .dd-component .dd-menu {
+            background-color: #1F2937 !important;
+            border-color: #374151 !important;
+            color: #F9FAFB !important;
+        }
+        html.dark-theme .dd-component .dd-label { color: #F9FAFB !important; }
+        html.dark-theme .dd-component .dd-option { color: #F9FAFB !important; }
+        html.dark-theme .dd-component .dd-option:hover { background-color: #374151 !important; }
+        html.dark-theme .dd-component .dd-option.active { background: var(--clr-primary) !important; color: #fff !important; }
     </style>
 
     <script>

@@ -10,7 +10,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 
-require_role(['user']);
+require_role(['officer']);
 
 $pdo = getDB();
 $root = '../';
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     $year_to_create = (int) $_POST['year_id'];
 
     // Check if items exist in Admin settings for this year
-    $check_stmt = $pdo->prepare('SELECT COUNT(*) FROM admin_item WHERE year_id = ?');
+    $check_stmt = $pdo->prepare('SELECT COUNT(*) FROM admin_item WHERE year_id = ? AND data_source = \x27officer\x27');
     $check_stmt->execute([$year_to_create]);
     $item_count = (int) $check_stmt->fetchColumn();
 
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         INSERT IGNORE INTO user_item (admin_item_id, affiliation_id, year_id, Vol)
         SELECT id, :affil, :year_id1, 0 
         FROM admin_item 
-        WHERE year_id = :year_id2
+        WHERE year_id = :year_id2 AND data_source = \x27officer\x27
     ');
     $stmt->execute([':affil' => $affil_id, ':year_id1' => $year_to_create, ':year_id2' => $year_to_create]);
 
@@ -190,7 +190,7 @@ $available_years = $stmt_avail->fetchAll();
 // Only show years that have at least one record in user_item for this affiliation
 $fetch_years_sql = "
     SELECT y.id, y.year, 
-           (SELECT COALESCE(SUM(ui.Vol * ai.AD), 0) 
+           (SELECT COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) 
             FROM user_item ui 
             JOIN admin_item ai ON ai.id = ui.admin_item_id 
             WHERE ui.year_id = y.id AND ui.affiliation_id = :affil1) AS total_emission
@@ -225,8 +225,8 @@ $page_title2 = "UP Net Zero";
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css?v=2">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
 </head>
 
 <body>
@@ -269,7 +269,7 @@ $page_title2 = "UP Net Zero";
                     <?php foreach ($years as $y): ?>
                         <!-- Sub Card -->
                         <div
-                            style="border: 1px solid #E1CBAF; border-radius: 20px; padding: 24px; text-align: center; background: #FFFFFF; box-shadow: 0 4px 12px rgba(0,0,0,0.03); position: relative;">
+                            style="border: 1px solid #E1CBAF; border-radius: 20px; padding: 32px; text-align: center; background: #FFFFFF; box-shadow: 0 4px 12px rgba(0,0,0,0.03); position: relative;">
 
                             <!-- Action Buttons (Top Right) -->
                             <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 8px;">
@@ -336,16 +336,17 @@ $page_title2 = "UP Net Zero";
                     <input type="hidden" name="action" value="create_user_year">
                     <div class="form-group-dark" style="margin-bottom:1.5rem;">
                         <label class="form-label-dark">เลือกปีงบประมาณ (จากระบบ Admin) *</label>
-                        <select name="year_id" class="form-control-dark" required>
-                            <?php if (empty($available_years)): ?>
-                                <option value="" disabled>-- ไม่มีปีงบประมาณใหม่ให้เพิ่ม --</option>
-                            <?php else: ?>
-                                <option value="" disabled selected>-- เลือกปีงบประมาณ --</option>
-                                <?php foreach ($available_years as $ay): ?>
-                                    <option value="<?= $ay['id'] ?>"><?= $ay['year'] ?></option>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </select>
+                        <?php
+                        // ใช้ component dropdown กลาง (components/dropdown.php) แทน <select> เดิม
+                        $dd_id          = 'createYearSelect';
+                        $dd_name        = 'year_id';
+                        $dd_options     = array_map(fn($ay) => ['value' => $ay['id'], 'label' => $ay['year']], $available_years);
+                        $dd_selected    = '';
+                        $dd_placeholder = empty($available_years) ? '-- ไม่มีปีงบประมาณใหม่ให้เพิ่ม --' : '-- เลือกปีงบประมาณ --';
+                        $dd_required    = true;
+                        $dd_class       = 'dd-field';
+                        include __DIR__ . '/../components/dropdown.php';
+                        ?>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn-secondary"
@@ -402,16 +403,18 @@ $page_title2 = "UP Net Zero";
                     <div class="form-group-dark" style="margin-bottom:1.5rem;">
                         <label class="form-label-dark">ต้องการเปลี่ยนข้อมูลของปี (<span
                                 id="edit_target_year_label">-</span>) เป็นปี: *</label>
-                        <select name="new_year_id" id="edit_new_year_select" class="form-control-dark" required>
-                            <option value="" disabled selected>-- เลือกปีงบประมาณใหม่ --</option>
-                            <?php
-                            // Get all admin years for list
-                            $all_admin_years = $pdo->query('SELECT id, year FROM admin_year ORDER BY year DESC')->fetchAll();
-                            foreach ($all_admin_years as $ay):
-                                ?>
-                                <option value="<?= $ay['id'] ?>">ปีงบประมาณ <?= $ay['year'] ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                        <?php
+                        // ใช้ component dropdown กลาง (components/dropdown.php) แทน <select> เดิม
+                        $all_admin_years = $pdo->query('SELECT id, year FROM admin_year ORDER BY year DESC')->fetchAll();
+                        $dd_id          = 'editYearSelect';
+                        $dd_name        = 'new_year_id';
+                        $dd_options     = array_map(fn($ay) => ['value' => $ay['id'], 'label' => 'ปีงบประมาณ ' . $ay['year']], $all_admin_years);
+                        $dd_selected    = '';
+                        $dd_placeholder = '-- เลือกปีงบประมาณใหม่ --';
+                        $dd_required    = true;
+                        $dd_class       = 'dd-field';
+                        include __DIR__ . '/../components/dropdown.php';
+                        ?>
                     </div>
 
                     <p style="font-size: 0.85rem; color: #6B7280; margin-bottom: 1.5rem; line-height: 1.4;">
@@ -544,18 +547,21 @@ $page_title2 = "UP Net Zero";
                 document.getElementById('edit_target_year_id').value = id;
                 document.getElementById('edit_target_year_label').textContent = yearName;
 
-                // Hide the current year from the dropdown options
-                const select = document.getElementById('edit_new_year_select');
-                select.value = ""; // Reset selection
+                // รีเซ็ต component dropdown กลับเป็น placeholder
+                const wrap  = document.getElementById('editYearSelect');
+                const input = document.getElementById('editYearSelect_input');
+                const label = document.getElementById('editYearSelect_label');
+                if (input) input.value = '';
+                if (label) {
+                    label.textContent = wrap.dataset.emptyLabel || '-- เลือกปีงบประมาณใหม่ --';
+                    label.style.color = '#9CA3AF';
+                }
 
-                Array.from(select.options).forEach(opt => {
-                    if (opt.value == id) {
-                        opt.hidden = true;
-                        opt.disabled = true;
-                    } else {
-                        opt.hidden = false;
-                        opt.disabled = false;
-                    }
+                // ซ่อนตัวเลือก "ปีปัจจุบัน" ออกจากรายการ
+                wrap.querySelectorAll('.dd-option').forEach(opt => {
+                    const isCurrent = String(opt.dataset.value) === String(id);
+                    opt.style.display = isCurrent ? 'none' : '';
+                    opt.classList.remove('active');
                 });
 
                 openModal('modalEditYear');
@@ -602,7 +608,7 @@ $page_title2 = "UP Net Zero";
 
     </main>
 
-    <script src="<?= $root ?>assets/js/session-timer.js"></script>
+    <script src="<?= $root ?>assets/js/session-timer.js<?= asset_v('assets/js/session-timer.js') ?>"></script>
 </body>
 
 </html>

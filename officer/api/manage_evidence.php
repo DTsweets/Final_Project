@@ -5,7 +5,7 @@
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../config/db.php';
 
-require_role(['user']);
+require_role(['officer']);
 
 header('Content-Type: application/json');
 

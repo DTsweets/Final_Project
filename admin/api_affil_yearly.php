@@ -24,7 +24,7 @@ $sql = '
         y.id AS year_id,
         y.year,
         COUNT(DISTINCT ui.id) AS entry_count,
-        COALESCE(SUM(ui.Vol * ai.AD), 0) AS total_emission
+        COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM admin_year y
     LEFT JOIN user_item ui ON ui.year_id = y.id AND ui.affiliation_id = :affil_id
     LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id

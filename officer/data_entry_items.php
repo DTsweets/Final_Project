@@ -8,7 +8,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 
-require_role(['user']);
+require_role(['officer']);
 
 $pdo = getDB();
 $root = '../';
@@ -48,7 +48,7 @@ if (!empty($scope_groups_ids)) {
     $stmt = $pdo->prepare("SELECT ai.*, ag.id as group_id 
                            FROM admin_item ai 
                            JOIN admin_g ag ON ag.id = ai.scope
-                           WHERE ai.year_id = ? AND ai.scope IN ($in) 
+                           WHERE ai.year_id = ? AND ai.scope IN ($in) AND ai.data_source = 'officer' 
                            ORDER BY ai.id ASC");
     $stmt->execute(array_merge([$selected_year], $scope_groups_ids));
     $all_items = $stmt->fetchAll();
@@ -114,6 +114,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         header("Location: data_entry_items.php?year=$selected_year&" . http_build_query(['scope_groups' => $scope_groups_ids]) . "&msg=" . urlencode("เกิดข้อผิดพลาด: " . $e->getMessage()) . "&msg_type=danger");
         exit;
     }
+}
+
+// ── บล็อกการแก้ไข "ข้อมูลอ้างอิงกลาง" (admin_item) — เป็นสิทธิ์ของ admin เท่านั้น ──
+// role user มีสิทธิ์แค่กรอกปริมาณ (save) และแนบหลักฐาน; การเพิ่ม/แก้/ลบ Emission Factor
+// กระทบทุกคณะในปีนั้น จึงต้องทำผ่านหน้า admin เท่านั้น (กันการ POST ตรงเข้ามา bypass UI)
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && in_array($_POST['action'] ?? '', ['add_custom_item', 'edit_item', 'delete_item'], true)) {
+    http_response_code(403);
+    require __DIR__ . '/../includes/403.php';
+    exit;
 }
 
 // NEW: Handle adding custom item
@@ -184,8 +194,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css?v=3">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <style>
         :root {
             --bg-page: #F8FAFC;
@@ -343,7 +353,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
-            z-index: 1000;
             transition: all 0.2s;
         }
 
@@ -1050,6 +1059,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         <?php include_once __DIR__ . '/includes/header.php'; ?>
 
         <div class="data-entry-items-container">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem;">
+                <a href="items.php"
+                    style="display: inline-flex; align-items: center; gap: 8px; color: #6B7280; text-decoration: none; font-weight: 600; transition: all 0.2s; font-size: 0.95rem;"
+                    onmouseover="this.style.color='var(--clr-primary)'; this.style.transform='translateX(-4px)';"
+                    onmouseout="this.style.color='#6B7280'; this.style.transform='none'">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    กลับไปหน้าเลือกปี
+                </a>
+            </div>
             <?php if (isset($_GET['msg']) && !str_contains($_GET['msg'], 'สำเร็จ')): ?>
                 <div class="msg-box"
                     style="padding: 1rem; margin-bottom: 2rem; border-radius: 12px; font-weight: 600; background-color: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
@@ -1089,15 +1111,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         </svg>
                         บันทึกข้อมูล
                     </button>
-                    <button type="button" onclick="openModal('modal-custom-item')"
-                        class="btn-action btn-define-activity" style="background-color: #4B5563;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                        เพิ่มรายการกิจกรรม
-                    </button>
+                    <?php /* ปุ่ม "เพิ่มรายการกิจกรรม" ถูกนำออก:
+                             การเพิ่ม/แก้ไข Emission Factor (admin_item) เป็นสิทธิ์ของ admin เท่านั้น
+                             (ดูการบล็อก action add_custom_item/edit_item/delete_item ด้านบนของไฟล์) */ ?>
                 </div>
             </div>
 
@@ -1183,7 +1199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     <?php foreach ($items as $item): ?>
                                         <?php
                                         $vol = $existing_data[$item['id']] ?? 0;
-                                        $total = ($vol * $item['AD']);
+                                        $total = ($vol * $item['AD']) / 1000;
                                         ?>
                                         <tr class="item-row">
                                             <td>
@@ -1261,7 +1277,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <!-- Modal: เลือกกิจกรรมขอบเขตใหม่ -->
     <div class="modal-overlay" id="modal-add-new-scope">
         <div class="modal-box" style="max-width: 1200px; padding: 2rem; border-radius: 20px;">
-            <button type="button" onclick="closeModal('modal-add-new-scope')"
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-add-new-scope')"
                 style="position: absolute; top: 10px; right: 10px; background: #FF4747; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1350,7 +1366,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <!-- Modal: แก้ไขกิจกรรม (Edit Item) -->
     <div class="modal-overlay" id="modal-edit-item">
         <div class="modal-box" style="max-width: 500px; padding: 2.5rem; border-radius: 20px;">
-            <button type="button" onclick="closeModal('modal-edit-item')"
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-edit-item')"
                 style="position: absolute; top: 10px; right: 10px; background: #FF4747; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1395,7 +1411,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     </div>
     <div class="modal-overlay" id="modal-custom-item">
         <div class="modal-box" style="max-width: 500px; padding: 2.5rem; border-radius: 20px;">
-            <button type="button" onclick="closeModal('modal-custom-item')"
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-custom-item')"
                 style="position: absolute; top: 10px; right: 10px; background: #FF4747; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1409,14 +1425,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <input type="hidden" name="action" value="add_custom_item">
                 <div class="form-group-dark" style="margin-bottom: 1.5rem;">
                     <label class="form-label-dark">ขอบเขต :</label>
-                    <select name="scope_id" class="form-control-dark" required>
-                        <option value="" disabled selected>เลือกขอบเขต</option>
-                        <?php foreach ($groups as $g): ?>
-                            <option value="<?= $g['id'] ?>">ขอบเขตที่ <?= $g['scope'] ?>
-                                <?= htmlspecialchars($g['name_tiem']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php
+                    // ใช้ component dropdown กลาง (components/dropdown.php) แทน <select> เดิม
+                    $dd_id          = 'customScopeDropdown';
+                    $dd_name        = 'scope_id';
+                    $dd_options     = array_map(fn($g) => ['value' => $g['id'], 'label' => 'ขอบเขตที่ ' . $g['scope'] . ' ' . $g['name_tiem']], $groups);
+                    $dd_selected    = '';
+                    $dd_placeholder = 'เลือกขอบเขต';
+                    $dd_required    = true;
+                    $dd_class       = 'dd-field';
+                    include __DIR__ . '/../components/dropdown.php';
+                    ?>
                 </div>
                 <div class="form-group-dark" style="margin-bottom: 1.5rem;">
                     <label class="form-label-dark">รายการ :</label>
@@ -1453,7 +1472,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             const ef = parseFloat(ef_cell.dataset.ef) || 0;
             const vol = parseFloat(input.value) || 0;
             const totalPill = row.querySelector('.total-pill');
-            const total = (vol * ef);
+            const total = (vol * ef) / 1000;
             totalPill.textContent = total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 });
         }
 
@@ -2006,7 +2025,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <div class="modal-overlay" id="modal-manage-evidence">
         <div class="modal-box" style="max-width: 720px; padding: 2rem 2.5rem; border-radius: 24px; position: relative;">
             <!-- Close -->
-            <button type="button" onclick="closeModal('modal-manage-evidence')"
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-manage-evidence')"
                 style="position: absolute; top: 12px; right: 12px; background: #FF4747; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index:10;">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="18" y1="6" x2="6" y2="18" />

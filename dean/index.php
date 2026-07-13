@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/ghg_report.php';
-require_role(['admin', 'user_n']);
+require_role(['admin', 'dean']);
 
 $pdo  = getDB();
 $root = '../';
@@ -26,7 +26,7 @@ $scope1 = $scope2 = $scope3 = 0;
 if ($affil_id) {
     $stmt = $pdo->prepare("
         SELECT ag.scope AS scope_no, ai.name_tiem, ai.unit,
-               COALESCE(ui.Vol,0) AS vol, COALESCE(ui.Vol,0)*ai.AD AS emission
+               COALESCE(ui.Vol,0) AS vol, (COALESCE(ui.Vol,0)*ai.AD)/1000 AS emission
         FROM admin_item ai
         JOIN admin_g ag ON ai.scope = ag.id
         LEFT JOIN user_item ui ON ui.admin_item_id = ai.id AND ui.affiliation_id = :aff AND ui.year_id = :y
@@ -54,16 +54,16 @@ $sys_affil = ghg_by_affiliation($pdo, $selected_year);
     <title>Dashboard (คณบดี) — UP Net Zero</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css?v=1">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
 </head>
 <body class="light-theme">
 
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
-        <?php include __DIR__ . '/../user/includes/header.php'; ?>
+        <?php include __DIR__ . '/../officer/includes/header.php'; ?>
 
         <div class="page-content">
 
@@ -72,17 +72,16 @@ $sys_affil = ghg_by_affiliation($pdo, $selected_year);
                 <h2 class="db-title">ภาพรวมคณบดี — <?= htmlspecialchars($affil_name) ?></h2>
                 <div class="db-year-select-wrap">
                     <span class="db-year-label">ผลรวมของปี</span>
-                    <div class="db-year-dropdown" id="yearDropdownWrap">
-                        <button class="db-year-btn" onclick="toggleYearDrop(event)">
-                            <?= htmlspecialchars($year_label) ?>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-                        </button>
-                        <div class="db-year-menu" id="yearMenu">
-                            <?php foreach ($years as $yd): ?>
-                                <a href="?year=<?= $yd['year_id'] ?>" class="db-year-option <?= $yd['year_id'] == $selected_year ? 'active' : '' ?>"><?= htmlspecialchars($yd['year']) ?></a>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
+                    <?php
+                        // ใช้ component dropdown กลาง (components/dropdown.php) แทน dropdown เฉพาะกิจ
+                        $dd_id       = 'yearSelect';
+                        $dd_name     = 'year';
+                        $dd_options  = array_map(fn($yd) => ['value' => $yd['year_id'], 'label' => $yd['year']], $years);
+                        $dd_selected = $selected_year;
+                        $dd_required = false;
+                        $dd_class    = 'dd-pill';
+                        include __DIR__ . '/../components/dropdown.php';
+                    ?>
                 </div>
             </div>
 
@@ -183,7 +182,7 @@ $sys_affil = ghg_by_affiliation($pdo, $selected_year);
         <div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeDetailModal()">
             <div class="modal-box" style="max-width:780px; padding:0; overflow:hidden;">
                 <div id="detailModalHeader" style="padding:2rem 2.5rem; color:#fff;">
-                    <button onclick="closeDetailModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
+                    <button class="modal-close-btn" onclick="closeDetailModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
                     <div style="font-size:.8rem; opacity:.8; text-transform:uppercase; letter-spacing:.05em;">รายละเอียดการปล่อยก๊าซเรือนกระจก (คณะ)</div>
                     <h3 id="detailModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">—</h3>
                 </div>
@@ -196,13 +195,16 @@ $sys_affil = ghg_by_affiliation($pdo, $selected_year);
             </div>
         </div>
 
-        <script src="<?= $root ?>assets/js/ghg-charts.js"></script>
+        <script src="<?= $root ?>assets/js/ghg-charts.js<?= asset_v('assets/js/ghg-charts.js') ?>"></script>
         <script>
             window.DETAIL_ITEMS = <?= json_encode($items, JSON_UNESCAPED_UNICODE) ?>;
             window.SYS_SCOPE = <?= json_encode([$sys_scope[1], $sys_scope[2], $sys_scope[3]]) ?>;
             window.SCOPE_BG = {0:'linear-gradient(135deg, var(--clr-primary), #8B5CF6)',1:'linear-gradient(135deg, #F97316, #EA580C)',2:'linear-gradient(135deg, #EC4899, #BE185D)',3:'linear-gradient(135deg, #3B82F6, #1D4ED8)'};
 
-            window.toggleYearDrop = function (e) { e.stopPropagation(); document.getElementById('yearMenu').classList.toggle('open'); document.getElementById('yearDropdownWrap').classList.toggle('open'); };
+            // component dropdown ยิง event 'dd:change' เมื่อเลือกปี → โหลดหน้าใหม่ตาม ?year=
+            document.getElementById('yearSelect')?.addEventListener('dd:change', function (e) {
+                window.location = '?year=' + e.detail.value;
+            });
             window.openDetailModal = function (scope) {
                 const title = scope === 0 ? 'การปล่อยก๊าซเรือนกระจกทั้งหมด (คณะ)' : ('Scope ' + scope);
                 document.getElementById('detailModalTitle').textContent = title;
@@ -226,7 +228,6 @@ $sys_affil = ghg_by_affiliation($pdo, $selected_year);
 
             if (!window.__deanDashBound) {
                 window.__deanDashBound = true;
-                document.addEventListener('click', () => { document.getElementById('yearMenu')?.classList.remove('open'); document.getElementById('yearDropdownWrap')?.classList.remove('open'); });
                 document.addEventListener('keydown', e => { if (e.key === 'Escape') window.closeDetailModal(); });
             }
         </script>

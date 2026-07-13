@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $position  = trim($_POST['position'] ?? '');
         $affil     = (int)($_POST['affiliation'] ?? 0);
         $email     = trim($_POST['email'] ?? '');
-        $role_new  = 'user'; // Default role, or can be added to form later if needed
+        $role_new  = 'officer'; // Default role, or can be added to form later if needed
 
         try {
             $stmt = $pdo->prepare(
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $position  = trim($_POST['position'] ?? '');
         $affil     = (int)($_POST['affiliation'] ?? 0);
         $email     = trim($_POST['email'] ?? '');
-        $role_new  = $_POST['role'] ?? 'user';
+        $role_new  = $_POST['role'] ?? 'officer';
 
         try {
             $stmt = $pdo->prepare('UPDATE users SET username=:u, password=:p, firstname=:fn, lastname=:ln, role=:r, Affiliation=:a, email=:e, position=:pos WHERE id=:id');
@@ -146,7 +146,7 @@ $page_title = "ข้อมูลผู้ใช้งาน";
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <style>
         :root {
             --bg-body: #F3F6F9;
@@ -715,8 +715,8 @@ $page_title = "ข้อมูลผู้ใช้งาน";
                                     <svg class="custom-select-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                 </div>
                                 <div class="custom-options">
-                                    <div class="custom-option" onclick="selectOption('e-role-select', 'user', 'เจ้าหน้าที่บันทึกข้อมูล')">เจ้าหน้าที่บันทึกข้อมูล</div>
-                                    <div class="custom-option" onclick="selectOption('e-role-select', 'user_n', 'บุคลากร/คณบดี')">บุคลากร/คณบดี</div>
+                                    <div class="custom-option" onclick="selectOption('e-role-select', 'officer', 'เจ้าหน้าที่บันทึกข้อมูล')">เจ้าหน้าที่บันทึกข้อมูล</div>
+                                    <div class="custom-option" onclick="selectOption('e-role-select', 'dean', 'บุคลากร/คณบดี')">บุคลากร/คณบดี</div>
                                     <div class="custom-option" onclick="selectOption('e-role-select', 'admin', 'ผู้ดูแลระบบ')">ผู้ดูแลระบบ</div>
                                 </div>
                             </div>

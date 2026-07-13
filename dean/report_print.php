@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/ghg_report.php';
-require_role(['admin', 'user_n']);
+require_role(['admin', 'dean']);
 
 $pdo = getDB();
 $affil_id = (int)($_SESSION['affiliation_id'] ?? 0);

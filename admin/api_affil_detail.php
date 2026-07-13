@@ -30,7 +30,7 @@ $sql = '
         ag.scope,
         ai.unit,
         ui.Vol          AS vol,
-        (ui.Vol * ai.AD) AS emission
+        (ui.Vol * ai.AD)/1000 AS emission
     FROM user_item ui
     JOIN admin_item    ai ON ai.id  = ui.admin_item_id
     JOIN admin_g       ag ON ag.id  = ai.scope
