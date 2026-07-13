@@ -1,0 +1,32 @@
+# ===== Secrets / Config =====
+# ไฟล์ที่มีรหัสผ่าน DB และค่าลับ ไม่ควรอยู่ใน repo
+.env
+config/db.local.php
+
+# ===== User Uploads =====
+# รูปโปรไฟล์ที่ผู้ใช้อัปโหลด ไม่ควรเก็บใน git
+assets/images/profiles/
+
+# ===== Dependencies =====
+vendor/
+node_modules/
+
+# ===== Logs & Temp =====
+*.log
+*.tmp
+*.bak
+*.cache
+error_log
+
+# ===== Windows / OS =====
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ===== Editor / IDE =====
+.vscode/
+.idea/
+*.swp
+
+# ===== Claude local =====
+.claude/settings.local.json
