@@ -67,7 +67,7 @@ try {
                 break;
             }
 
-            $stmt = $pdo->prepare("SELECT id, file_path, file_type, created_at FROM user_item_evidence WHERE user_item_id = ? ORDER BY created_at DESC");
+            $stmt = $pdo->prepare("SELECT id, file_path, file_type, original_name, created_at FROM user_item_evidence WHERE user_item_id = ? ORDER BY created_at DESC");
             $stmt->execute([$user_item_l['id']]);
             echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
             break;
@@ -122,13 +122,27 @@ try {
 
                 if (in_array($ext, $image_exts)) {
                     // --- Image upload ---
-                    $new_filename = 'ev_' . $user_item_id . '_' . time() . '_' . $i . '.webp';
-                    $upload_path  = $img_dir . $new_filename;
+                    $gd_ok = function_exists('imagecreatetruecolor') && function_exists('imagewebp');
 
-                    if (move_uploaded_file($tmp_name, $upload_path)) {
-                        if (processEvidenceImage($upload_path, $upload_path, $ext)) {
-                            $stmt = $pdo->prepare("INSERT INTO user_item_evidence (user_item_id, file_path, file_type) VALUES (?, ?, ?)");
-                            $stmt->execute([$user_item_id, $new_filename, 'image/webp']);
+                    if ($gd_ok) {
+                        // มี GD → ย่อ + แปลงเป็น WebP
+                        $new_filename = 'ev_' . $user_item_id . '_' . time() . '_' . $i . '.webp';
+                        $upload_path  = $img_dir . $new_filename;
+                        if (move_uploaded_file($tmp_name, $upload_path)) {
+                            if (processEvidenceImage($upload_path, $upload_path, $ext)) {
+                                $stmt = $pdo->prepare("INSERT INTO user_item_evidence (user_item_id, file_path, file_type, original_name) VALUES (?, ?, ?, ?)");
+                                $stmt->execute([$user_item_id, $new_filename, 'image/webp', $name]);
+                                $uploaded[] = ['id' => $pdo->lastInsertId(), 'path' => $new_filename, 'type' => 'image'];
+                            }
+                        }
+                    } else {
+                        // ไม่มี GD → เก็บไฟล์ต้นฉบับ (ไม่ย่อ/ไม่แปลง) เพื่อให้อัปโหลดได้
+                        $new_filename = 'ev_' . $user_item_id . '_' . time() . '_' . $i . '.' . $ext;
+                        $upload_path  = $img_dir . $new_filename;
+                        if (move_uploaded_file($tmp_name, $upload_path)) {
+                            $img_mime = ($ext === 'jpg') ? 'image/jpeg' : 'image/' . $ext;
+                            $stmt = $pdo->prepare("INSERT INTO user_item_evidence (user_item_id, file_path, file_type, original_name) VALUES (?, ?, ?, ?)");
+                            $stmt->execute([$user_item_id, $new_filename, $img_mime, $name]);
                             $uploaded[] = ['id' => $pdo->lastInsertId(), 'path' => $new_filename, 'type' => 'image'];
                         }
                     }
@@ -141,8 +155,8 @@ try {
 
                     if (move_uploaded_file($tmp_name, $upload_path)) {
                         $mime = $mime_map[$ext] ?? 'application/octet-stream';
-                        $stmt = $pdo->prepare("INSERT INTO user_item_evidence (user_item_id, file_path, file_type) VALUES (?, ?, ?)");
-                        $stmt->execute([$user_item_id, $new_filename, $mime]);
+                        $stmt = $pdo->prepare("INSERT INTO user_item_evidence (user_item_id, file_path, file_type, original_name) VALUES (?, ?, ?, ?)");
+                        $stmt->execute([$user_item_id, $new_filename, $mime, $name]);
                         $uploaded[] = ['id' => $pdo->lastInsertId(), 'path' => $new_filename, 'type' => 'document'];
                     }
                 }

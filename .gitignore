@@ -6,6 +6,12 @@ config/db.local.php
 # ===== User Uploads =====
 # รูปโปรไฟล์ที่ผู้ใช้อัปโหลด ไม่ควรเก็บใน git
 assets/images/profiles/
+# ไฟล์หลักฐาน (รูป/เอกสาร) ที่ผู้ใช้อัปโหลด
+assets/images/evidence/
+
+# ===== Database Backups =====
+# ไฟล์ backup ฐานข้อมูล (dump ตามวันที่) ไม่ควรอยู่ใน repo
+database/*_backup_*.sql
 
 # ===== Dependencies =====
 vendor/

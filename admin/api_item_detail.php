@@ -49,7 +49,7 @@ if (!$item) {
 
 // ── ดึงไฟล์แนบ ─────────────────────────────────────────────────────────────
 $stmtEv = $pdo->prepare('
-    SELECT id, file_path, file_type, created_at
+    SELECT id, file_path, file_type, original_name, created_at
     FROM user_item_evidence
     WHERE user_item_id = :uid
     ORDER BY created_at DESC

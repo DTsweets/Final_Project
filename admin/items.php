@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role === 'admin') {
                     INSERT IGNORE INTO admin_item (year_id, scope, name_tiem, unit, AD)
                     SELECT :tgt_year, scope, name_tiem, unit, AD
                     FROM admin_item
-                    WHERE year_id = :src_year AND data_source = \x27officer\x27
+                    WHERE year_id = :src_year AND data_source = \'officer\'
                 ');
                 $copy_stmt->execute([':tgt_year' => $target_year_id, ':src_year' => $source_year_id]);
                 $copied = $copy_stmt->rowCount();
@@ -333,14 +333,7 @@ $page_title2 = "UP Net Zero";
         <?php include_once __DIR__ . '/includes/header.php'; ?>
 
         <div class="page-content" style="padding-top: 1rem;">
-            <?php if ($msg): ?>
-                <div
-                    style="padding: 1rem; margin-bottom: 1.5rem; border-radius: 12px; font-weight: 600; <?php echo $msg_type === 'success' ? 'background-color: #ECFDF5; color: #047857; border: 1px solid #A7F3D0;' : 'background-color: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA;'; ?> box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
-                    <div><?= htmlspecialchars($msg) ?></div>
-                    <button onclick="this.parentElement.style.display='none'"
-                        style="background: none; border: none; color: inherit; cursor: pointer; font-size: 1.25rem;">&times;</button>
-                </div>
-            <?php endif; ?>
+            <?php $toast_msg = $msg; $toast_type = $msg_type; include __DIR__ . '/../components/toast.php'; ?>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                 <div style="color: var(--text-primary); font-weight: 800; font-size: 1.25rem;">
                     ชื่อหน่วยงาน : <?= htmlspecialchars($affiliation_name ?? 'ADMIN(คณะ)') ?>

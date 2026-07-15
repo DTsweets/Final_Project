@@ -29,7 +29,7 @@ if ($affil_id) {
                COALESCE(ui.Vol,0) AS vol, (COALESCE(ui.Vol,0)*ai.AD)/1000 AS emission
         FROM admin_item ai
         JOIN admin_g ag ON ai.scope = ag.id
-        LEFT JOIN user_item ui ON ui.admin_item_id = ai.id AND ui.affiliation_id = :aff AND ui.year_id = :y
+        LEFT JOIN user_item ui ON ui.admin_item_id = ai.id AND ui.affiliation_id = :aff AND ui.year_id = :y AND ui.source = 'officer'
         WHERE ai.year_id = :y2
         ORDER BY ag.scope ASC, ai.id ASC");
     $stmt->execute([':aff' => $affil_id, ':y' => $selected_year, ':y2' => $selected_year]);

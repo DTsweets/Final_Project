@@ -20,7 +20,8 @@ function ghg_years(PDO $pdo): array
  */
 function ghg_scope_totals(PDO $pdo, int $year, ?int $affil = null): array
 {
-    $affilCond = $affil !== null ? ' AND ui.affiliation_id = :aff' : '';
+    // รายคณะ = เฉพาะข้อมูลที่คณะกรอกเอง (officer); ทั้งระบบ (affil=null) รวมทุก source
+    $affilCond = $affil !== null ? " AND ui.affiliation_id = :aff AND ui.source = 'officer'" : '';
     $sql = "
         SELECT ag.scope, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS e
         FROM admin_g ag
@@ -56,7 +57,7 @@ function ghg_by_affiliation(PDO $pdo, ?int $year = null): array
             SELECT a.id AS affil_id, a.affiliation_item,
                    COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
             FROM affiliation_id a
-            LEFT JOIN user_item  ui ON ui.affiliation_id = a.id
+            LEFT JOIN user_item  ui ON ui.affiliation_id = a.id AND ui.source = \'officer\'
             LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
             GROUP BY a.id, a.affiliation_item
             ORDER BY total_emission DESC';
@@ -66,7 +67,7 @@ function ghg_by_affiliation(PDO $pdo, ?int $year = null): array
         SELECT a.id AS affil_id, a.affiliation_item,
                COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
         FROM affiliation_id a
-        LEFT JOIN user_item  ui ON ui.affiliation_id = a.id AND ui.year_id = :y
+        LEFT JOIN user_item  ui ON ui.affiliation_id = a.id AND ui.year_id = :y AND ui.source = \'officer\'
         LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
         GROUP BY a.id, a.affiliation_item
         ORDER BY total_emission DESC');
@@ -86,7 +87,7 @@ function ghg_affil_detail(PDO $pdo, int $affil, int $year): array
         FROM user_item ui
         JOIN admin_item ai ON ai.id = ui.admin_item_id
         JOIN admin_g    ag ON ag.id = ai.scope
-        WHERE ui.affiliation_id = :aff AND ui.year_id = :y
+        WHERE ui.affiliation_id = :aff AND ui.year_id = :y AND ui.source = \'officer\'
         ORDER BY ag.scope ASC, ag.order_num ASC, ai.name_tiem ASC');
     $stmt->execute([':aff' => $affil, ':y' => $year]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -100,7 +101,7 @@ function ghg_affil_yearly(PDO $pdo, int $affil): array
                COUNT(DISTINCT ui.id) AS entry_count,
                COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
         FROM admin_year y
-        LEFT JOIN user_item  ui ON ui.year_id = y.id AND ui.affiliation_id = :aff
+        LEFT JOIN user_item  ui ON ui.year_id = y.id AND ui.affiliation_id = :aff AND ui.source = \'officer\'
         LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
         GROUP BY y.id, y.year
         ORDER BY y.year DESC');
@@ -114,4 +115,33 @@ function ghg_affil_name(PDO $pdo, int $affil): string
     $stmt = $pdo->prepare('SELECT affiliation_item FROM affiliation_id WHERE id = :id');
     $stmt->execute([':id' => $affil]);
     return (string)($stmt->fetchColumn() ?: '-');
+}
+
+/* ============ GHG Removal (การดูดกลับ — ระดับส่วนกลาง/มหาวิทยาลัย) ============ */
+
+/** ยอดดูดกลับรวมของปี (tCO₂e) = SUM(qty * factor)/1000 */
+function removal_total(PDO $pdo, int $year): float
+{
+    $stmt = $pdo->prepare('
+        SELECT COALESCE(SUM(re.qty * ri.factor)/1000, 0)
+        FROM removal_entry re
+        JOIN removal_item ri ON ri.id = re.removal_item_id
+        WHERE re.year_id = :y');
+    $stmt->execute([':y' => $year]);
+    return (float) $stmt->fetchColumn();
+}
+
+/** รายการดูดกลับของปี + qty ที่กรอก + tCO₂e (แสดงทุกรายการแม้ยังไม่กรอก) */
+function removal_items_list(PDO $pdo, int $year): array
+{
+    $stmt = $pdo->prepare('
+        SELECT ri.id, ri.name_tiem, ri.unit, ri.factor,
+               COALESCE(re.qty, 0) AS qty,
+               COALESCE(re.qty, 0) * ri.factor / 1000 AS emission
+        FROM removal_item ri
+        LEFT JOIN removal_entry re ON re.removal_item_id = ri.id AND re.year_id = ri.year_id
+        WHERE ri.year_id = :y
+        ORDER BY ri.id ASC');
+    $stmt->execute([':y' => $year]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

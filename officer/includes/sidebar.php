@@ -130,6 +130,21 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                     </svg>
                     กิจกรรม
                 </a>
+                <?php if ((int) ($_SESSION['affiliation_id'] ?? 0) === 1): /* GHG Removal: เฉพาะศูนย์สิ่งแวดล้อม */ ?>
+                <!-- 3. GHG Removal -->
+                <a href="<?= $root ?? '../' ?>officer/ghg.php"
+                    class="sub-item <?= ($current_page == 'ghg.php') ? 'active' : '' ?>">
+                    <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
+                        <path d="M12 2.5C17 4.5 20 9 20 14C20 18.5 16 21.5 12 22.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
+                        <path d="M12 2.5V22.5" stroke="#BC8E5C" stroke-width="1.8" />
+                        <path d="M12 7.5L17 6.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
+                        <path d="M12 12.5L18.5 10.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
+                        <path d="M12 17.5L16.5 15.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                    GHG Removal
+                </a>
+                <?php endif; ?>
             </div>
         </div>
         <!-- Category: LABELS -->

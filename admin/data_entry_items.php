@@ -398,6 +398,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             text-align: center;
             font-family: inherit;
             font-weight: 600;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+        /* effect โฟกัส: เส้นกรอบม่วง + glow ให้เหมือนช่องอื่นทั้งโปรเจ็ค */
+        .vol-input:focus {
+            outline: none;
+            border-color: #62368B;
+            box-shadow: 0 0 0 1px #62368B, 0 0 0 4px rgba(98, 54, 139, 0.15);
         }
 
         .total-cell {
@@ -511,15 +518,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     กลับไปหน้าเลือกปี
                 </a>
             </div>
-            <?php if (isset($_GET['msg'])): ?>
-                <div style="display:flex; align-items:center; gap:12px; padding:16px; border-radius:8px; margin-bottom:24px; font-weight:500; background-color:#ECFDF5; color:#065F46; border:1px solid #A7F3D0;">
-                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                    <?= htmlspecialchars($_GET['msg']) ?>
-                </div>
-            <?php endif; ?>
+            <?php
+                $toast_msg  = ($error_msg ?? '') !== '' ? $error_msg : ($_GET['msg'] ?? '');
+                $toast_type = ((($error_msg ?? '') !== '') || (($_GET['msg_type'] ?? '') === 'danger') || (isset($_GET['msg']) && str_contains($_GET['msg'], 'ผิดพลาด'))) ? 'danger' : 'success';
+                include __DIR__ . '/../components/toast.php';
+            ?>
 
             <div class="header-actions">
                 <h1 class="main-heading">กรอกข้อมูลขอบเขตกิจกรรม</h1>

@@ -20,7 +20,7 @@ $stmt_years = $pdo->prepare("
     FROM admin_year y
     INNER JOIN user_item ui ON ui.year_id = y.id
     INNER JOIN admin_item ai ON ai.id = ui.admin_item_id
-    WHERE ui.affiliation_id = :affil
+    WHERE ui.affiliation_id = :affil AND ui.source = 'officer'
     GROUP BY y.id, y.year
     ORDER BY y.year DESC
 ");
@@ -41,8 +41,8 @@ $stmt_detail = $pdo->prepare("
     FROM admin_item ai
     JOIN admin_g ag ON ai.scope = ag.id
     LEFT JOIN user_item ui
-           ON ui.admin_item_id = ai.id AND ui.affiliation_id = :affil AND ui.year_id = :year
-    WHERE ai.year_id = :year2
+           ON ui.admin_item_id = ai.id AND ui.affiliation_id = :affil AND ui.year_id = :year AND ui.source = 'officer'
+    WHERE ai.year_id = :year2 AND ai.data_source = 'officer'
     ORDER BY ag.scope ASC, ai.id ASC
 ");
 $stmt_detail->execute([':affil' => $affil_id, ':year' => $selected_year, ':year2' => $selected_year]);
@@ -64,6 +64,20 @@ foreach ($detail_rows as $r) {
     ];
 }
 $total_emission = $scope1 + $scope2 + $scope3;
+
+// ── ยอด "กิจกรรม" ที่คณะตนเองจัด (source='event') — แยกจากยอดหลัก (officer) ──
+$ev_stmt = $pdo->prepare("
+    SELECT COALESCE(SUM(ui.Vol * ai.AD)/1000, 0)
+    FROM user_item ui
+    JOIN admin_item ai ON ai.id = ui.admin_item_id
+    WHERE ui.affiliation_id = :a AND ui.year_id = :y AND ui.source = 'event'
+");
+$ev_stmt->execute([':a' => $affil_id, ':y' => $selected_year]);
+$event_emission = (float) $ev_stmt->fetchColumn();
+
+$evc_stmt = $pdo->prepare("SELECT COUNT(*) FROM event WHERE affiliation_id = :a AND year_id = :y");
+$evc_stmt->execute([':a' => $affil_id, ':y' => $selected_year]);
+$event_count = (int) $evc_stmt->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -160,6 +174,37 @@ $total_emission = $scope1 + $scope2 + $scope3;
                     <span class="db-card-btn db-btn-green" style="opacity:.85;">0 tCO₂e</span>
                 </div>
             </div>
+
+            <?php if ($event_count > 0): ?>
+            <!-- กิจกรรมของคณะ (แยกจากยอดหลัก) -->
+            <div class="db-section-label">กิจกรรมของคณะ ปี <?= htmlspecialchars($year_label) ?></div>
+            <div style="margin-bottom:1.5rem;">
+                <div class="db-card db-card-white">
+                    <div class="db-card-inner">
+                        <div class="db-card-text">
+                            <div class="db-big-num"><?= number_format($event_emission, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
+                            <div class="db-card-desc">การปล่อยจากกิจกรรมที่คณะจัด (<?= $event_count ?> กิจกรรม)</div>
+                            <div class="db-card-subdesc">ACTIVITIES — แยกจากยอดหลักด้านบน</div>
+                        </div>
+                        <div class="db-card-illus">
+                            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+                                <rect x="14" y="18" width="44" height="40" rx="6" fill="#FDE68A" />
+                                <rect x="14" y="18" width="44" height="12" rx="6" fill="#F59E0B" opacity=".55" />
+                                <rect x="22" y="12" width="4" height="12" rx="2" fill="#B45309" />
+                                <rect x="46" y="12" width="4" height="12" rx="2" fill="#B45309" />
+                                <circle cx="27" cy="42" r="3" fill="#F59E0B" />
+                                <circle cx="36" cy="42" r="3" fill="#F59E0B" />
+                                <circle cx="45" cy="42" r="3" fill="#F59E0B" />
+                            </svg>
+                        </div>
+                    </div>
+                    <a href="collect.php?tab=event&year=<?= $selected_year ?>" class="db-card-btn db-btn-green" style="text-decoration:none;">
+                        ดูกิจกรรม
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+                    </a>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Scope Cards -->
             <div class="db-scope-row">

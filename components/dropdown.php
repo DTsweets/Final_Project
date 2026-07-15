@@ -124,6 +124,15 @@ $dd_has_options = count($dd_normalized) > 0;
             gap: 8px;
             background: #fff;
         }
+        /* บังคับพื้นหลังขาวให้ชนะ .form-control-dark (#F9FAFB) เสมอ — dark theme ใช้ !important จึงไม่กระทบ */
+        .dd-component .dd-trigger { background: #fff; transition: border-color .2s ease, box-shadow .2s ease; }
+
+        /* effect ตอนเปิด: ขอบม่วง + glow — คุมใน component ให้ทุกหน้าเหมือนกัน
+           (specificity 0,3,0 ชนะ override ระดับหน้า เช่น .co .dd-trigger) */
+        .dd-component .dd-trigger.open {
+            border-color: var(--clr-primary, #62368B);
+            box-shadow: 0 0 0 1px var(--clr-primary, #62368B), 0 0 0 4px rgba(98, 54, 139, 0.15);
+        }
 
         .dd-trigger:disabled {
             cursor: not-allowed;

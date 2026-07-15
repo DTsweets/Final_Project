@@ -470,8 +470,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         .vol-input:focus {
             outline: none;
-            border-color: #3B82F6;
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            border-color: #62368B;
+            box-shadow: 0 0 0 1px #62368B, 0 0 0 4px rgba(98, 54, 139, 0.15);
         }
 
         .total-pill {
@@ -1072,14 +1072,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     กลับไปหน้าเลือกปี
                 </a>
             </div>
-            <?php if (isset($_GET['msg']) && !str_contains($_GET['msg'], 'สำเร็จ')): ?>
-                <div class="msg-box"
-                    style="padding: 1rem; margin-bottom: 2rem; border-radius: 12px; font-weight: 600; background-color: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
-                    <div><?= htmlspecialchars($_GET['msg']) ?></div>
-                    <button onclick="this.parentElement.style.display='none'"
-                        style="background: none; border: none; color: inherit; cursor: pointer; font-size: 1.25rem;">&times;</button>
-                </div>
-            <?php endif; ?>
+            <?php
+                $toast_msg  = $_GET['msg'] ?? ($error_msg ?? '');
+                $toast_type = ((($_GET['msg_type'] ?? '') === 'danger') || (isset($error_msg) && $error_msg !== '') || (isset($_GET['msg']) && str_contains($_GET['msg'], 'ผิดพลาด'))) ? 'danger' : 'success';
+                include __DIR__ . '/../components/toast.php';
+            ?>
 
             <div class="header-actions">
                 <div>
@@ -1983,7 +1980,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             const extBg = { pdf: '#FEF2F2', doc: '#EFF6FF', docx: '#EFF6FF', xls: '#ECFDF5', xlsx: '#ECFDF5', ppt: '#FFF7ED', pptx: '#FFF7ED' };
 
             list.innerHTML = docs.map(doc => {
-                const filename = doc.file_path.split('/').pop();
+                const diskName = doc.file_path.split('/').pop();
+                const filename = doc.original_name || diskName;   // แสดงชื่อไฟล์ต้นฉบับ (รองรับไทย)
                 const ext = filename.split('.').pop().toLowerCase();
                 const color = extColor[ext] || '#6B7280';
                 const bg = extBg[ext] || '#F3F4F6';
@@ -1997,7 +1995,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div style="font-size:0.75rem; color:#9CA3AF; margin-top:2px;">${new Date(doc.created_at).toLocaleDateString('th-TH')}</div>
                     </div>
                     <div style="display:flex; gap:8px; flex-shrink:0;">
-                        <a href="../assets/images/evidence/${doc.file_path}" download title="ดาวน์โหลด"
+                        <a href="../assets/images/evidence/${doc.file_path}" download="${filename}" title="ดาวน์โหลด"
                             style="width:34px; height:34px; border-radius:8px; background:#3B82F6; color:white; display:flex; align-items:center; justify-content:center; text-decoration:none;">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         </a>

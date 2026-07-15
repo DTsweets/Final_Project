@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     $year_to_create = (int) $_POST['year_id'];
 
     // Check if items exist in Admin settings for this year
-    $check_stmt = $pdo->prepare('SELECT COUNT(*) FROM admin_item WHERE year_id = ? AND data_source = \x27officer\x27');
+    $check_stmt = $pdo->prepare('SELECT COUNT(*) FROM admin_item WHERE year_id = ? AND data_source = \'officer\'');
     $check_stmt->execute([$year_to_create]);
     $item_count = (int) $check_stmt->fetchColumn();
 
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         INSERT IGNORE INTO user_item (admin_item_id, affiliation_id, year_id, Vol)
         SELECT id, :affil, :year_id1, 0 
         FROM admin_item 
-        WHERE year_id = :year_id2 AND data_source = \x27officer\x27
+        WHERE year_id = :year_id2 AND data_source = \'officer\'
     ');
     $stmt->execute([':affil' => $affil_id, ':year_id1' => $year_to_create, ':year_id2' => $year_to_create]);
 
@@ -237,14 +237,7 @@ $page_title2 = "UP Net Zero";
         <?php include_once __DIR__ . '/includes/header.php'; ?>
 
         <div class="page-content" style="padding-top: 1rem;">
-            <?php if ($msg && $msg_type === 'danger'): ?>
-                <div
-                    style="padding: 1rem; margin-bottom: 1.5rem; border-radius: 12px; font-weight: 600; background-color: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
-                    <div><?= htmlspecialchars($msg) ?></div>
-                    <button onclick="this.parentElement.style.display='none'"
-                        style="background: none; border: none; color: inherit; cursor: pointer; font-size: 1.25rem;">&times;</button>
-                </div>
-            <?php endif; ?>
+            <?php $toast_msg = $msg; $toast_type = $msg_type; include __DIR__ . '/../components/toast.php'; ?>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                 <div style="color: var(--text-primary); font-weight: 800; font-size: 1.25rem;">
                     ชื่อหน่วยงาน : <?= htmlspecialchars($affiliation_name ?? 'ADMIN(คณะ)') ?>

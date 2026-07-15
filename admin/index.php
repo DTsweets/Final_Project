@@ -5,6 +5,7 @@
  */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ghg_report.php';
 
 require_role(['admin']);
 
@@ -29,9 +30,11 @@ foreach ($year_data as $y) {
     }
 }
 
-// ── จำนวนรายงานทั้งหมด (ไม่กรองปี: 1 รายงาน = 1 คณะ × 1 ปี) ────────────
+// ── จำนวนรายงานทั้งหมด — นับแยกผู้ให้ข้อมูล: คณะ(officer) รายคณะ + แบบสอบถาม + กิจกรรม ────────────
 $total_entries = (int) $pdo->query('
-    SELECT COUNT(DISTINCT CONCAT(affiliation_id,"-",year_id))
+    SELECT COUNT(DISTINCT CONCAT(
+        CASE WHEN source = "officer" THEN CONCAT("aff", affiliation_id) ELSE source END,
+        "-", year_id))
     FROM user_item
 ')->fetchColumn();
 
@@ -53,17 +56,39 @@ $cumulative_emission = (float) $pdo->query('
 ')->fetchColumn();
 $sum['total_entries'] = $total_entries;
 
-// ── สะสมรายคณะ (ทุกปี) ── แสดงทุกคณะถึงไม่มีข้อมูล ──────────────────────
+// ── GHG Removal (การดูดกลับ ระดับส่วนกลาง) + Net = ปล่อย − ดูดกลับ ──
+$removal = removal_total($pdo, $selected_year);
+$net = (float) $sum['total_emission'] - $removal;
+
+// ── สะสมรายคณะ (ทุกปี) — คณะ = officer เท่านั้น (กันนับซ้ำ) ──────────────────────
 $cumul_affil_rows = $pdo->query('
     SELECT a.id AS affil_id,
            a.affiliation_item,
            COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
     FROM affiliation_id a
-    LEFT JOIN user_item ui  ON ui.affiliation_id  = a.id
+    LEFT JOIN user_item ui  ON ui.affiliation_id  = a.id AND ui.source = "officer"
     LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
     GROUP BY a.id, a.affiliation_item
     ORDER BY total_emission DESC
 ')->fetchAll();
+
+// ยอดสะสม (ทุกปี) แยกตาม source — ใช้เติมสไลซ์ แบบสอบถาม/กิจกรรม ในโดนัทสะสม
+$src_cumul = $pdo->query('
+    SELECT ui.source, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS e
+    FROM user_item ui
+    JOIN admin_item ai ON ai.id = ui.admin_item_id
+    GROUP BY ui.source
+')->fetchAll(PDO::FETCH_KEY_PAIR);
+
+// รวมเป็น breakdown สะสม: คณะ(officer) + แบบสอบถาม + กิจกรรม
+$cumul_breakdown = array_map(fn($r) => [
+    'affil_id' => $r['affil_id'],
+    'name'     => $r['affiliation_item'],
+    'emission' => (float) $r['total_emission'],
+], $cumul_affil_rows);
+$cumul_breakdown[] = ['affil_id' => null, 'name' => 'แบบสอบถาม', 'emission' => (float) ($src_cumul['survey'] ?? 0), 'source' => 'survey'];
+$cumul_breakdown[] = ['affil_id' => null, 'name' => 'กิจกรรม',   'emission' => (float) ($src_cumul['event'] ?? 0), 'source' => 'event'];
+usort($cumul_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
 
 // ── Scope 1, 2, 3 ────────────────────────────────────
 $scope_sql = '
@@ -83,6 +108,17 @@ $scope1 = $scope_rows[1] ?? 0;
 $scope2 = $scope_rows[2] ?? 0;
 $scope3 = $scope_rows[3] ?? 0;
 
+// ── แยกตามแหล่งข้อมูล (source) ปีที่เลือก — JOIN admin_item 1:1 ไม่นับซ้ำ ──
+$src_stmt = $pdo->prepare('
+    SELECT ui.source, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
+    FROM user_item ui
+    JOIN admin_item ai ON ai.id = ui.admin_item_id
+    WHERE ui.year_id = :y
+    GROUP BY ui.source
+');
+$src_stmt->execute([':y' => $selected_year]);
+$src_map = $src_stmt->fetchAll(PDO::FETCH_KEY_PAIR);   // source => emission (officer/survey/event)
+
 // ── รายคณะ แยกตาม Scope (รวมคณะที่ยังไม่กรอก) ───────────
 $scope_affil_sql = '
     SELECT ag.scope,
@@ -95,13 +131,14 @@ $scope_affil_sql = '
     LEFT   JOIN user_item   ui ON ui.admin_item_id = ai.id
                                AND ui.affiliation_id = a.id
                                AND ui.year_id = :y2
+                               AND ui.source = \'officer\'
     GROUP  BY ag.scope, a.id, a.affiliation_item
     ORDER  BY ag.scope ASC, total_emission DESC, a.affiliation_item ASC
 ';
 $stmt_sa = $pdo->prepare($scope_affil_sql);
 $stmt_sa->execute([':y1' => $selected_year, ':y2' => $selected_year]);
 $scope_affil_rows = $stmt_sa->fetchAll();
-// จัด index: scope_affil_by_scope[1] = [...rows...]
+// จัด index: scope_affil_by_scope[1] = [...rows...] (คณะ = officer เท่านั้น)
 $scope_affil_by_scope = [];
 foreach ($scope_affil_rows as $r) {
     $scope_affil_by_scope[(int)$r['scope']][] = [
@@ -110,15 +147,40 @@ foreach ($scope_affil_rows as $r) {
         'emission' => (float) $r['total_emission'],
     ];
 }
+// เติมสไลซ์ แบบสอบถาม/กิจกรรม ต่อ Scope (ยอดของ survey/event แยกตาม scope ของปีที่เลือก)
+$scope_src_stmt = $pdo->prepare('
+    SELECT ag.scope, ui.source, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS e
+    FROM admin_g ag
+    JOIN admin_item ai ON ai.scope = ag.id AND ai.year_id = :y1
+    JOIN user_item  ui ON ui.admin_item_id = ai.id AND ui.year_id = :y2 AND ui.source IN (\'survey\', \'event\')
+    GROUP BY ag.scope, ui.source
+');
+$scope_src_stmt->execute([':y1' => $selected_year, ':y2' => $selected_year]);
+$SRC_SLICE_LABELS = ['survey' => 'แบบสอบถาม', 'event' => 'กิจกรรม'];
+$scope_src_tmp = [];   // [scope][source] = e
+foreach ($scope_src_stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $scope_src_tmp[(int)$r['scope']][$r['source']] = (float) $r['e'];
+}
+foreach ([1, 2, 3] as $sc) {
+    foreach (['survey', 'event'] as $srcKey) {
+        $scope_affil_by_scope[$sc][] = [
+            'affil_id' => null,
+            'name'     => $SRC_SLICE_LABELS[$srcKey],
+            'emission' => (float) ($scope_src_tmp[$sc][$srcKey] ?? 0),
+        ];
+    }
+    // เรียงมาก→น้อยในแต่ละ scope
+    usort($scope_affil_by_scope[$sc], fn($a, $b) => $b['emission'] <=> $a['emission']);
+}
 
-// ── รายคณะ (รวมคณะที่ยังไม่กรอกข้อมูล) ──────────────
+// ── รายคณะ (เฉพาะข้อมูลที่คณะกรอกเอง source='officer' — กันนับซ้ำกับแบบสอบถาม/กิจกรรม) ──
 $affil_sql = '
     SELECT a.id AS affil_id,
            a.affiliation_item,
            COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission,
            COUNT(DISTINCT ui.id)             AS entry_count
     FROM affiliation_id a
-    LEFT JOIN user_item ui  ON ui.affiliation_id  = a.id AND ui.year_id = :y
+    LEFT JOIN user_item ui  ON ui.affiliation_id  = a.id AND ui.year_id = :y AND ui.source = \'officer\'
     LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
     GROUP BY a.id, a.affiliation_item
     ORDER BY total_emission DESC, a.affiliation_item ASC
@@ -126,6 +188,16 @@ $affil_sql = '
 $stmt_affil = $pdo->prepare($affil_sql);
 $stmt_affil->execute([':y' => $selected_year]);
 $affil_rows = $stmt_affil->fetchAll();
+
+// ── รวมเป็น "แยกตามผู้ให้ข้อมูล": คณะ (officer) + แบบสอบถาม + กิจกรรม (กันนับซ้ำ, รวม = Total Emission) ──
+$year_breakdown = array_map(fn($r) => [
+    'name'     => $r['affiliation_item'],
+    'emission' => (float) $r['total_emission'],
+    'kind'     => 'faculty',
+], $affil_rows);
+$year_breakdown[] = ['name' => 'แบบสอบถาม', 'emission' => (float) ($src_map['survey'] ?? 0), 'kind' => 'survey'];
+$year_breakdown[] = ['name' => 'กิจกรรม',   'emission' => (float) ($src_map['event'] ?? 0), 'kind' => 'event'];
+usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -286,7 +358,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 <div class="db-card db-card-white">
                     <div class="db-card-inner">
                         <div class="db-card-text">
-                            <div class="db-big-num">0</div>
+                            <div class="db-big-num"><?= number_format($removal, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
                             <div class="db-card-desc">GHG Removal</div>
                             <div class="db-card-subdesc">การดูดกลับก๊าซเรือนกระจกทั้งหมด</div>
                         </div>
@@ -304,13 +376,34 @@ $affil_rows = $stmt_affil->fetchAll();
                             </svg>
                         </div>
                     </div>
-                    <a href="#" class="db-card-btn db-btn-green">
-                        0 tCO₂e
+                    <a href="ghg.php" class="db-card-btn db-btn-green" style="text-decoration:none;">
+                        จัดการการดูดกลับ
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2.5" stroke-linecap="round">
                             <polyline points="9 18 15 12 9 6" />
                         </svg>
                     </a>
+                </div>
+
+                <!-- Net Emission (ปล่อย − ดูดกลับ) -->
+                <div class="db-card db-card-white">
+                    <div class="db-card-inner">
+                        <div class="db-card-text">
+                            <div class="db-big-num"><?= number_format($net, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
+                            <div class="db-card-desc">การปล่อยสุทธิ (Net)</div>
+                            <div class="db-card-subdesc">NET = ปล่อย − ดูดกลับ</div>
+                        </div>
+                        <div class="db-card-illus">
+                            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+                                <circle cx="36" cy="36" r="26" fill="#EDE9FE" />
+                                <path d="M22 40 L32 30 L40 38 L52 26" stroke="#7C3AED" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                                <circle cx="52" cy="26" r="4" fill="#7C3AED" />
+                            </svg>
+                        </div>
+                    </div>
+                    <span class="db-card-btn db-btn-green" style="opacity:.9;">
+                        <?= number_format($net, 2) ?> tCO₂e
+                    </span>
                 </div>
 
             </div>
@@ -322,7 +415,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 <div class="db-card db-card-scope1">
                     <div class="db-card-inner">
                         <div class="db-card-text">
-                            <div class="db-big-num db-num-s1"><?= number_format($scope1, 0) ?></div>
+                            <div class="db-big-num db-num-s1"><?= number_format($scope1, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
                             <div class="db-scope-label db-scope-s1">Scope 1</div>
                         </div>
                         <div class="db-card-illus">
@@ -351,7 +444,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 <div class="db-card db-card-scope2">
                     <div class="db-card-inner">
                         <div class="db-card-text">
-                            <div class="db-big-num db-num-s2"><?= number_format($scope2, 0) ?></div>
+                            <div class="db-big-num db-num-s2"><?= number_format($scope2, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
                             <div class="db-scope-label db-scope-s2">Scope 2</div>
                         </div>
                         <div class="db-card-illus">
@@ -381,7 +474,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 <div class="db-card db-card-scope3">
                     <div class="db-card-inner">
                         <div class="db-card-text">
-                            <div class="db-big-num db-num-s3"><?= number_format($scope3, 0) ?></div>
+                            <div class="db-big-num db-num-s3"><?= number_format($scope3, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
                             <div class="db-scope-label db-scope-s3">Scope 3</div>
                         </div>
                         <div class="db-card-illus">
@@ -406,6 +499,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 </div>
 
             </div>
+
             <!-- ── Detail Modal (รายละเอียดรายการคณะ) ── -->
             <div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeDetail()">
                 <div class="modal-box detail-modal-box">
@@ -565,7 +659,7 @@ $affil_rows = $stmt_affil->fetchAll();
                             </svg>
                         </div>
                         <div style="position:relative; z-index:1;">
-                            <div class="detail-modal-label">การปล่อยก๊าซเรือนกระจก — รายคณะ/หน่วยงาน</div>
+                            <div class="detail-modal-label">การปล่อยก๊าซเรือนกระจก — แยกตามผู้ให้ข้อมูล (คณะ / แบบสอบถาม / กิจกรรม)</div>
                             <h3 class="detail-modal-title" id="yearEmissionTitle">—</h3>
                         </div>
                     </div>
@@ -673,12 +767,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 }
 
                 /* ═══ Year Emission data (รายคณะ ปีที่เลือก) ═══ */
-                const _yearEmissionData = <?= json_encode(array_map(fn($r) => [
-                    'affil_id' => $r['affil_id'],
-                    'name' => $r['affiliation_item'],
-                    'emission' => (float) $r['total_emission'],
-                    'entries' => (int) $r['entry_count'],
-                ], $affil_rows), JSON_UNESCAPED_UNICODE) ?>;
+                const _yearEmissionData = <?= json_encode($year_breakdown, JSON_UNESCAPED_UNICODE) ?>;
                 const _yearLabel = <?= json_encode($year_label) ?>;
                 const _selectedYear = <?= (int) $selected_year ?>;
                 const _yearTotalEmission = <?= (float) $sum['total_emission'] ?>;
@@ -750,8 +839,8 @@ $affil_rows = $stmt_affil->fetchAll();
                     body.innerHTML = `
             <div class="detail-summary">
                 <div class="detail-stat">
-                    <div class="detail-stat-label">จำนวนคณะ/หน่วยงาน</div>
-                    <div class="detail-stat-value">${data.length} คณะ</div>
+                    <div class="detail-stat-label">จำนวนรายการ (คณะ + แบบสอบถาม + กิจกรรม)</div>
+                    <div class="detail-stat-value">${data.length} รายการ</div>
                 </div>
                 <div class="detail-stat">
                     <div class="detail-stat-label">รวมปี ${_yearLabel} (tCO₂e)</div>
@@ -782,7 +871,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 </colgroup>
                 <thead><tr>
                     <th>#</th>
-                    <th>คณะ / หน่วยงาน</th>
+                    <th>รายการ (คณะ / แบบสอบถาม / กิจกรรม)</th>
                     <th style="text-align:right;">Total Emission (tCO₂e)</th>
                     <th style="text-align:right;">สัดส่วน</th>
                 </tr></thead>
@@ -832,14 +921,12 @@ $affil_rows = $stmt_affil->fetchAll();
                 }
 
                 /* ═══ Cumulative Modal (การปล่อยสะสมรายคณะ ทุกปี) ═══ */
-                const _cumulData = <?= json_encode(array_map(fn($r) => [
-                    'affil_id' => $r['affil_id'],
-                    'name' => $r['affiliation_item'],
-                    'emission' => (float) $r['total_emission'],
-                ], $cumul_affil_rows), JSON_UNESCAPED_UNICODE) ?>;
+                const _cumulData = <?= json_encode($cumul_breakdown, JSON_UNESCAPED_UNICODE) ?>;
 
                 /* สี Pie Chart จำแนกตามคณะ */
                 const _FACULTY_COLORS = {
+                    'แบบสอบถาม': '#7C3AED',
+                    'กิจกรรม': '#F59E0B',
                     'วิทยาศาสตร์': '#1E88E5',
                     'วิศวกรรมศาสตร์': '#F4511E',
                     'บริหารธุรกิจ': '#2E7D32',
@@ -975,9 +1062,11 @@ $affil_rows = $stmt_affil->fetchAll();
                         </div>
                     </td>
                     <td style="text-align:center;">
-                        <button class="btn-detail" onclick="closeCumulativeModal(); openAffilYearly(${r.affil_id}, '${r.name}')" style="padding:5px 14px; font-size:0.8rem;">
-                            รายละเอียด
-                        </button>
+                        ${r.affil_id !== null
+                                ? `<button class="btn-detail" onclick="closeCumulativeModal(); openAffilYearly(${r.affil_id}, '${r.name}')" style="padding:5px 14px; font-size:0.8rem;">รายละเอียด</button>`
+                                : (r.source
+                                    ? `<button class="btn-detail" onclick="closeCumulativeModal(); openAffilYearly(null, '${r.name}', '${r.source}')" style="padding:5px 14px; font-size:0.8rem;">รายละเอียด</button>`
+                                    : '<span style="color:#9CA3AF;font-size:0.8rem;">—</span>')}
                     </td>
                 </tr>`;
                     });
@@ -985,8 +1074,8 @@ $affil_rows = $stmt_affil->fetchAll();
                     body.innerHTML = `
             <div class="detail-summary">
                 <div class="detail-stat">
-                    <div class="detail-stat-label">จำนวนคณะ/หน่วยงาน</div>
-                    <div class="detail-stat-value">${_cumulData.length} คณะ</div>
+                    <div class="detail-stat-label">จำนวนรายการ (คณะ + แบบสอบถาม + กิจกรรม)</div>
+                    <div class="detail-stat-value">${_cumulData.length} รายการ</div>
                 </div>
                 <div class="detail-stat">
                     <div class="detail-stat-label">รวมทุกปี (tCO₂e)</div>
@@ -1119,8 +1208,8 @@ $affil_rows = $stmt_affil->fetchAll();
                     body.innerHTML = `
                     <div class="detail-summary">
                         <div class="detail-stat">
-                            <div class="detail-stat-label">จำนวนคณะ/หน่วยงาน</div>
-                            <div class="detail-stat-value">${data.length} คณะ</div>
+                            <div class="detail-stat-label">จำนวนรายการ (คณะ + แบบสอบถาม + กิจกรรม)</div>
+                            <div class="detail-stat-value">${data.length} รายการ</div>
                         </div>
                         <div class="detail-stat">
                             <div class="detail-stat-label">Scope ${scopeNum} — ปี ${_yearLabel} (tCO₂e)</div>
@@ -1300,7 +1389,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 }
 
                 /* ═══ รายละเอียดรายปี (คลิกจากตารางสะสม) ═══ */
-                function openAffilYearly(affilId, affilName) {
+                function openAffilYearly(affilId, affilName, source = null) {
                     replayDetailPop();
                     document.getElementById('detailModalTitle').textContent = affilName;
 
@@ -1317,16 +1406,19 @@ $affil_rows = $stmt_affil->fetchAll();
                     document.getElementById('detailModal').style.display = 'flex';
                     lockScroll();
 
-                    fetch(`api_affil_yearly.php?affil_id=${affilId}`)
+                    const url = source
+                        ? `api_affil_yearly.php?source=${source}`
+                        : `api_affil_yearly.php?affil_id=${affilId}`;
+                    fetch(url)
                         .then(r => r.json())
-                        .then(data => renderAffilYearly(data, affilId, affilName))
+                        .then(data => renderAffilYearly(data, affilId, affilName, source))
                         .catch(() => {
                             document.getElementById('detailModalBody').innerHTML =
                                 '<p class="no-data-msg">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
                         });
                 }
 
-                function renderAffilYearly(data, affilId, affilName) {
+                function renderAffilYearly(data, affilId, affilName, source = null) {
                     if (!data || data.length === 0) {
                         document.getElementById('detailModalBody').innerHTML =
                             '<p class="no-data-msg">ยังไม่มีข้อมูลการปล่อยก๊าซสำหรับคณะนี้</p>';
@@ -1353,16 +1445,120 @@ $affil_rows = $stmt_affil->fetchAll();
             </tr></thead>
             <tbody>`;
                     data.forEach((r, i) => {
+                        const hasData = parseInt(r.entry_count) > 0;
+                        let btn;
+                        if (source) {
+                            btn = hasData
+                                ? `<button class="btn-detail" onclick="openSourceYearDetail('${source}', ${r.year_id}, '${r.year}', '${affilName.replace(/'/g, "\\'")}')" style="padding:4px 10px; font-size:0.75rem;">ดูรายการ</button>`
+                                : '<span style="color:#9CA3AF;font-size:0.8rem;">—</span>';
+                        } else {
+                            btn = `<button class="btn-detail" onclick="openDetail(${affilId}, '${affilName.replace(/'/g, "\\'")}', ${r.year_id}, true)" style="padding:4px 10px; font-size:0.75rem;">รายการกิจกรรม</button>`;
+                        }
                         html += `<tr>
                 <td style="font-weight:700;">${r.year}</td>
                 <td style="text-align:center;"><span class="badge">${r.entry_count} รายการ</span></td>
                 <td style="text-align:right;font-weight:700;color:var(--clr-primary);">${parseFloat(r.total_emission).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td style="text-align:center;">
-                    <button class="btn-detail" onclick="openDetail(${affilId}, '${affilName.replace(/'/g, "\\'")}', ${r.year_id}, true)" style="padding:4px 10px; font-size:0.75rem;">
-                        รายการกิจกรรม
-                    </button>
-                </td>
+                <td style="text-align:center;">${btn}</td>
             </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('detailModalBody').innerHTML = html;
+                }
+
+                // รายการย่อยของ แบบสอบถาม/กิจกรรม ในปีที่เลือก (drill จากหน้ายอดรายปีในโมดัลสะสม)
+                let _symEvents = [];
+                let _symName = '', _symSource = '', _symYearLabel = '';
+
+                function openSourceYearDetail(source, yearId, yearLabel, sourceName) {
+                    replayDetailPop();
+                    _symName = sourceName; _symSource = source; _symYearLabel = yearLabel;
+                    document.getElementById('detailModalTitle').textContent = sourceName + ' — ' + yearLabel;
+                    document.getElementById('detailBreadcrumb').style.display = 'block';
+                    document.getElementById('detailModalBody').innerHTML =
+                        '<div class="detail-loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>';
+
+                    fetch(`api_affil_detail.php?source=${source}&year_id=${yearId}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            const body = document.getElementById('detailModalBody');
+                            if (!data || data.length === 0) { body.innerHTML = '<p class="no-data-msg">ยังไม่มีข้อมูล</p>'; return; }
+                            if (source === 'survey') {
+                                // แบบสอบถาม → ตารางกลุ่ม/คำถาม
+                                document.getElementById('detailBreadcrumb').innerHTML = _symYearlyBackPill();
+                                let html = `<div class="modal-search-wrap"><input type="text" class="modal-search-input" placeholder="ค้นหาคำถาม..." oninput="filterTable(this,'tbody-sy')"></div><table class="detail-table"><thead><tr><th>กลุ่ม</th><th>คำถาม</th><th style="text-align:right;width:7rem;">จำนวนผู้ตอบ</th><th style="text-align:right;width:6rem;">เฉลี่ย/คน</th><th style="text-align:center;width:5rem;">หน่วย</th><th style="text-align:right;width:7rem;">tCO₂e</th></tr></thead><tbody id="tbody-sy">`;
+                                data.forEach(r => {
+                                    const resp = Number(r.respondents).toLocaleString('th-TH');
+                                    const avg = Number(r.avg_value).toLocaleString('th-TH', { maximumFractionDigits: 4 });
+                                    const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+                                    html += `<tr><td style="font-weight:600;">${r.audience ?? '-'}</td><td>${r.name_tiem}</td><td style="text-align:right;font-weight:700;">${resp}</td><td style="text-align:right;">${avg}</td><td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td><td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emi}</td></tr>`;
+                                });
+                                html += '</tbody></table>';
+                                body.innerHTML = html;
+                                return;
+                            }
+                            // กิจกรรม → จัดกลุ่มตาม event แล้วโชว์ "รายการกิจกรรม" ก่อน
+                            _symEvents = [];
+                            const idx = {};
+                            data.forEach(r => {
+                                if (!(r.event_id in idx)) {
+                                    idx[r.event_id] = _symEvents.length;
+                                    _symEvents.push({ name: r.event_name, organizer: r.organizer, event_date: r.event_date, event_end_date: r.event_end_date, items: [] });
+                                }
+                                _symEvents[idx[r.event_id]].items.push(r);
+                            });
+                            renderSymEventList();
+                        })
+                        .catch(() => {
+                            document.getElementById('detailModalBody').innerHTML = '<p class="no-data-msg">เกิดข้อผิดพลาด</p>';
+                        });
+                }
+
+                // ปุ่มกลับ "ยอดรายปี"
+                function _symYearlyBackPill() {
+                    return `<span class="back-btn-pill" onclick="openAffilYearly(null, '${_symName.replace(/'/g, "\\'")}', '${_symSource}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> กลับยอดรายปี</span>`;
+                }
+
+                // กิจกรรม ระดับ 1: รายการกิจกรรม
+                function renderSymEventList() {
+                    document.getElementById('detailModalTitle').textContent = _symName + ' — ' + _symYearLabel;
+                    document.getElementById('detailBreadcrumb').innerHTML = _symYearlyBackPill();
+                    let html = `<div class="modal-search-wrap"><input type="text" class="modal-search-input" placeholder="ค้นหากิจกรรม..." oninput="filterTable(this,'tbody-sy')"></div>
+        <table class="detail-table"><thead><tr>
+            <th style="text-align:center;width:6.5rem;">Scope</th><th>กิจกรรม</th><th>ผู้จัด</th>
+            <th style="text-align:center;width:11rem;">วันที่</th><th style="text-align:center;width:8rem;">ดูรายละเอียด</th>
+        </tr></thead><tbody id="tbody-sy">`;
+                    _symEvents.forEach((ev, i) => {
+                        const scopes = [...new Set(ev.items.map(it => Number(it.scope)))].sort();
+                        const pills = scopes.map(s => `<span class="scope-pill s${s}" style="white-space:nowrap;">Scope ${s}</span>`).join(' ');
+                        html += `<tr>
+            <td style="text-align:center;">${pills}</td>
+            <td style="font-weight:600;">${ev.name}</td>
+            <td style="color:var(--text-muted);">${ev.organizer ?? '-'}</td>
+            <td style="text-align:center;white-space:nowrap;">${_dateRange(ev)}</td>
+            <td style="text-align:center;"><button class="btn-detail" onclick="openSymEventDetail(${i})">ดูรายละเอียด</button></td>
+        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('detailModalBody').innerHTML = html;
+                }
+
+                // กิจกรรม ระดับ 2: รายการย่อยของกิจกรรมนั้น
+                function openSymEventDetail(i) {
+                    const ev = _symEvents[i];
+                    if (!ev) return;
+                    replayDetailPop();
+                    document.getElementById('detailModalTitle').textContent = ev.name;
+                    document.getElementById('detailBreadcrumb').innerHTML =
+                        `<span class="back-btn-pill" onclick="renderSymEventList()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> กลับรายการกิจกรรม</span>`;
+                    let html = `<div class="modal-search-wrap"><input type="text" class="modal-search-input" placeholder="ค้นหารายการ..." oninput="filterTable(this,'tbody-sy')"></div>
+        <table class="detail-table"><thead><tr>
+            <th>รายการ</th><th style="text-align:center;width:7rem;">หน่วย</th>
+            <th style="text-align:right;width:7rem;">จำนวน</th><th style="text-align:right;width:7rem;">tCO₂e</th>
+        </tr></thead><tbody id="tbody-sy">`;
+                    ev.items.forEach(r => {
+                        const vol = Number(r.vol).toLocaleString('th-TH', { maximumFractionDigits: 4 });
+                        const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                        html += `<tr><td style="font-weight:600;">${r.name_tiem}</td><td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td><td style="text-align:right;font-weight:700;">${vol}</td><td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emi}</td></tr>`;
                     });
                     html += '</tbody></table>';
                     document.getElementById('detailModalBody').innerHTML = html;
@@ -1406,11 +1602,11 @@ $affil_rows = $stmt_affil->fetchAll();
                     let html = `
         <div class="detail-summary">
             <div class="detail-stat">
-                <div class="detail-stat-label">จำนวนคณะ/หน่วยงาน</div>
-                <div class="detail-stat-value">${data.length} คณะ</div>
+                <div class="detail-stat-label">จำนวนผู้ให้ข้อมูล (คณะ + แบบสอบถาม + กิจกรรม)</div>
+                <div class="detail-stat-value">${data.length} รายการ</div>
             </div>
             <div class="detail-stat">
-                <div class="detail-stat-label">รายงานทั้งหมด (คณะ × ปี)</div>
+                <div class="detail-stat-label">รายงานทั้งหมด (ผู้ให้ข้อมูล × ปี)</div>
                 <div class="detail-stat-value">${totalReports} ครั้ง</div>
             </div>
         </div>
@@ -1419,7 +1615,7 @@ $affil_rows = $stmt_affil->fetchAll();
         </div>
         <table class="detail-table">
             <thead><tr>
-                <th>ชื่อคณะ / หน่วยงาน</th>
+                <th>ผู้ให้ข้อมูล (คณะ / แบบสอบถาม / กิจกรรม)</th>
                 <th style="text-align:center;">จำนวนปีที่รายงาน</th>
                 <th style="text-align:center;">รายละเอียด</th>
             </tr></thead>
@@ -1434,7 +1630,7 @@ $affil_rows = $stmt_affil->fetchAll();
                 </td>
                 <td style="text-align:center;">
                     ${cnt > 0
-                                ? `<button class="btn-detail" onclick="openReportsYears(${r.affil_id}, '${r.affil_name.replace(/'/g, "\\'")}')">ดูปีที่กรอก</button>`
+                                ? `<button class="btn-detail" onclick="openReportsYears(${r.affil_id === null ? 'null' : r.affil_id}, '${r.affil_name.replace(/'/g, "\\'")}', ${r.source ? `'${r.source}'` : 'null'})">ดูปีที่กรอก</button>`
                                 : `<span style="color:#9CA3AF;font-size:0.85rem;">ไม่มีข้อมูล</span>`
                             }
                 </td>
@@ -1460,23 +1656,29 @@ $affil_rows = $stmt_affil->fetchAll();
                     box.style.animation = 'modalPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
                 }
 
-                function openReportsYears(affilId, affilName) {
+                function openReportsYears(affilId, affilName, source = null) {
                     replayReportsPop();
                     document.getElementById('reportsModalTitle').textContent = affilName;
                     document.getElementById('reportsBreadcrumb').style.display = 'block';
+                    // breadcrumb ระดับ "ปีที่รายงาน" → ปุ่มกลับไปรายการผู้ให้ข้อมูล (list)
+                    document.getElementById('reportsBreadcrumb').innerHTML =
+                        `<span class="back-btn-pill" onclick="backToReportsList()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> กลับรายการคณะ</span>`;
                     document.getElementById('reportsModalBody').innerHTML =
                         '<div class="detail-loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>';
 
-                    fetch(`api_reports_list.php?mode=years&affil_id=${affilId}`)
+                    const url = source
+                        ? `api_reports_list.php?mode=years&source=${source}`
+                        : `api_reports_list.php?mode=years&affil_id=${affilId}`;
+                    fetch(url)
                         .then(r => r.json())
-                        .then(data => renderReportsYears(data, affilId))
+                        .then(data => renderReportsYears(data, affilId, source))
                         .catch(() => {
                             document.getElementById('reportsModalBody').innerHTML =
                                 '<p class="no-data-msg">เกิดข้อผิดพลาด</p>';
                         });
                 }
 
-                function renderReportsYears(data, affilId) {
+                function renderReportsYears(data, affilId, source = null) {
                     if (!data || data.length === 0) {
                         document.getElementById('reportsModalBody').innerHTML =
                             '<p class="no-data-msg">ยังไม่มีข้อมูลที่กรอกสำหรับคณะนี้</p>';
@@ -1503,7 +1705,7 @@ $affil_rows = $stmt_affil->fetchAll();
                     <span style="display:inline-block;padding:4px 14px;border-radius:999px;font-size:0.82rem;font-weight:700;background:#F3EAFF;color:var(--clr-primary);">${r.item_count} รายการ</span>
                 </td>
                 <td style="text-align:center;">
-                    <button class="btn-detail" onclick="openReportsItems(${affilId}, document.getElementById('reportsModalTitle').textContent, ${r.year_id}, '${r.year_label}')">ดูประเภท</button>
+                    <button class="btn-detail" onclick="openReportsItems(${affilId === null ? 'null' : affilId}, document.getElementById('reportsModalTitle').textContent, ${r.year_id}, '${r.year_label}', ${source ? `'${source}'` : 'null'})">${source ? 'ดูรายการ' : 'ดูประเภท'}</button>
                 </td>
             </tr>`;
                     });
@@ -1518,20 +1720,23 @@ $affil_rows = $stmt_affil->fetchAll();
 
                 // Level 3: แสดงประเภทที่กรอกในปีนั้น
                 let _prevAffilId = null, _prevAffilName = null;
-                function openReportsItems(affilId, affilName, yearId, yearLabel) {
+                function openReportsItems(affilId, affilName, yearId, yearLabel, source = null) {
                     replayReportsPop();
                     _prevAffilId = affilId;
                     _prevAffilName = affilName;
                     document.getElementById('reportsModalTitle').textContent = affilName + ' — ' + yearLabel;
                     document.getElementById('reportsBreadcrumb').style.display = 'block';
                     document.getElementById('reportsBreadcrumb').innerHTML =
-                        `<span class="back-btn-pill" onclick="backToReportsYears(${affilId},'${affilName.replace(/'/g, "\\'")}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> กลับปีที่รายงาน</span>`;
+                        `<span class="back-btn-pill" onclick="openReportsYears(${affilId === null ? 'null' : affilId},'${affilName.replace(/'/g, "\\'")}', ${source ? `'${source}'` : 'null'})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> กลับปีที่รายงาน</span>`;
                     document.getElementById('reportsModalBody').innerHTML =
                         '<div class="detail-loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>';
 
-                    fetch(`api_affil_detail.php?affil_id=${affilId}&year_id=${yearId}`)
+                    const url = source
+                        ? `api_affil_detail.php?source=${source}&year_id=${yearId}`
+                        : `api_affil_detail.php?affil_id=${affilId}&year_id=${yearId}`;
+                    fetch(url)
                         .then(r => r.json())
-                        .then(data => renderReportsItems(data))
+                        .then(data => renderReportsItems(data, source))
                         .catch(() => {
                             document.getElementById('reportsModalBody').innerHTML =
                                 '<p class="no-data-msg">เกิดข้อผิดพลาด</p>';
@@ -1541,14 +1746,213 @@ $affil_rows = $stmt_affil->fetchAll();
                 // cache สำหรับ Level 4
                 let _itemsCache = {};
 
-                function renderReportsItems(data) {
+                /* ═══ กิจกรรม 2 ระดับ (รายการกิจกรรม → รายละเอียดต่อกิจกรรม) ═══ */
+                let _eventCache = [];
+                let _eventListTitle = '';
+                let _eventYearsBreadcrumb = '';
+                const _dmy = iso => { const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + '-' + m[2] + '-' + m[1] : '-'; };
+                const _dateRange = ev => ev.event_end_date ? `${_dmy(ev.event_date)} – ${_dmy(ev.event_end_date)}` : _dmy(ev.event_date);
+
+                // ระดับ 1: รายการกิจกรรม — Scope / กิจกรรม / ผู้จัด / วันที่ / ดูรายละเอียด
+                function renderEventList() {
+                    document.getElementById('reportsModalTitle').textContent = _eventListTitle;
+                    document.getElementById('reportsBreadcrumb').innerHTML = _eventYearsBreadcrumb;
+                    let html = `
+        <div class="modal-search-wrap">
+            <input type="text" class="modal-search-input" placeholder="ค้นหากิจกรรม..." oninput="filterTable(this,'tbody-l3')">
+        </div>
+        <table class="detail-table">
+            <thead><tr>
+                <th style="text-align:center;width:6.5rem;">Scope</th>
+                <th>กิจกรรม</th>
+                <th>ผู้จัด</th>
+                <th style="text-align:center;width:11rem;">วันที่</th>
+                <th style="text-align:center;width:8rem;">ดูรายละเอียด</th>
+            </tr></thead>
+            <tbody id="tbody-l3">`;
+                    _eventCache.forEach((ev, i) => {
+                        const scopes = [...new Set(ev.items.map(it => Number(it.scope)))].sort();
+                        const pills = scopes.map(s => `<span class="scope-pill s${s}" style="white-space:nowrap;">Scope ${s}</span>`).join(' ');
+                        html += `<tr>
+                <td style="text-align:center;">${pills}</td>
+                <td style="font-weight:600;">${ev.name}</td>
+                <td style="color:var(--text-muted);">${ev.organizer ?? '-'}</td>
+                <td style="text-align:center;white-space:nowrap;">${_dateRange(ev)}</td>
+                <td style="text-align:center;">
+                    <button class="btn-detail" onclick="openEventDetail(${i})">ดูรายละเอียด</button>
+                </td>
+            </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('reportsModalBody').innerHTML = html;
+                }
+
+                // ระดับ 2: รายละเอียดต่อกิจกรรม — รายการ / จำนวน / หน่วย / tCO₂e
+                function openEventDetail(i) {
+                    const ev = _eventCache[i];
+                    if (!ev) return;
+                    replayReportsPop();
+                    document.getElementById('reportsModalTitle').textContent = ev.name;
+                    document.getElementById('reportsBreadcrumb').style.display = 'block';
+                    document.getElementById('reportsBreadcrumb').innerHTML =
+                        `<span class="back-btn-pill" onclick="backToEventList()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> กลับรายการกิจกรรม</span>`;
+                    let html = `
+        <div class="modal-search-wrap">
+            <input type="text" class="modal-search-input" placeholder="ค้นหารายการ..." oninput="filterTable(this,'tbody-l3')">
+        </div>
+        <table class="detail-table">
+            <thead><tr>
+                <th>รายการ</th>
+                <th style="text-align:center;width:7rem;">หน่วย</th>
+                <th style="text-align:right;width:7rem;">จำนวน</th>
+                <th style="text-align:right;width:7rem;">tCO₂e</th>
+            </tr></thead>
+            <tbody id="tbody-l3">`;
+                    ev.items.forEach(r => {
+                        const vol = Number(r.vol).toLocaleString('th-TH', { maximumFractionDigits: 4 });
+                        const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                        html += `<tr>
+                <td style="font-weight:600;">${r.name_tiem}</td>
+                <td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td>
+                <td style="text-align:right;font-weight:700;">${vol}</td>
+                <td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emi}</td>
+            </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('reportsModalBody').innerHTML = html;
+                }
+
+                function backToEventList() {
+                    replayReportsPop();
+                    renderEventList();
+                }
+
+                /* ═══ แบบสอบถาม 2 ระดับ (รายการกลุ่ม → รายละเอียดต่อกลุ่ม) ═══ */
+                let _surveyCache = [];
+                let _surveyListTitle = '';
+                let _surveyYearsBreadcrumb = '';
+
+                // ระดับ 1: รายการกลุ่ม — Scope / กลุ่ม / ดูรายละเอียด
+                function renderSurveyList() {
+                    document.getElementById('reportsModalTitle').textContent = _surveyListTitle;
+                    document.getElementById('reportsBreadcrumb').innerHTML = _surveyYearsBreadcrumb;
+                    let html = `
+        <div class="modal-search-wrap">
+            <input type="text" class="modal-search-input" placeholder="ค้นหากลุ่ม..." oninput="filterTable(this,'tbody-l3')">
+        </div>
+        <table class="detail-table">
+            <thead><tr>
+                <th style="text-align:center;width:6.5rem;">Scope</th>
+                <th>กลุ่ม</th>
+                <th style="text-align:center;width:8rem;">ดูรายละเอียด</th>
+            </tr></thead>
+            <tbody id="tbody-l3">`;
+                    _surveyCache.forEach((g, i) => {
+                        const scopes = [...new Set(g.items.map(it => Number(it.scope)))].sort();
+                        const pills = scopes.map(s => `<span class="scope-pill s${s}" style="white-space:nowrap;">Scope ${s}</span>`).join(' ');
+                        html += `<tr>
+                <td style="text-align:center;">${pills}</td>
+                <td style="font-weight:600;">${g.audience}</td>
+                <td style="text-align:center;">
+                    <button class="btn-detail" onclick="openSurveyDetail(${i})">ดูรายละเอียด</button>
+                </td>
+            </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('reportsModalBody').innerHTML = html;
+                }
+
+                // ระดับ 2: รายละเอียดต่อกลุ่ม — คำถาม / จำนวนผู้ตอบ / เฉลี่ย/คน / หน่วย / tCO₂e
+                function openSurveyDetail(i) {
+                    const g = _surveyCache[i];
+                    if (!g) return;
+                    replayReportsPop();
+                    document.getElementById('reportsModalTitle').textContent = g.audience;
+                    document.getElementById('reportsBreadcrumb').style.display = 'block';
+                    document.getElementById('reportsBreadcrumb').innerHTML =
+                        `<span class="back-btn-pill" onclick="backToSurveyList()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> กลับรายการกลุ่ม</span>`;
+                    let html = `
+        <div class="modal-search-wrap">
+            <input type="text" class="modal-search-input" placeholder="ค้นหาคำถาม..." oninput="filterTable(this,'tbody-l3')">
+        </div>
+        <table class="detail-table">
+            <thead><tr>
+                <th>คำถาม</th>
+                <th style="text-align:right;width:7rem;">จำนวนผู้ตอบ</th>
+                <th style="text-align:right;width:6rem;">เฉลี่ย/คน</th>
+                <th style="text-align:center;width:5rem;">หน่วย</th>
+                <th style="text-align:right;width:7rem;">tCO₂e</th>
+            </tr></thead>
+            <tbody id="tbody-l3">`;
+                    g.items.forEach(r => {
+                        const resp = Number(r.respondents).toLocaleString('th-TH');
+                        const avg = Number(r.avg_value).toLocaleString('th-TH', { maximumFractionDigits: 4 });
+                        const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+                        html += `<tr>
+                <td style="font-weight:600;">${r.name_tiem}</td>
+                <td style="text-align:right;font-weight:700;">${resp}</td>
+                <td style="text-align:right;">${avg}</td>
+                <td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td>
+                <td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emi}</td>
+            </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('reportsModalBody').innerHTML = html;
+                }
+
+                function backToSurveyList() {
+                    replayReportsPop();
+                    renderSurveyList();
+                }
+
+                function renderReportsItems(data, source = null) {
                     if (!data || data.length === 0) {
                         document.getElementById('reportsModalBody').innerHTML =
                             '<p class="no-data-msg">ยังไม่มีข้อมูลที่กรอก</p>';
                         return;
                     }
 
-                    // จัดกลุ่ม unique ตาม activity_type
+                    // แบบสอบถาม → 2 ระดับ: (1) รายการกลุ่ม (2) รายละเอียดต่อกลุ่ม
+                    if (source === 'survey') {
+                        _surveyCache = [];
+                        const idxOf = {};
+                        data.forEach(r => {
+                            const grp = r.audience ?? '-';
+                            if (!(grp in idxOf)) {
+                                idxOf[grp] = _surveyCache.length;
+                                _surveyCache.push({ audience: grp, items: [] });
+                            }
+                            _surveyCache[idxOf[grp]].items.push(r);
+                        });
+                        _surveyListTitle = document.getElementById('reportsModalTitle').textContent;
+                        _surveyYearsBreadcrumb = document.getElementById('reportsBreadcrumb').innerHTML;
+                        renderSurveyList();
+                        return;
+                    }
+
+                    // กิจกรรม → 2 ระดับ: (1) รายการกิจกรรม (2) รายละเอียดต่อกิจกรรม
+                    if (source === 'event') {
+                        // จัดกลุ่มรายการตาม event
+                        _eventCache = [];
+                        const idxOf = {};
+                        data.forEach(r => {
+                            if (!(r.event_id in idxOf)) {
+                                idxOf[r.event_id] = _eventCache.length;
+                                _eventCache.push({
+                                    name: r.event_name, organizer: r.organizer,
+                                    event_date: r.event_date, event_end_date: r.event_end_date, items: []
+                                });
+                            }
+                            _eventCache[idxOf[r.event_id]].items.push(r);
+                        });
+                        // จำ breadcrumb "กลับปีที่รายงาน" ไว้ใช้ตอนกลับจากหน้ารายละเอียด
+                        _eventListTitle = document.getElementById('reportsModalTitle').textContent;
+                        _eventYearsBreadcrumb = document.getElementById('reportsBreadcrumb').innerHTML;
+                        renderEventList();
+                        return;
+                    }
+
+                    // คณะ (officer) → เหมือนเดิม: จัดกลุ่มตามประเภท + ปุ่มดูรายละเอียด (มีไฟล์)
                     const seen = new Set();
                     const unique = [];
                     _itemsCache = {};
@@ -1636,9 +2040,10 @@ $affil_rows = $stmt_affil->fetchAll();
                     <td style="text-align:right;">${parseFloat(r.vol).toLocaleString('th-TH', { maximumFractionDigits: 4 })}</td>
                     ${!hideFiles ? `
                     <td style="text-align:center;">
-                        <button class="btn-detail" style="padding:5px 12px;font-size:0.8rem;" onclick="openFilesLightbox(${r.user_item_id}, '${r.name_tiem.replace(/'/g, "\'")}')">
+                        <button class="btn-detail" style="position:relative;padding:5px 12px;font-size:0.8rem;" onclick="openFilesLightbox(${r.user_item_id}, '${r.name_tiem.replace(/'/g, "\'")}')">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                             ไฟล์
+                            ${Number(r.ev_count) > 0 ? `<span style="position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#EF4444;color:#fff;font-size:0.68rem;font-weight:800;line-height:18px;box-shadow:0 1px 3px rgba(0,0,0,.25);">${Number(r.ev_count)}</span>` : ''}
                         </button>
                     </td>` : ''}
                 </tr>`;
@@ -1778,7 +2183,7 @@ $affil_rows = $stmt_affil->fetchAll();
                             onmouseout="this.style.borderColor='#E5E7EB';this.style.transform='translateY(0)';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
                             <div style="font-size:2.5rem;color:var(--clr-primary);">📄</div>
                             <div style="color:var(--text-primary);font-weight:800;font-size:0.9rem;">${ext}</div>
-                            <div style="color:var(--text-muted);font-size:0.75rem;font-weight:600;text-align:center;padding:0 12px;word-break:break-all;">${f.file_path.split('/').pop().substring(0, 24)}</div>
+                            <div style="color:var(--text-muted);font-size:0.75rem;font-weight:600;text-align:center;padding:0 12px;word-break:break-all;">${(f.original_name || f.file_path.split('/').pop()).substring(0, 40)}</div>
                         </div>`;
                         }
                     });
@@ -1807,7 +2212,7 @@ $affil_rows = $stmt_affil->fetchAll();
                         document.getElementById('lbContent').innerHTML =
                             `<img src="${filePath}" style="max-width:100%;max-height:55vh;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.1);border:1px solid #E5E7EB;object-fit:contain;" onerror="this.alt='โหลดไม่ได้'">`;
                         document.getElementById('lbFooter').innerHTML =
-                            `<a href="${filePath}" download target="_blank" style="display:inline-flex;align-items:center;gap:8px;color:white;text-decoration:none;font-size:0.9rem;font-weight:700;font-family:'Kanit',sans-serif;padding:10px 24px;background:var(--clr-primary);border-radius:12px;box-shadow:0 4px 12px rgba(98,54,139,0.25);transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                            `<a href="${filePath}" download="${f.original_name || ''}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;color:white;text-decoration:none;font-size:0.9rem;font-weight:700;font-family:'Kanit',sans-serif;padding:10px 24px;background:var(--clr-primary);border-radius:12px;box-shadow:0 4px 12px rgba(98,54,139,0.25);transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         ดาวน์โหลดภาพ
                      </a>`;
@@ -1816,8 +2221,8 @@ $affil_rows = $stmt_affil->fetchAll();
                     <div style="background:white;border-radius:24px;padding:3rem 4rem;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,0.5);">
                         <div style="font-size:4rem;margin-bottom:1rem;">📄</div>
                         <div style="font-size:1.2rem;font-weight:700;color:#111;margin-bottom:0.4rem;">${ext} ไฟล์</div>
-                        <div style="font-size:0.82rem;color:#6B7280;margin-bottom:1.5rem;word-break:break-all;max-width:300px;">${f.file_path.split('/').pop()}</div>
-                        <a href="${filePath}" download target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--clr-primary);color:white;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-family:'Kanit',sans-serif;">
+                        <div style="font-size:0.82rem;color:#6B7280;margin-bottom:1.5rem;word-break:break-all;max-width:300px;">${f.original_name || f.file_path.split('/').pop()}</div>
+                        <a href="${filePath}" download="${f.original_name || ''}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--clr-primary);color:white;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-family:'Kanit',sans-serif;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             ดาวน์โหลด
                         </a>

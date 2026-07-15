@@ -61,6 +61,10 @@
     transform: translateY(-1px);
 }
 
+/* chevron หงายขึ้นตอนเปิด (JS ใส่ class .open ที่ .db-year-dropdown) */
+.db-year-btn svg { transition: transform 0.2s ease; }
+.db-year-dropdown.open .db-year-btn svg { transform: rotate(180deg); }
+
 .db-year-menu {
     display: none;
     position: absolute;
@@ -547,7 +551,6 @@
 .detail-stat-label {
     font-size: 0.78rem;
     font-weight: 700;
-    text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--text-muted);
     margin-bottom: 0.4rem;
@@ -563,6 +566,7 @@
 .detail-table {
     width: 100%;
     border-collapse: collapse;
+    margin-top: 16px;
 }
 
 .detail-table th {
@@ -571,7 +575,6 @@
     text-align: left;
     font-size: 0.78rem;
     font-weight: 800;
-    text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-secondary);
     border-bottom: 2px solid #F3F4F6;
@@ -629,8 +632,8 @@
     top: 0;
     z-index: 5;
     background: white;
-    padding: 0 0 0.85rem 0;
-    margin-bottom: 0.25rem;
+    padding: 0;
+    margin: 0;
 }
 
 .modal-search-input {

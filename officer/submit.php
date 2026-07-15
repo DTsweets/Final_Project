@@ -83,7 +83,7 @@ $items_sql = '
         ON ui.admin_item_id = ai.id
         AND ui.affiliation_id = :affil
         AND ui.year_id = :year
-    WHERE ai.year_id = :year2 AND ai.data_source = \x27officer\x27
+    WHERE ai.year_id = :year2 AND ai.data_source = \'officer\'
     ORDER BY ag.scope, ai.id
 ';
 $stmt = $pdo->prepare($items_sql);

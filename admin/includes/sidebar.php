@@ -196,8 +196,18 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
         let isNavigating = false;
 
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px);z-index:9999;display:none;cursor:wait;';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.55);backdrop-filter:blur(2px);cursor:wait;';
+        overlay.innerHTML = '<div class="nav-spinner" role="status" aria-label="กำลังโหลด"></div>';
         document.body.appendChild(overlay);
+
+        // สไตล์ spinner + transition เนื้อหาตอนสลับหน้า
+        const _navStyle = document.createElement('style');
+        _navStyle.textContent =
+            '@keyframes navspin{to{transform:rotate(360deg)}}' +
+            '.nav-spinner{width:46px;height:46px;border:4px solid rgba(124,58,237,.18);border-top-color:#7C3AED;border-radius:50%;animation:navspin .7s linear infinite;}' +
+            '.main-content{transition:opacity .22s ease, transform .22s ease;}' +
+            '.main-content.nav-leaving{opacity:0;transform:translateY(8px);}';
+        document.head.appendChild(_navStyle);
 
         /**
          * ฉีด CSS ที่หน้าใหม่ต้องการ แต่ยังไม่มีใน <head> ปัจจุบัน

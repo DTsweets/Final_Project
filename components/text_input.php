@@ -29,7 +29,16 @@
  *                     เพื่อสืบทอดสไตล์เฉพาะหน้า
  *   $ti_wrap_class  = class ของกล่องนอก (.ti-component) — ใช้คุมความกว้าง/สูง (optional)
  *   $ti_wrap_style  = inline style ของกล่องนอก เช่น 'width:320px' (optional)
+ *   $ti_bg          = สีพื้นหลัง input (optional) เช่น '#FCFBFD' — ตั้งตัวแปร --ti-bg
+ *   $ti_bg_focus    = สีพื้นหลังตอน focus (optional) — ตั้งตัวแปร --ti-bg-focus
  *   $ti_autofocus   = true/false                         (default false)
+ *
+ * การกำหนดสีพื้นหลัง มี 2 ทาง:
+ *   1) ส่งสีตรง ๆ (เร็ว):   $ti_bg = '#FCFBFD';
+ *   2) ส่งผ่าน "class สี" (reuse): ให้ class ตั้งค่าตัวแปร --ti-bg แล้วส่งทาง $ti_wrap_class
+ *      <style> .bg-soft { --ti-bg:#FCFBFD; --ti-bg-focus:#fff; } </style>
+ *      <?php $ti_wrap_class = 'bg-soft'; include ...; ?>
+ *   ทั้งสองทางคุม background ครบทั้ง ปกติ/focus/autofill โดยไม่ต้องสู้ specificity
  *
  * การกำหนดความกว้าง/ความสูงของกล่อง (แนะนำใช้ $ti_wrap_class):
  *   ความกว้าง -> ใส่ที่กล่องนอก, ความสูง -> ใส่ที่ .ti-input ข้างใน
@@ -77,7 +86,14 @@ $ti_style       = $ti_style ?? '';
 $ti_class       = $ti_class ?? '';
 $ti_wrap_class  = $ti_wrap_class ?? '';   // class ของกล่องนอก (.ti-component) — ใช้คุมความกว้าง/สูง
 $ti_wrap_style  = $ti_wrap_style ?? '';   // inline style ของกล่องนอกโดยเฉพาะ (เช่น 'width:320px')
+$ti_bg          = $ti_bg ?? '';           // สีพื้นหลัง input (ตั้ง --ti-bg) เช่น '#FCFBFD'
+$ti_bg_focus    = $ti_bg_focus ?? '';     // สีพื้นหลังตอน focus (ตั้ง --ti-bg-focus)
 $ti_autofocus   = $ti_autofocus ?? false;
+
+// รวมสีพื้นหลังเป็น CSS variable บนกล่องนอก (ครอบทั้ง base/focus/autofill)
+$ti_bg_vars  = ($ti_bg !== '' ? '--ti-bg:' . $ti_bg . ';' : '')
+             . ($ti_bg_focus !== '' ? '--ti-bg-focus:' . $ti_bg_focus . ';' : '');
+$ti_wrap_style = trim($ti_bg_vars . $ti_wrap_style);
 
 // อนุญาตเฉพาะ type ที่ปลอดภัย/สมเหตุสมผลกับ component นี้
 $ti_allowed_types = ['text', 'email', 'number', 'password', 'tel', 'search'];
@@ -150,7 +166,7 @@ unset(
     $ti_id, $ti_name, $ti_value, $ti_label, $ti_placeholder, $ti_type,
     $ti_required, $ti_disabled, $ti_suggestions, $ti_maxlength,
     $ti_step, $ti_min, $ti_max, $ti_style,
-    $ti_class, $ti_wrap_class, $ti_wrap_style, $ti_autofocus,
+    $ti_class, $ti_wrap_class, $ti_wrap_style, $ti_bg, $ti_bg_focus, $ti_bg_vars, $ti_autofocus,
     $ti_allowed_types, $ti_norm_suggestions, $ti_has_suggestions
 );
 ?>
@@ -159,9 +175,12 @@ unset(
     <?php define('TI_COMPONENT_ASSETS_LOADED', true); ?>
     <style>
         /* ── ตัวแปรสีหลัก: ใช้ของหน้าเว็บถ้ามี ไม่งั้น fallback เป็นสีม่วงแบรนด์ ── */
-        .ti-component {
+        /* ประกาศตัวแปรทั้งบนกล่องนอกและตัว input เอง เผื่อใช้ .ti-input แบบเดี่ยว (ไม่มี .ti-component ห่อ) */
+        .ti-component, .ti-input {
             --ti-primary: var(--clr-primary, #62368B);
             --ti-border: var(--border, #E5E7EB);
+        }
+        .ti-component {
             position: relative;
             /* ไม่ล็อก width ไว้ที่นี่ (div เป็น block กว้างเต็ม parent อยู่แล้ว)
                เพื่อให้ $ti_wrap_class / $ti_wrap_style กำหนดความกว้างทับได้โดยไม่ติด specificity */
@@ -185,7 +204,7 @@ unset(
         .ti-input {
             width: 100%;
             height: 58px;
-            background: #F9FAFB;
+            background: var(--ti-bg, #F9FAFB);
             border: 1px solid var(--ti-border);
             border-radius: 18px;
             padding: 0 1.5rem;
@@ -202,8 +221,8 @@ unset(
         .ti-input:focus {
             outline: none;
             border-color: var(--ti-primary);
-            background: #fff;
-            box-shadow: 0 0 0 5px rgba(98, 54, 139, 0.1);
+            background: var(--ti-bg-focus, #fff);
+            box-shadow: 0 0 0 1px var(--ti-primary), 0 0 0 4px rgba(98, 54, 139, 0.15);
             transform: translateY(-1px);
         }
 
@@ -211,6 +230,16 @@ unset(
             cursor: not-allowed;
             opacity: 0.6;
         }
+
+        /* ── ล้างพื้นหลัง autofill ของเบราว์เซอร์ (โทนฟ้า/ม่วง) ให้ใช้สีเดียวกับ .ti-input ── */
+        .ti-input:-webkit-autofill,
+        .ti-input:-webkit-autofill:hover,
+        .ti-input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 1000px var(--ti-bg, #F9FAFB) inset;
+            -webkit-text-fill-color: var(--text-primary, #374151);
+            transition: background-color 9999s ease-in-out 0s;
+        }
+        .ti-input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px var(--ti-bg-focus, #fff) inset; }
 
         /* ── เมนูคำแนะนำ (autocomplete) — เข้าชุดกับ .dd-menu ── */
         .ti-menu {
@@ -260,6 +289,12 @@ unset(
             background-color: #1F2937;
             border-color: #374151;
             color: #F9FAFB;
+        }
+        html.dark-theme .ti-input:-webkit-autofill,
+        html.dark-theme .ti-input:-webkit-autofill:hover,
+        html.dark-theme .ti-input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 1000px #1F2937 inset;
+            -webkit-text-fill-color: #F9FAFB;
         }
         html.dark-theme .ti-label { color: #F9FAFB; }
         html.dark-theme .ti-menu {
