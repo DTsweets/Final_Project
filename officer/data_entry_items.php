@@ -1,6 +1,6 @@
 <?php
 /**
- * ADMIN — Data Entry Step 2: Items Input (data_entry_items.php)
+ * OFFICER — Data Entry Step 2: Items Input (data_entry_items.php)
  * -----------------------------------------------------------
  * กรอกข้อมูลกิจกรรม แยกตามขอบเขต (Step 2)
  */
@@ -64,8 +64,8 @@ $evidence_counts = [];
 $evidence_thumbs = [];
 $stmt = $pdo->prepare('
     SELECT ui.admin_item_id, ui.Vol, ui.id as user_item_id,
-           (SELECT COUNT(*) FROM user_item_evidence WHERE user_item_id = ui.id) as ev_count,
-           (SELECT file_path FROM user_item_evidence WHERE user_item_id = ui.id ORDER BY created_at ASC LIMIT 1) as ev_thumb
+           (SELECT COUNT(*) FROM evidence WHERE entity_type=\'user_item\' AND entity_id = ui.id) as ev_count,
+           (SELECT file_path FROM evidence WHERE entity_type=\'user_item\' AND entity_id = ui.id AND kind=\'file\' ORDER BY created_at ASC LIMIT 1) as ev_thumb
     FROM user_item ui 
     WHERE ui.year_id = ? AND ui.affiliation_id = ?
 ');
@@ -1378,13 +1378,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <input type="hidden" name="item_id" id="edit_item_id">
                 <div class="form-group-dark" style="margin-bottom: 1.5rem;">
                     <label class="form-label-dark">ขอบเขต :</label>
-                    <select name="scope_id" id="edit_scope_id" class="form-control-dark" required>
-                        <?php foreach ($groups as $g): ?>
-                            <option value="<?= $g['id'] ?>">ขอบเขตที่ <?= $g['scope'] ?>
-                                <?= htmlspecialchars($g['name_tiem']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php
+                    // ใช้ component dropdown กลาง (components/dropdown.php) แทน <select> เดิม
+                    $dd_id          = 'editScopeDropdown';
+                    $dd_name        = 'scope_id';
+                    $dd_options     = array_map(fn($g) => ['value' => $g['id'], 'label' => 'ขอบเขตที่ ' . $g['scope'] . ' ' . $g['name_tiem']], $groups);
+                    $dd_selected    = '';
+                    $dd_placeholder = 'เลือกขอบเขต';
+                    $dd_required    = true;
+                    $dd_class       = 'dd-field';
+                    include __DIR__ . '/../components/dropdown.php';
+                    ?>
                 </div>
                 <div class="form-group-dark" style="margin-bottom: 1.5rem;">
                     <label class="form-label-dark">รายการ :</label>
@@ -1459,7 +1463,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         function toggleAccordion(id) {
             const section = document.getElementById(id);
             section.classList.toggle('active');
+            saveAccordionState();
         }
+
+        // จำ accordion ที่เปิดอยู่ (ข้าม reload หลังบันทึก/แก้ไข/ลบ)
+        function saveAccordionState() {
+            try {
+                var open = [];
+                document.querySelectorAll('.accordion-section.active').forEach(function (s) { open.push(s.id); });
+                sessionStorage.setItem('accOpen:' + location.pathname, JSON.stringify(open));
+            } catch (e) {}
+        }
+        // เปิด accordion กลับทันที (ทำงานตอน parse ก่อน event load → หน้าสูงเท่าเดิม scroll-keep เลื่อนกลับได้)
+        (function () {
+            try {
+                var raw = sessionStorage.getItem('accOpen:' + location.pathname);
+                if (raw) JSON.parse(raw).forEach(function (id) {
+                    var s = document.getElementById(id);
+                    if (s) s.classList.add('active');
+                });
+            } catch (e) {}
+        })();
 
         function calculateRow(input) {
             if (parseFloat(input.value) > 1000000) input.value = 1000000;
@@ -1478,7 +1502,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         function openEditModal(id, scopeId, name, unit, ad) {
             document.getElementById('edit_item_id').value = id;
-            document.getElementById('edit_scope_id').value = scopeId;
+            const _opt = document.querySelector('#editScopeDropdown_menu .dd-option[data-value="' + scopeId + '"]');
+            ddSetValue('editScopeDropdown', scopeId, _opt ? _opt.textContent.trim() : '');
             document.getElementById('edit_name_tiem').value = name;
             document.getElementById('edit_unit').value = unit;
             document.getElementById('edit_AD').value = ad;

@@ -511,6 +511,7 @@ $page_title2 = "UP Net Zero";
                         $current_year_th = (int) date('Y') + 543;
                         $existing_years = array_column($years, 'year');
 
+                        // ช่วงปี: ปีปัจจุบัน ถึง −10 (ไม่มีอนาคต) แต่ตัดปีที่มีแล้วออก กันเพิ่มซ้ำ
                         $available_years = [];
                         for ($i = $current_year_th; $i >= $current_year_th - 10; $i--) {
                             if (!in_array($i, $existing_years)) {
@@ -821,11 +822,11 @@ $page_title2 = "UP Net Zero";
                         <?php
                         $current_year_th = (int) date('Y') + 543;
 
-                        // สร้างรายการปีที่เลือกได้ (ปีปัจจุบัน+2 ถึง ปีปัจจุบัน-10)
+                        // สร้างรายการปีที่เลือกได้ (ปีปัจจุบัน ถึง ปีปัจจุบัน-10) ให้ตรงกับ modal "เพิ่มปี"
                         // หมายเหตุ: ไม่กรอง $existing_years ออก เพราะปีปัจจุบันของแถวที่กำลังแก้ไข
                         // ต้องอยู่ในลิสต์ด้วยเสมอ (ระบบจัดการปีซ้ำด้วย modal "สลับปี" อยู่แล้ว)
                         $edit_year_options = [];
-                        for ($i = $current_year_th + 2; $i >= $current_year_th - 10; $i--) {
+                        for ($i = $current_year_th; $i >= $current_year_th - 10; $i--) {
                             $edit_year_options[] = $i;
                         }
 

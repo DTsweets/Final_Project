@@ -19,6 +19,8 @@ foreach (ghg_years($pdo) as $y) { if ($y['year_id'] == $year) { $year_label = $y
 
 $scope = ghg_scope_totals($pdo, $year, $view === 'faculty' ? $affil_id : null);
 $total = $scope[1] + $scope[2] + $scope[3];
+$removal = $view === 'faculty' ? removal_activity_total($pdo, $year, $affil_id) : removal_total($pdo, $year);
+$net = $total - $removal;
 $rows  = $view === 'faculty' ? ghg_affil_detail($pdo, $affil_id, $year) : ghg_by_affiliation($pdo, $year);
 $scopeName = $view === 'faculty' ? ('คณะ ' . $affil_name) : 'ทั้งระบบ (ทุกคณะ)';
 ?>
@@ -56,7 +58,9 @@ $scopeName = $view === 'faculty' ? ('คณะ ' . $affil_name) : 'ทั้ง�
         <div style="color:#F97316;">Scope 1: <?= number_format($scope[1], 2, '.', ',') ?> tCO₂e</div>
         <div style="color:#EC4899;">Scope 2: <?= number_format($scope[2], 2, '.', ',') ?> tCO₂e</div>
         <div style="color:#3B82F6;">Scope 3: <?= number_format($scope[3], 2, '.', ',') ?> tCO₂e</div>
-        <div style="color:#62368B;">รวม: <?= number_format($total, 2, '.', ',') ?> tCO₂e</div>
+        <div style="color:#62368B;">รวมการปล่อย: <?= number_format($total, 2, '.', ',') ?> tCO₂e</div>
+        <div style="color:#166534;">ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?>: <?= number_format($removal, 2, '.', ',') ?> tCO₂e</div>
+        <div style="color:#111827;font-weight:700;">สุทธิ (Net = ปล่อย − ดูดกลับ): <?= number_format($net, 2, '.', ',') ?> tCO₂e</div>
     </div>
 
     <table>

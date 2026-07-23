@@ -1,8 +1,8 @@
 <?php
 /**
- * ADMIN — Scope Items Management (items.php)
+ * OFFICER — Scope Items Management (items.php)
  * -------------------------------------------
- * สิทธิ์: admin, admin_c
+ * สิทธิ์: officer (เจ้าหน้าที่คณะ)
  * จัดการ admin_item (รายการ emission factor)
  * ดู/เพิ่ม/แก้ไข/ลบ admin_item ตามปีและ scope
  */

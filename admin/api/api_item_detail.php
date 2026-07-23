@@ -4,8 +4,8 @@
  * ดึงรายละเอียด user_item เดี่ยว: ชื่อ, จำนวน, ค่า emission + ไฟล์แนบ
  * params: user_item_id
  */
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../config/db.php';
 
 require_role(['admin']);
 
@@ -50,8 +50,8 @@ if (!$item) {
 // ── ดึงไฟล์แนบ ─────────────────────────────────────────────────────────────
 $stmtEv = $pdo->prepare('
     SELECT id, file_path, file_type, original_name, created_at
-    FROM user_item_evidence
-    WHERE user_item_id = :uid
+    FROM evidence
+    WHERE entity_type = \'user_item\' AND entity_id = :uid AND kind = \'file\'
     ORDER BY created_at DESC
 ');
 $stmtEv->execute([':uid' => $userItemId]);

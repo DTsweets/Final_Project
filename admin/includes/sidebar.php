@@ -275,7 +275,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                     if (!isSubItem) ddCollapseOthers(nextEl);
 
                     isNavigating = true;
-                    overlay.style.display = 'block';
+                    overlay.style.display = 'flex';
 
                     fetch(url)
                         .then(res => res.text())
@@ -332,4 +332,21 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
             }
         });
     });
+</script>
+
+<script>
+/* ── จำตำแหน่ง scroll ข้ามการ reload (POST→redirect) กันหน้าเด้งขึ้นบนสุด — ใช้ร่วมทุกหน้าที่มี sidebar ── */
+(function () {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    var KEY = 'scrollY:' + location.pathname; // key ตาม path เพื่อไม่ให้ scroll ของหน้าหนึ่งไปเด้งอีกหน้า
+    window.addEventListener('beforeunload', function () {
+        try { sessionStorage.setItem(KEY, String(window.scrollY)); } catch (e) {}
+    });
+    window.addEventListener('load', function () {
+        try {
+            var y = sessionStorage.getItem(KEY);
+            if (y !== null) { window.scrollTo(0, parseInt(y, 10) || 0); sessionStorage.removeItem(KEY); }
+        } catch (e) {}
+    });
+})();
 </script>

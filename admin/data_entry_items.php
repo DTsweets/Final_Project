@@ -838,7 +838,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         function toggleAccordion(id) {
             const section = document.getElementById(id);
             section.classList.toggle('active');
+            saveAccordionState();
         }
+
+        // จำ accordion ที่เปิดอยู่ (ข้าม reload หลังบันทึก/แก้ไข/ลบ)
+        function saveAccordionState() {
+            try {
+                var open = [];
+                document.querySelectorAll('.accordion-section.active').forEach(function (s) { open.push(s.id); });
+                sessionStorage.setItem('accOpen:' + location.pathname, JSON.stringify(open));
+            } catch (e) {}
+        }
+        // เปิด accordion กลับทันที (ทำงานตอน parse ก่อน event load → หน้าสูงเท่าเดิม scroll-keep เลื่อนกลับได้)
+        (function () {
+            try {
+                var raw = sessionStorage.getItem('accOpen:' + location.pathname);
+                if (raw) JSON.parse(raw).forEach(function (id) {
+                    var s = document.getElementById(id);
+                    if (s) s.classList.add('active');
+                });
+            } catch (e) {}
+        })();
 
         function calculateRow(input) {
             const row = input.closest('tr');

@@ -96,8 +96,15 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
         const navLinks = document.querySelectorAll('.sidebar-nav .nav-item');
         let isNavigating = false;
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px);z-index:9999;display:none;cursor:wait;';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.55);backdrop-filter:blur(2px);cursor:wait;';
+        overlay.innerHTML = '<div class="nav-spinner" role="status" aria-label="กำลังโหลด"></div>';
         document.body.appendChild(overlay);
+        if (!document.getElementById('navSpinStyle')) {
+            const _st = document.createElement('style');
+            _st.id = 'navSpinStyle';
+            _st.textContent = '@keyframes navspin{to{transform:rotate(360deg)}}.nav-spinner{width:46px;height:46px;border:4px solid rgba(124,58,237,.18);border-top-color:#7C3AED;border-radius:50%;animation:navspin .7s linear infinite;}';
+            document.head.appendChild(_st);
+        }
 
         function injectPageStyles(doc) {
             const existing = new Set(Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(l => l.href));
@@ -119,7 +126,7 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
                 e.preventDefault();
                 const url = this.getAttribute('href');
                 if (!url || url === '#') return;
-                isNavigating = true; overlay.style.display = 'block';
+                isNavigating = true; overlay.style.display = 'flex';
                 fetch(url).then(r => r.text()).then(html => {
                     const doc = new DOMParser().parseFromString(html, 'text/html');
                     if (doc.title) document.title = doc.title;
@@ -143,4 +150,21 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
             });
         });
     });
+</script>
+
+<script>
+/* ── จำตำแหน่ง scroll ข้ามการ reload (POST→redirect) กันหน้าเด้งขึ้นบนสุด — ใช้ร่วมทุกหน้าที่มี sidebar ── */
+(function () {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    var KEY = 'scrollY:' + location.pathname; // key ตาม path เพื่อไม่ให้ scroll ของหน้าหนึ่งไปเด้งอีกหน้า
+    window.addEventListener('beforeunload', function () {
+        try { sessionStorage.setItem(KEY, String(window.scrollY)); } catch (e) {}
+    });
+    window.addEventListener('load', function () {
+        try {
+            var y = sessionStorage.getItem(KEY);
+            if (y !== null) { window.scrollTo(0, parseInt(y, 10) || 0); sessionStorage.removeItem(KEY); }
+        } catch (e) {}
+    });
+})();
 </script>

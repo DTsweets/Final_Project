@@ -389,7 +389,8 @@
 /* Detail Modal */
 .detail-modal-box {
     max-width: 1000px !important;
-    padding: 0 !important;
+    /* เว้นช่องล่างเล็กน้อย ให้ scrollbar จบเหนือมุมมน → ปุ่มลูกศรล่าง (▼) ไม่โดนตัด */
+    padding: 0 0 18px !important;
     border-radius: 32px !important;
     overflow: hidden;
 }
@@ -505,6 +506,28 @@
     padding: 2.25rem 2.75rem;
     max-height: 58vh;
     overflow-y: auto;
+    /* scrollbar แบบบาง (house style) — Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: #D1D5DB transparent;
+}
+
+/* scrollbar แบบบาง (house style) — Chrome/Edge/Safari */
+.detail-modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.detail-modal-body::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 6px 0;
+}
+
+.detail-modal-body::-webkit-scrollbar-thumb {
+    background: #D1D5DB;
+    border-radius: 8px;
+}
+
+.detail-modal-body::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
 }
 
 .detail-loading {

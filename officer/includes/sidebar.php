@@ -1,10 +1,10 @@
 <?php
 /**
- * Sidebar Component for Super Admin
+ * Sidebar Component for Officer (เจ้าหน้าที่คณะ)
  */
 $current_page = basename($_SERVER['PHP_SELF']);
-$admin_name = isset($_SESSION['firstname']) && isset($_SESSION['lastname']) ? $_SESSION['firstname'] . ' ' . $_SESSION['lastname'] : 'ADMIN CESM';
-$admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
+$admin_name = isset($_SESSION['firstname']) && isset($_SESSION['lastname']) ? $_SESSION['firstname'] . ' ' . $_SESSION['lastname'] : 'เจ้าหน้าที่';
+$admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Officer';
 ?>
 <!-- ปุ่มเปิด/ปิดเมนู (แสดงเฉพาะจอเล็ก ≤1024px) -->
 <button type="button" class="sidebar-toggle" aria-label="เปิดเมนู" onclick="toggleSidebar()">
@@ -117,7 +117,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                     </svg>
                     UP Net Zero
                 </a>
-                <!-- 2. กิจกรรม -->
+                <!-- 2. แบบสอบถาม & กิจกรรม -->
                 <a href="<?= $root ?? '../' ?>officer/collect.php"
                     class="sub-item <?= ($current_page == 'collect.php') ? 'active' : '' ?>">
                     <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -128,7 +128,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                         <path d="M12 12.5L18.5 10.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
                         <path d="M12 17.5L16.5 15.5" stroke="#BC8E5C" stroke-width="1.8" stroke-linecap="round" />
                     </svg>
-                    กิจกรรม
+                    แบบสอบถาม & กิจกรรม
                 </a>
                 <?php if ((int) ($_SESSION['affiliation_id'] ?? 0) === 1): /* GHG Removal: เฉพาะศูนย์สิ่งแวดล้อม */ ?>
                 <!-- 3. GHG Removal -->
@@ -250,7 +250,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                     if (!isSubItem) ddCollapseOthers(nextEl);
 
                     isNavigating = true;
-                    overlay.style.display = 'block';
+                    overlay.style.display = 'flex';
 
                     fetch(url)
                         .then(res => res.text())
@@ -307,4 +307,21 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
             }
         });
     });
+</script>
+
+<script>
+/* ── จำตำแหน่ง scroll ข้ามการ reload (POST→redirect) กันหน้าเด้งขึ้นบนสุด — ใช้ร่วมทุกหน้าที่มี sidebar ── */
+(function () {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    var KEY = 'scrollY:' + location.pathname; // key ตาม path เพื่อไม่ให้ scroll ของหน้าหนึ่งไปเด้งอีกหน้า
+    window.addEventListener('beforeunload', function () {
+        try { sessionStorage.setItem(KEY, String(window.scrollY)); } catch (e) {}
+    });
+    window.addEventListener('load', function () {
+        try {
+            var y = sessionStorage.getItem(KEY);
+            if (y !== null) { window.scrollTo(0, parseInt(y, 10) || 0); sessionStorage.removeItem(KEY); }
+        } catch (e) {}
+    });
+})();
 </script>

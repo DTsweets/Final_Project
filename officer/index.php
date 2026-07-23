@@ -5,6 +5,7 @@
  */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ghg_report.php';
 require_role(['officer']);
 
 $pdo  = getDB();
@@ -78,6 +79,10 @@ $event_emission = (float) $ev_stmt->fetchColumn();
 $evc_stmt = $pdo->prepare("SELECT COUNT(*) FROM event WHERE affiliation_id = :a AND year_id = :y");
 $evc_stmt->execute([':a' => $affil_id, ':y' => $selected_year]);
 $event_count = (int) $evc_stmt->fetchColumn();
+
+// ── การดูดกลับจากกิจกรรมของคณะนี้ (removal_event_item ของ event คณะตน) ──
+$removal_activity = removal_activity_total($pdo, $selected_year, $affil_id);
+$removal_rows     = removal_activity_list($pdo, $selected_year, $affil_id);
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -158,9 +163,9 @@ $event_count = (int) $evc_stmt->fetchColumn();
                 <div class="db-card db-card-white">
                     <div class="db-card-inner">
                         <div class="db-card-text">
-                            <div class="db-big-num">0</div>
+                            <div class="db-big-num"><?= number_format($removal_activity, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
                             <div class="db-card-desc">GHG Removal</div>
-                            <div class="db-card-subdesc">การดูดกลับก๊าซเรือนกระจกทั้งหมด</div>
+                            <div class="db-card-subdesc">การดูดกลับจากกิจกรรมของคณะ</div>
                         </div>
                         <div class="db-card-illus">
                             <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
@@ -171,7 +176,14 @@ $event_count = (int) $evc_stmt->fetchColumn();
                             </svg>
                         </div>
                     </div>
-                    <span class="db-card-btn db-btn-green" style="opacity:.85;">0 tCO₂e</span>
+                    <?php if (!empty($removal_rows)): ?>
+                    <button onclick="openRemovalModal()" class="db-card-btn db-btn-green" style="border:none;cursor:pointer;">
+                        ดูรายละเอียด
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+                    </button>
+                    <?php else: ?>
+                    <span class="db-card-btn db-btn-green" style="opacity:.7;">ยังไม่มีกิจกรรมดูดกลับ</span>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -212,7 +224,7 @@ $event_count = (int) $evc_stmt->fetchColumn();
                 <div class="db-card db-card-scope1">
                     <div class="db-card-inner">
                         <div class="db-card-text">
-                            <div class="db-big-num db-num-s1"><?= number_format($scope1, 0) ?></div>
+                            <div class="db-big-num db-num-s1"><?= number_format($scope1, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
                             <div class="db-scope-label db-scope-s1">Scope 1</div>
                         </div>
                     </div>
@@ -225,7 +237,7 @@ $event_count = (int) $evc_stmt->fetchColumn();
                 <div class="db-card db-card-scope2">
                     <div class="db-card-inner">
                         <div class="db-card-text">
-                            <div class="db-big-num db-num-s2"><?= number_format($scope2, 0) ?></div>
+                            <div class="db-big-num db-num-s2"><?= number_format($scope2, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
                             <div class="db-scope-label db-scope-s2">Scope 2</div>
                         </div>
                     </div>
@@ -238,7 +250,7 @@ $event_count = (int) $evc_stmt->fetchColumn();
                 <div class="db-card db-card-scope3">
                     <div class="db-card-inner">
                         <div class="db-card-text">
-                            <div class="db-big-num db-num-s3"><?= number_format($scope3, 0) ?></div>
+                            <div class="db-big-num db-num-s3"><?= number_format($scope3, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
                             <div class="db-scope-label db-scope-s3">Scope 3</div>
                         </div>
                     </div>
@@ -260,7 +272,7 @@ $event_count = (int) $evc_stmt->fetchColumn();
                         <div style="font-size:.8rem; opacity:.8; text-transform:uppercase; letter-spacing:.05em;">รายละเอียดการปล่อยก๊าซเรือนกระจก</div>
                         <h3 id="detailModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">—</h3>
                     </div>
-                    <div style="padding:1.5rem 2.5rem; max-height:58vh; overflow-y:auto;">
+                    <div class="detail-modal-body">
                         <table class="data-table" style="width:100%;">
                             <thead><tr>
                                 <th>รายการ</th><th>หน่วย</th>
@@ -273,7 +285,23 @@ $event_count = (int) $evc_stmt->fetchColumn();
                 </div>
             </div>
 
+            <!-- ── Removal Modal (การดูดกลับจากกิจกรรมของคณะ — read-only accordion) ── -->
+            <div class="modal-overlay" id="removalModal" onclick="if(event.target===this)closeRemovalModal()">
+                <div class="modal-box" style="max-width:820px; padding:0; overflow:hidden;">
+                    <div style="padding:2rem 2.5rem; color:#fff; background:linear-gradient(135deg,#2E7D32,#66BB6A);">
+                        <button class="modal-close-btn" onclick="closeRemovalModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
+                        <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">การดูดกลับจากกิจกรรมของคณะ</div>
+                        <h3 style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">🌱 รวม <?= number_format($removal_activity, 4) ?> tCO₂e</h3>
+                    </div>
+                    <div class="detail-modal-body">
+                        <p class="muted" style="margin:0 0 12px;color:#8A8194;">คลิกที่กิจกรรมเพื่อดูรายละเอียด</p>
+                        <div id="removalModalBody"></div>
+                    </div>
+                </div>
+            </div>
+
             <script>
+                window.REMOVAL_ROWS = <?= json_encode($removal_rows, JSON_UNESCAPED_UNICODE) ?>;
                 window.DETAIL_ITEMS = <?= json_encode($items, JSON_UNESCAPED_UNICODE) ?>;
                 window.SCOPE_BG = {
                     0: 'linear-gradient(135deg, var(--clr-primary), #8B5CF6)',
@@ -301,7 +329,7 @@ $event_count = (int) $evc_stmt->fetchColumn();
                                 <td>${it.name}</td>
                                 <td>${it.unit ?? '-'}</td>
                                 <td style="text-align:right;">${Number(it.vol).toLocaleString('th-TH', {maximumFractionDigits:4})}</td>
-                                <td style="text-align:right; font-weight:700; color:var(--clr-primary);">${Number(it.emission).toLocaleString('th-TH', {maximumFractionDigits:2})}</td>
+                                <td style="text-align:right; font-weight:700; color:var(--clr-primary);">${Number(it.emission).toLocaleString('th-TH', {minimumFractionDigits:4, maximumFractionDigits:4})}</td>
                             </tr>`).join('');
                     }
                     document.getElementById('detailModal').style.display = 'flex';
@@ -313,10 +341,39 @@ $event_count = (int) $evc_stmt->fetchColumn();
                     document.body.style.overflow = '';
                 };
 
+                // ── Removal modal (accordion กลุ่มตามกิจกรรม) ──
+                window.rmxToggle = function (head) { head.closest('.rmx-act').classList.toggle('open'); };
+                window.openRemovalModal = function () {
+                    const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+                    const f4 = n => (parseFloat(n)||0).toLocaleString('th-TH', {minimumFractionDigits:4, maximumFractionDigits:4});
+                    const groups = {};
+                    (window.REMOVAL_ROWS||[]).forEach(a => {
+                        const k = a.event_id;
+                        if (!groups[k]) groups[k] = { name: a.event_name || '-', items: [], sub: 0 };
+                        groups[k].items.push(a); groups[k].sub += parseFloat(a.emission)||0;
+                    });
+                    const chev = '<svg class="rmx-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+                    let acc = '';
+                    Object.values(groups).forEach(g => {
+                        let rows = '';
+                        g.items.forEach(a => {
+                            rows += `<tr><td style="font-weight:600;">${esc(a.name_tiem)}</td><td style="text-align:center;color:#6B7280;">${esc(a.unit||'-')}</td><td style="text-align:right;">${f4(a.factor)}</td><td style="text-align:right;">${(parseFloat(a.qty)||0).toLocaleString('th-TH',{maximumFractionDigits:4})}</td><td style="text-align:right;font-weight:700;color:#166534;">${f4(a.emission)}</td></tr>`;
+                        });
+                        acc += `<div class="rmx-act"><div class="rmx-head" onclick="rmxToggle(this)"><div class="rmx-title">${chev}<span class="rmx-text">${esc(g.name)}</span></div><div style="color:#166534;font-weight:800;white-space:nowrap;flex-shrink:0;">รวม ${f4(g.sub)} tCO₂e</div></div><div class="rmx-body"><table class="data-table" style="width:100%;"><thead><tr><th style="text-align:left;">รายการดูดกลับ</th><th style="text-align:center;">หน่วย</th><th style="text-align:right;">ค่าดูดกลับ (kgCO₂e/หน่วย)</th><th style="text-align:right;">ปริมาณ</th><th style="text-align:right;">tCO₂e</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                    });
+                    document.getElementById('removalModalBody').innerHTML = acc || '<p style="color:#9CA3AF;text-align:center;padding:24px;">ยังไม่มีข้อมูล</p>';
+                    document.getElementById('removalModal').style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                };
+                window.closeRemovalModal = function () {
+                    document.getElementById('removalModal').style.display = 'none';
+                    document.body.style.overflow = '';
+                };
+
                 // ผูก listener ระดับ document ครั้งเดียว (กันซ้อนตอน SPA สลับหน้า)
                 if (!window.__userDashBound) {
                     window.__userDashBound = true;
-                    document.addEventListener('keydown', e => { if (e.key === 'Escape') window.closeDetailModal(); });
+                    document.addEventListener('keydown', e => { if (e.key === 'Escape') { window.closeDetailModal(); window.closeRemovalModal(); } });
                 }
             </script>
     </main>

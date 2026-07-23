@@ -382,3 +382,14 @@
 .sub-item:hover .sub-icon {
     transform: scale(1.1);
 }
+
+/* ===== ซ่อนลูกศร spinner ของ input type=number (ทุกหน้า) ===== */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}

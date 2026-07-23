@@ -25,6 +25,12 @@ $view = ($_GET['view'] ?? 'system') === 'faculty' ? 'faculty' : 'system';
 $scope = ghg_scope_totals($pdo, $selected_year, $view === 'faculty' ? $affil_id : null);
 $total = $scope[1] + $scope[2] + $scope[3];
 
+// ── การดูดกลับ + สุทธิ (มุมมองคณะ = กิจกรรมของคณะ / ทั้งระบบ = ระดับมหาวิทยาลัย) ──
+$removal = $view === 'faculty'
+    ? removal_activity_total($pdo, $selected_year, $affil_id)
+    : removal_total($pdo, $selected_year);
+$net = $total - $removal;
+
 // ตารางรายละเอียด
 if ($view === 'faculty') {
     $detail = ghg_affil_detail($pdo, $affil_id, $selected_year); // by activity
@@ -104,9 +110,14 @@ $dl = 'view=' . $view . '&year=' . $selected_year;
                     <div class="db-big-num" style="margin:.25rem 0 1rem;"><?= number_format($total, 2, '.', ',') ?> <span class="db-big-unit">tCO₂e</span></div>
                     <canvas id="scopeDonut" width="200" height="200" style="max-width:100%;"></canvas>
                     <div style="display:flex;justify-content:center;gap:12px;margin-top:10px;font-size:.85rem;">
-                        <span style="color:#F97316;font-weight:700;">■ S1 <?= number_format($scope[1],0) ?></span>
-                        <span style="color:#EC4899;font-weight:700;">■ S2 <?= number_format($scope[2],0) ?></span>
-                        <span style="color:#3B82F6;font-weight:700;">■ S3 <?= number_format($scope[3],0) ?></span>
+                        <span style="color:#F97316;font-weight:700;">■ S1 <?= number_format($scope[1],2) ?></span>
+                        <span style="color:#EC4899;font-weight:700;">■ S2 <?= number_format($scope[2],2) ?></span>
+                        <span style="color:#3B82F6;font-weight:700;">■ S3 <?= number_format($scope[3],2) ?></span>
+                    </div>
+                    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #F1EEF5;font-size:.9rem;text-align:left;">
+                        <div style="display:flex;justify-content:space-between;"><span style="color:#6B7280;">การปล่อย</span><span style="font-weight:700;"><?= number_format($total,2,'.',',') ?></span></div>
+                        <div style="display:flex;justify-content:space-between;margin-top:4px;"><span style="color:#166534;">🌱 ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?></span><span style="font-weight:700;color:#166534;"><?= number_format($removal,2,'.',',') ?></span></div>
+                        <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px dashed #E7E3EC;"><span style="color:#374151;font-weight:700;">สุทธิ (Net)</span><span style="font-weight:800;color:var(--clr-primary);"><?= number_format($net,2,'.',',') ?></span></div>
                     </div>
                 </div>
                 <div class="db-card db-card-white">

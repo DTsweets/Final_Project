@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $redir  = "?year=$pyear";
     try {
         if ($action === 'add_removal_item') {
-            $name = trim($_POST['name'] ?? ''); $unit = trim($_POST['unit'] ?? ''); $factor = (float) ($_POST['factor'] ?? 0);
+            $name = trim($_POST['name'] ?? ''); $unit = trim($_POST['unit'] ?? ''); $factor = max(0, (float) ($_POST['factor'] ?? 0));
             if ($name === '') throw new Exception('กรุณาระบุชื่อรายการ');
             try {
                 $pdo->prepare("INSERT INTO removal_item (year_id,name_tiem,unit,factor) VALUES (?,?,?,?)")
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: $redir&msg=" . urlencode('เพิ่มรายการดูดกลับแล้ว')); exit;
         }
         if ($action === 'edit_removal_item') {
-            $id = (int) $_POST['item_id']; $name = trim($_POST['name'] ?? ''); $unit = trim($_POST['unit'] ?? ''); $factor = (float) ($_POST['factor'] ?? 0);
+            $id = (int) $_POST['item_id']; $name = trim($_POST['name'] ?? ''); $unit = trim($_POST['unit'] ?? ''); $factor = max(0, (float) ($_POST['factor'] ?? 0));
             if ($name === '') throw new Exception('กรุณาระบุชื่อรายการ');
             $pdo->prepare("UPDATE removal_item SET name_tiem=?, unit=?, factor=? WHERE id=?")->execute([$name, $unit, $factor, $id]);
             header("Location: $redir&msg=" . urlencode('แก้ไขรายการแล้ว')); exit;
@@ -39,14 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($action === 'save_removal') {
             $qty = $_POST['qty'] ?? [];
-            $up  = $pdo->prepare("INSERT INTO removal_entry (removal_item_id,year_id,qty,create_year) VALUES (?,?,?,CURDATE())
-                                  ON DUPLICATE KEY UPDATE qty=VALUES(qty), create_year=CURDATE()");
-            $del = $pdo->prepare("DELETE FROM removal_entry WHERE removal_item_id=? AND year_id=?");
+            // อัปเดต qty ตรงบน removal_item (รวม removal_entry เข้ามาแล้ว) เฉพาะรายการของปีนั้น
+            $up  = $pdo->prepare("UPDATE removal_item SET qty=? WHERE id=? AND year_id=?");
             $ids = $pdo->prepare("SELECT id FROM removal_item WHERE year_id=?"); $ids->execute([$pyear]);
             foreach ($ids->fetchAll(PDO::FETCH_COLUMN) as $iid) {
-                $q = (float) ($qty[$iid] ?? 0);
-                if ($q > 0) $up->execute([$iid, $pyear, $q]);
-                else        $del->execute([$iid, $pyear]);
+                $q = max(0, (float) ($qty[$iid] ?? 0));
+                $up->execute([$q, $iid, $pyear]);
             }
             header("Location: $redir&msg=" . urlencode('บันทึกปริมาณดูดกลับแล้ว')); exit;
         }
@@ -57,8 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $flash   = $_GET['msg'] ?? '';
 $flash_t = (($_GET['msg_type'] ?? '') === 'danger') ? 'danger' : 'success';
-$rows        = removal_items_list($pdo, $selected_year);
-$year_total  = removal_total($pdo, $selected_year);
+$rows          = removal_items_list($pdo, $selected_year);        // ส่วนกลาง (แก้ไขได้)
+$central_total = removal_central_total($pdo, $selected_year);
+$year_total    = $central_total;   // หน้านี้จัดการเฉพาะการดูดกลับ "ส่วนกลาง" (การดูดกลับจากกิจกรรมดูภาพรวมที่ Dashboard)
 $page_title  = 'กรอกข้อมูล';
 $page_title2 = 'GHG Removal';
 ?>
@@ -77,20 +76,20 @@ $page_title2 = 'GHG Removal';
     <main class="main-content">
         <?php include $HEADER; ?>
         <style>
-            .co { padding:26px 30px 70px; max-width:1000px; }
+            .co { padding:26px 30px 70px; max-width:none; }
             .co h1 { font-size:1.4rem; font-weight:800; color:#2A2233; margin:0 0 12px; }
             .flash { display:flex; align-items:center; gap:10px; border-radius:12px; padding:12px 16px; font-weight:600; margin-bottom:16px; }
             .flash svg { flex-shrink:0; }
             .flash.success{background:#DCFCE7;color:#166534;} .flash.danger{background:#FEE2E2;color:#B91C1C;}
             .card { background:#fff; border:1px solid #E7E3EC; border-radius:16px; padding:20px 22px; margin-bottom:16px; }
-            .card h2 { font-size:1.05rem; font-weight:800; margin:0 0 14px; color:#2A2233; }
+            .card h2 { font-size:1.05rem; font-weight:800; margin:0 0 14px; color:#2A2233; overflow-wrap:anywhere; word-break:break-word; }
             .row-top{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
             .rgrid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;align-items:end;}
             .fld label{display:block;font-size:.8rem;font-weight:600;color:#4B4155;margin:0 0 5px;}
             .fld input{width:100%;}
             table.t{width:100%;border-collapse:collapse;}
             table.t th{text-align:center;font-size:.75rem;color:#6B7280;padding:8px 10px;border-bottom:1px solid #E7E3EC;}
-            table.t td{padding:10px;border-bottom:1px solid #F1EEF5;font-size:.92rem;}
+            table.t td{padding:10px;border-bottom:1px solid #F1EEF5;font-size:.92rem;overflow-wrap:anywhere;word-break:break-word;}
             table.t td.num,table.t th.num{text-align:right;}
             .ti-input{border:1px solid #E5E7EB;border-radius:10px;padding:9px 12px;font-family:inherit;font-size:.95rem;}
             .icobtn{border:none;border-radius:9px;padding:7px;cursor:pointer;color:#fff;transition:all 0.2s;}
@@ -106,10 +105,22 @@ $page_title2 = 'GHG Removal';
             /* ลดความสูง input (component) แต่คงองศาโค้ง border-radius:18px เดิม */
             .ti-sm .ti-input{ height:44px; padding:0 1rem; background:#fff !important; }
             .ti-qty{ height:44px !important; min-height:0 !important; padding:0 1rem !important; text-align:center; background:#fff !important; }
+            /* accordion กิจกรรมดูดกลับ (คลิกดูรายละเอียด) */
+            .rm-act{ border:1px solid #E7E3EC; border-radius:12px; overflow:hidden; margin-bottom:12px; }
+            .rm-act-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:12px 16px; background:#F6F4F9; cursor:pointer; transition:background .15s; }
+            .rm-act-head:hover{ background:#EFEAF5; }
+            .rm-act-title{ font-weight:800; color:#2A2233; min-width:0; flex:1; display:flex; align-items:flex-start; gap:8px; }
+            .rm-act-text{ min-width:0; line-height:1.5; overflow-wrap:anywhere; word-break:break-word; }
+            .rm-chev{ flex-shrink:0; margin-top:4px; }
+            .rm-act-affil{ white-space:nowrap; }
+            .rm-chev{ color:#8A8194; transition:transform .2s; flex-shrink:0; }
+            .rm-act.open .rm-chev{ transform:rotate(90deg); }
+            .rm-act-body{ display:none; padding:6px 16px 10px; }
+            .rm-act.open .rm-act-body{ display:block; }
         </style>
 
         <div class="co">
-            <h1>🌱 GHG Removal — การดูดกลับก๊าซเรือนกระจก (ระดับมหาวิทยาลัย)</h1>
+            <h1>🌱 GHG Removal — การดูดกลับก๊าซเรือนกระจกของมหาวิทยาลัยพะเยา</h1>
 
             <?php $toast_msg = $flash; $toast_type = $flash_t; include __DIR__ . '/../components/toast.php'; ?>
 
@@ -120,7 +131,9 @@ $page_title2 = 'GHG Removal';
                         $dd_selected=$selected_year;$dd_required=false;$dd_class='dd-pill';$dd_placeholder='เลือกปี';
                         include __DIR__.'/../components/dropdown.php'; ?>
                 </div>
-                <span class="muted" style="margin-left:auto;">รวมการดูดกลับ: <span style="color:#166534;font-weight:800;"><?= number_format($year_total,3) ?></span> tCO₂e</span>
+                <span class="muted" style="margin-left:auto;text-align:right;line-height:1.5;">
+                    รวมการดูดกลับส่วนกลาง: <span style="color:#166534;font-weight:800;"><?= number_format($year_total,3) ?></span> tCO₂e
+                </span>
             </div>
 
             <!-- เพิ่มรายการดูดกลับ -->
@@ -149,14 +162,14 @@ $page_title2 = 'GHG Removal';
                 <form method="POST">
                     <input type="hidden" name="action" value="save_removal"><input type="hidden" name="year_id" value="<?= $selected_year ?>">
                     <table class="t">
-                        <thead><tr><th style="text-align:left;">รายการ</th><th style="text-align:center;">หน่วย</th><th class="num">ค่าดูดกลับ (kgCO₂e/หน่วย)</th><th class="num">ปริมาณ</th><th class="num">tCO₂e</th><th style="text-align:center;">จัดการ</th></tr></thead>
+                        <thead><tr><th style="text-align:left;">รายการ</th><th style="text-align:center;">หน่วย</th><th class="num">ค่าดูดกลับ (kgCO₂e/หน่วย)</th><th style="text-align:center;">ปริมาณ</th><th class="num">tCO₂e</th><th style="text-align:center;">จัดการ</th></tr></thead>
                         <tbody>
                         <?php foreach ($rows as $r): ?>
                             <tr>
                                 <td style="font-weight:600;"><?= htmlspecialchars($r['name_tiem']) ?></td>
                                 <td style="text-align:center;color:#6B7280;"><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
                                 <td class="num"><?= number_format((float)$r['factor'],4) ?></td>
-                                <td class="num"><input class="ti-input ti-qty" style="width:130px;" type="number" min="0" step="0.0001" name="qty[<?= (int)$r['id'] ?>]" value="<?= (float)$r['qty']!=0 ? htmlspecialchars(rtrim(rtrim(number_format((float)$r['qty'],4,'.',''),'0'),'.')) : '' ?>" placeholder="0"></td>
+                                <td style="text-align:center;"><input class="ti-input ti-qty" style="width:130px;" type="number" min="0" step="0.0001" name="qty[<?= (int)$r['id'] ?>]" value="<?= (float)$r['qty']!=0 ? htmlspecialchars(rtrim(rtrim(number_format((float)$r['qty'],4,'.',''),'0'),'.')) : '' ?>" placeholder="0"></td>
                                 <td class="num" style="font-weight:700;color:#166534;"><?= number_format((float)$r['emission'],4) ?></td>
                                 <td style="white-space:nowrap;text-align:center;">
                                     <button type="button" class="icobtn edit" title="แก้ไข"
@@ -202,6 +215,7 @@ $page_title2 = 'GHG Removal';
                 </div>
                 <?php endif; ?>
             </div>
+
         </div>
 
         <script>

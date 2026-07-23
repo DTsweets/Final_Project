@@ -119,16 +119,59 @@ function ghg_affil_name(PDO $pdo, int $affil): string
 
 /* ============ GHG Removal (การดูดกลับ — ระดับส่วนกลาง/มหาวิทยาลัย) ============ */
 
-/** ยอดดูดกลับรวมของปี (tCO₂e) = SUM(qty * factor)/1000 */
-function removal_total(PDO $pdo, int $year): float
+/** ยอดดูดกลับส่วนกลาง (manual ที่ศูนย์ฯ กรอก) ของปี (tCO₂e) */
+function removal_central_total(PDO $pdo, int $year): float
 {
     $stmt = $pdo->prepare('
-        SELECT COALESCE(SUM(re.qty * ri.factor)/1000, 0)
-        FROM removal_entry re
-        JOIN removal_item ri ON ri.id = re.removal_item_id
-        WHERE re.year_id = :y');
+        SELECT COALESCE(SUM(ri.qty * ri.factor)/1000, 0)
+        FROM removal_item ri
+        WHERE ri.year_id = :y');
     $stmt->execute([':y' => $year]);
     return (float) $stmt->fetchColumn();
+}
+
+/** ยอดดูดกลับจากกิจกรรมคณะ (removal_event_item — เก็บ factor ในตัวเอง แยกจาก master) ของปี (tCO₂e)
+ *  $affil = null → ทั้งมหาวิทยาลัย; ระบุ affil → เฉพาะกิจกรรมของคณะนั้น */
+function removal_activity_total(PDO $pdo, int $year, ?int $affil = null): float
+{
+    $sql = 'SELECT COALESCE(SUM(rei.qty * rei.factor)/1000, 0)
+            FROM removal_event_item rei
+            JOIN event e ON e.id = rei.event_id
+            WHERE e.year_id = :y';
+    $params = [':y' => $year];
+    if ($affil !== null) { $sql .= ' AND e.affiliation_id = :aff'; $params[':aff'] = $affil; }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return (float) $stmt->fetchColumn();
+}
+
+/** ยอดดูดกลับรวมของปี (tCO₂e) = ส่วนกลาง + จากกิจกรรมคณะ */
+function removal_total(PDO $pdo, int $year): float
+{
+    return removal_central_total($pdo, $year) + removal_activity_total($pdo, $year);
+}
+
+/** รายการดูดกลับจากกิจกรรมคณะของปี (สำหรับ breakdown บน dashboard / read-only)
+ *  $affil = null → ทุกคณะ; ระบุ affil → เฉพาะกิจกรรมของคณะนั้น */
+function removal_activity_list(PDO $pdo, int $year, ?int $affil = null): array
+{
+    $sql = '
+        SELECT rei.id, rei.name_tiem, rei.unit, rei.factor,
+               rei.qty,
+               rei.qty * rei.factor / 1000 AS emission,
+               e.id AS event_id, e.name AS event_name, e.organizer_name,
+               e.affiliation_id AS affil_id,
+               COALESCE(NULLIF(e.organizer_name, \'\'), a.affiliation_item) AS affil_name
+        FROM removal_event_item rei
+        JOIN event e ON e.id = rei.event_id
+        LEFT JOIN affiliation_id a ON a.id = e.affiliation_id
+        WHERE e.year_id = :y';
+    $params = [':y' => $year];
+    if ($affil !== null) { $sql .= ' AND e.affiliation_id = :aff'; $params[':aff'] = $affil; }
+    $sql .= ' ORDER BY e.affiliation_id ASC, e.id ASC, rei.id ASC';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 /** รายการดูดกลับของปี + qty ที่กรอก + tCO₂e (แสดงทุกรายการแม้ยังไม่กรอก) */
@@ -136,10 +179,9 @@ function removal_items_list(PDO $pdo, int $year): array
 {
     $stmt = $pdo->prepare('
         SELECT ri.id, ri.name_tiem, ri.unit, ri.factor,
-               COALESCE(re.qty, 0) AS qty,
-               COALESCE(re.qty, 0) * ri.factor / 1000 AS emission
+               ri.qty AS qty,
+               ri.qty * ri.factor / 1000 AS emission
         FROM removal_item ri
-        LEFT JOIN removal_entry re ON re.removal_item_id = ri.id AND re.year_id = ri.year_id
         WHERE ri.year_id = :y
         ORDER BY ri.id ASC');
     $stmt->execute([':y' => $year]);

@@ -19,6 +19,8 @@ foreach (ghg_years($pdo) as $y) { if ($y['year_id'] == $year) { $year_label = $y
 
 $scope = ghg_scope_totals($pdo, $year, $view === 'faculty' ? $affil_id : null);
 $total = $scope[1] + $scope[2] + $scope[3];
+$removal = $view === 'faculty' ? removal_activity_total($pdo, $year, $affil_id) : removal_total($pdo, $year);
+$net = $total - $removal;
 $rows  = $view === 'faculty' ? ghg_affil_detail($pdo, $affil_id, $year) : ghg_by_affiliation($pdo, $year);
 
 $scopeName = $view === 'faculty' ? ('คณะ ' . $affil_name) : 'ทั้งระบบ';
@@ -53,7 +55,8 @@ echo '<?mso-application progid="Excel.Sheet"?>' . "\n";
   <Worksheet ss:Name="รายงาน GHG">
     <Table ss:DefaultRowHeight="22">
       <Row ss:Height="30"><Cell ss:StyleID="sTitle"><Data ss:Type="String">รายงานการปล่อยก๊าซเรือนกระจก — <?= htmlspecialchars($scopeName, ENT_XML1) ?> (ปี <?= htmlspecialchars($year_label, ENT_XML1) ?>)</Data></Cell></Row>
-      <Row><Cell ss:StyleID="sData"><Data ss:Type="String">Scope 1: <?= number_format($scope[1],2) ?> | Scope 2: <?= number_format($scope[2],2) ?> | Scope 3: <?= number_format($scope[3],2) ?> | รวม: <?= number_format($total,2) ?> tCO₂e</Data></Cell></Row>
+      <Row><Cell ss:StyleID="sData"><Data ss:Type="String">Scope 1: <?= number_format($scope[1],2) ?> | Scope 2: <?= number_format($scope[2],2) ?> | Scope 3: <?= number_format($scope[3],2) ?> | รวมการปล่อย: <?= number_format($total,2) ?> tCO₂e</Data></Cell></Row>
+      <Row><Cell ss:StyleID="sData"><Data ss:Type="String">ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?>: <?= number_format($removal,2) ?> tCO₂e | สุทธิ (Net = ปล่อย − ดูดกลับ): <?= number_format($net,2) ?> tCO₂e</Data></Cell></Row>
       <Row></Row>
 
       <?php if ($view === 'faculty'): ?>
