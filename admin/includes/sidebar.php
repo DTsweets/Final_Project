@@ -350,3 +350,4 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
     });
 })();
 </script>
+<?php include __DIR__ . '/../../components/page_loader.php'; ?>

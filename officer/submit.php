@@ -97,7 +97,7 @@ foreach ($items as $it) {
 }
 
 $scope_labels = [1=>'Scope 1 — การเผาไหม้', 2=>'Scope 2 — การใช้ไฟฟ้า', 3=>'Scope 3 — ทางอ้อม'];
-$scope_icons  = [1=>'🔥', 2=>'⚡', 3=>'🌍'];
+$scope_icons  = [1=>ic('fire',40), 2=>ic('bolt',40), 3=>ic('globe',40)];
 
 $year_label = '';
 foreach ($years as $y) {
@@ -252,7 +252,7 @@ foreach ($years as $y) {
 
             <?php if (empty($items)): ?>
             <div style="text-align:center; padding:80px 20px; background:white; border-radius:20px; border:1px solid var(--border-color);">
-                <div style="font-size:54px; margin-bottom:15px;">📋</div>
+                <div style="margin-bottom:15px;color:#9CA3AF;"><?= ic('note',54) ?></div>
                 <h3 style="font-size:22px; margin-bottom:10px;">ยังไม่มีรายการ Emission Factor สำหรับปี <?= $year_label ?></h3>
                 <p style="color:var(--text-muted); font-size: 15px;">กรุณาติดต่อผู้ดูแลระบบส่วนกลาง (Admin) เพื่อเพิ่มรายการ</p>
             </div>
@@ -264,7 +264,7 @@ foreach ($years as $y) {
                 <?php foreach ($grouped as $scope_group => $group_items): ?>
                 <div class="form-section">
                     <div class="form-header">
-                        <div class="form-icon"><?= $scope_icons[$scope_group] ?? '📊' ?></div>
+                        <div class="form-icon"><?= $scope_icons[$scope_group] ?? ic('globe',40) ?></div>
                         <div class="form-title-group">
                             <strong><?= $scope_labels[$scope_group] ?? 'Scope '.$scope_group ?></strong>
                             <span><?= $group_items[0]['group_name'] ?? '' ?></span>

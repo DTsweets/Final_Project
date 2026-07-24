@@ -26,9 +26,7 @@ if ($mode === 'years') {
         // กิจกรรม — นับ "ทุกกิจกรรม" ต่อปี (ทั้งปล่อย/ดูดกลับ) + ยอดปล่อย
         $sql = '
             SELECT ay.id AS year_id, ay.year AS year_label,
-                   (SELECT COUNT(DISTINCT e.id)
-                    FROM event e JOIN event_item ei ON ei.event_id = e.id
-                    WHERE e.year_id = ay.id) AS item_count,
+                   (SELECT COUNT(*) FROM event e WHERE e.year_id = ay.id) AS item_count,
                    COALESCE((
                        SELECT SUM(ei.Vol * ai.AD)/1000
                        FROM event e JOIN event_item ei ON ei.event_id = e.id
@@ -36,7 +34,7 @@ if ($mode === 'years') {
                        WHERE e.year_id = ay.id
                    ), 0) AS total_emission
             FROM admin_year ay
-            WHERE EXISTS (SELECT 1 FROM event e JOIN event_item ei ON ei.event_id = e.id WHERE e.year_id = ay.id)
+            WHERE EXISTS (SELECT 1 FROM event e WHERE e.year_id = ay.id)
             ORDER BY ay.year DESC';
         $stmt = $pdo->query($sql);
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
@@ -120,7 +118,7 @@ $ev = $pdo->query('
            COALESCE((SELECT SUM(ei2.Vol * ai.AD)/1000
                      FROM event e2 JOIN event_item ei2 ON ei2.event_id = e2.id
                      JOIN admin_item ai ON ai.id = ei2.admin_item_id), 0) AS total_emission
-    FROM event e JOIN event_item ei ON ei.event_id = e.id
+    FROM event e
 ')->fetch(PDO::FETCH_ASSOC);
 $rows[] = [
     'affil_id' => null, 'affil_name' => 'กิจกรรม',

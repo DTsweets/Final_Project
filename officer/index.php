@@ -291,7 +291,7 @@ $removal_rows     = removal_activity_list($pdo, $selected_year, $affil_id);
                     <div style="padding:2rem 2.5rem; color:#fff; background:linear-gradient(135deg,#2E7D32,#66BB6A);">
                         <button class="modal-close-btn" onclick="closeRemovalModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
                         <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">การดูดกลับจากกิจกรรมของคณะ</div>
-                        <h3 style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">🌱 รวม <?= number_format($removal_activity, 4) ?> tCO₂e</h3>
+                        <h3 style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;"><?= ic('leaf',20) ?> รวม <?= number_format($removal_activity, 4) ?> tCO₂e</h3>
                     </div>
                     <div class="detail-modal-body">
                         <p class="muted" style="margin:0 0 12px;color:#8A8194;">คลิกที่กิจกรรมเพื่อดูรายละเอียด</p>

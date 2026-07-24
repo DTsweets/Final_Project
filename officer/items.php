@@ -324,7 +324,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: สร้างปีงบประมาณ (Create Year) -->
         <div class="modal-overlay" id="modal-create-year">
             <div class="modal-box" style="max-width: 450px;">
-                <div class="modal-title">➕ สร้างปีงบประมาณจัดทำ</div>
+                <div class="modal-title"><?= ic('add',20) ?>สร้างปีงบประมาณจัดทำ</div>
                 <form action="items.php" method="POST">
                     <input type="hidden" name="action" value="create_user_year">
                     <div class="form-group-dark" style="margin-bottom:1.5rem;">
@@ -388,7 +388,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: แก้ไขปี (Change/Swap) -->
         <div id="modalEditYear" class="modal-overlay">
             <div class="modal-box" style="max-width: 450px;">
-                <div class="modal-title">✏️ เปลี่ยนปีงบประมาณของข้อมูล</div>
+                <div class="modal-title"><?= ic('edit',20) ?>เปลี่ยนปีงบประมาณของข้อมูล</div>
                 <form action="items.php" method="POST">
                     <input type="hidden" name="action" value="edit_user_year">
                     <input type="hidden" name="year_id" id="edit_target_year_id">
@@ -489,7 +489,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: คัดลอกข้อมูลจากปีอื่น (Copy Year Data) -->
         <div id="modalCopyYear" class="modal-overlay">
             <div class="modal-box" style="max-width: 480px;">
-                <div class="modal-title">📋 คัดลอกข้อมูลจากปีอื่น</div>
+                <div class="modal-title"><?= ic('copy',20) ?>คัดลอกข้อมูลจากปีอื่น</div>
                 <form action="items.php" method="POST">
                     <input type="hidden" name="action" value="copy_user_year">
                     <input type="hidden" name="target_year_id" id="copy_target_year_id">

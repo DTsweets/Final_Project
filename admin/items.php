@@ -447,7 +447,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: เพิ่ม item -->
         <div class="modal-overlay" id="modal-add">
             <div class="modal-box" style="max-width: 600px; height: auto;">
-                <div class="modal-title">➕ เพิ่มรายการ Emission Factor</div>
+                <div class="modal-title"><?= ic('add',20) ?>เพิ่มรายการ Emission Factor</div>
                 <form method="POST">
                     <input type="hidden" name="action" value="add">
                     <div class="form-row">
@@ -500,7 +500,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: เพิ่มปี -->
         <div class="modal-overlay" id="modal-add-year">
             <div class="modal-box">
-                <div class="modal-title">➕ เพิ่มปีงบประมาณ</div>
+                <div class="modal-title"><?= ic('add',20) ?>เพิ่มปีงบประมาณ</div>
 
                 <form method="POST" id="formAddYear">
                     <input type="hidden" name="action" value="add_year">
@@ -543,7 +543,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: เพิ่ม Scope -->
         <div class="modal-overlay" id="modal-add-scope">
             <div class="modal-box" style="max-width: 800px;">
-                <div class="modal-title">➕ เพิ่มขอบเขต</div>
+                <div class="modal-title"><?= ic('add',20) ?>เพิ่มขอบเขต</div>
 
                 <div style="margin-bottom: 1.5rem; max-height: 240px; overflow-y: auto; padding-right: 6px;"
                     class="scope-list-container" id="scope-list-wrapper">
@@ -771,7 +771,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: แก้ไข item -->
         <div class="modal-overlay" id="modal-edit">
             <div class="modal-box">
-                <div class="modal-title">✏️ แก้ไขรายการ Emission Factor</div>
+                <div class="modal-title"><?= ic('edit',20) ?>แก้ไขรายการ Emission Factor</div>
                 <form method="POST">
                     <input type="hidden" name="action" value="edit">
                     <input type="hidden" name="item_id" id="edit-item-id">
@@ -813,7 +813,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: Edit Year -->
         <div id="modalEditYear" class="modal-overlay">
             <div class="modal-box">
-                <div class="modal-title">✏️ แก้ไขปีงบประมาณ</div>
+                <div class="modal-title"><?= ic('edit',20) ?>แก้ไขปีงบประมาณ</div>
                 <form method="POST">
                     <input type="hidden" name="action" value="edit_year">
                     <input type="hidden" name="year_id" id="edit_year_id">
@@ -917,7 +917,7 @@ $page_title2 = "UP Net Zero";
         <!-- Modal: คัดลอก admin_item จากปีอื่น -->
         <div id="modalCopyYear" class="modal-overlay">
             <div class="modal-box" style="max-width: 480px;">
-                <div class="modal-title">📋 คัดลอกรายการจากปีอื่น</div>
+                <div class="modal-title"><?= ic('copy',20) ?>คัดลอกรายการจากปีอื่น</div>
                 <form method="POST">
                     <input type="hidden" name="action" value="copy_year">
                     <input type="hidden" name="target_year_id" id="copy_target_year_id">

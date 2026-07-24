@@ -25,6 +25,9 @@ if (file_exists($env_path)) {
 }
 define('DB_CHARSET', 'utf8mb4');
 
+// ไอคอน SVG กลาง (แทน emoji) — ให้ ic() ใช้ได้ทุกหน้าที่โหลด config นี้
+require_once __DIR__ . '/../components/icons.php';
+
 /**
  * Cache-busting helper — คืน "?v=<filemtime>" ของไฟล์ asset โดยอัตโนมัติ
  * ทำให้ browser cache ไฟล์ CSS/JS ได้ยาว (ลดจำนวน request) แต่พอแก้ไฟล์ mtime เปลี่ยน

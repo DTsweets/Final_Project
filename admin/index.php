@@ -1062,7 +1062,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     </tr>`;
                         });
                         activityHtml = `
-            <div style="font-size:0.95rem;font-weight:800;color:var(--text-secondary);margin:2rem 0 0.75rem;">🌱 การดูดกลับจากกิจกรรม</div>
+            <div style="font-size:0.95rem;font-weight:800;color:var(--text-secondary);margin:2rem 0 0.75rem;"><?= ic('leaf',16) ?> การดูดกลับจากกิจกรรม</div>
             <table class="detail-table" style="table-layout:fixed;width:100%;">
                 <colgroup><col style="width:2.5rem;"><col><col style="width:200px;"><col style="width:130px;"><col style="width:150px;"></colgroup>
                 <thead><tr><th>#</th><th>กิจกรรม</th><th>ผู้จัด</th><th style="text-align:right;">รวม (tCO₂e)</th><th style="text-align:center;">รายละเอียด</th></tr></thead>
@@ -1100,7 +1100,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                 </div>
             </div>
 
-            <div style="font-size:0.95rem;font-weight:800;color:var(--text-secondary);margin:0 0 0.75rem;">🏛️ รายการดูดกลับส่วนกลาง</div>
+            <div style="font-size:0.95rem;font-weight:800;color:var(--text-secondary);margin:0 0 0.75rem;"><?= ic('building',16) ?> รายการดูดกลับส่วนกลาง</div>
             <table class="detail-table" style="table-layout:fixed;width:100%;">
                 <colgroup>
                     <col>
@@ -1758,7 +1758,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                 function _evBtnHtml(onclickExpr, cnt) {
                     cnt = Number(cnt || 0);
                     if (cnt <= 0) return '<span style="color:var(--text-muted);">-</span>';
-                    return `<button class="btn-detail" style="background:#EEF2FF;color:#4F46E5;" onclick="${onclickExpr}">📎 ไฟล์ <span style="background:#EF4444;color:#fff;font-size:.65rem;font-weight:800;border-radius:999px;padding:1px 6px;margin-left:2px;">${cnt}</span></button>`;
+                    return `<button class="btn-detail" style="background:#EEF2FF;color:#4F46E5;" onclick="${onclickExpr}"><?= ic('attach',13) ?> ไฟล์ <span style="background:#EF4444;color:#fff;font-size:.65rem;font-weight:800;border-radius:999px;padding:1px 6px;margin-left:2px;">${cnt}</span></button>`;
                 }
                 function openSourceYearDetail(source, yearId, yearLabel, sourceName) {
                     replayDetailPop();
@@ -1847,7 +1847,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
             <th>รายการ</th><th style="text-align:center;width:8rem;">ประเภท</th><th style="text-align:center;width:6.5rem;">Scope</th><th style="text-align:center;width:7rem;">หน่วย</th>
             <th style="text-align:right;width:7rem;">จำนวน</th><th style="text-align:right;width:7rem;">tCO₂e</th>
         </tr></thead><tbody id="tbody-sy">`;
-                    ev.items.filter(r => r.itype !== 'none').forEach(r => {
+                    ev.items.filter(r => r.itype === 'emit').forEach(r => {   // มุมการปล่อยสะสม → เฉพาะรายการปล่อย (ดูดกลับไปดูที่ GHG Removal)
                         const vol = Number(r.vol).toLocaleString('th-TH', { maximumFractionDigits: 4 });
                         const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
                         html += `<tr><td style="font-weight:600;">${r.name_tiem}</td><td style="text-align:center;">${_evTypeBadge(r.itype)}</td><td style="text-align:center;">${_evScopeCell(r)}</td><td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td><td style="text-align:right;font-weight:700;">${vol}</td><td style="text-align:right;font-weight:700;color:${r.itype === 'rmv' ? '#166534' : 'var(--clr-primary)'};">${emi}</td></tr>`;
@@ -2169,8 +2169,8 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                 // ป้ายประเภทรายการ (ปล่อย/ดูดกลับ)
                 function _evTypeBadge(itype) {
                     return itype === 'rmv'
-                        ? '<span style="font-size:.72rem;font-weight:700;color:#166534;background:#DCFCE7;border-radius:999px;padding:2px 10px;white-space:nowrap;">🌱 ดูดกลับ</span>'
-                        : '<span style="font-size:.72rem;font-weight:700;color:#92400E;background:#FEF3C7;border-radius:999px;padding:2px 10px;white-space:nowrap;">🏭 ปล่อย</span>';
+                        ? '<span style="font-size:.72rem;font-weight:700;color:#166534;background:#DCFCE7;border-radius:999px;padding:2px 10px;white-space:nowrap;"><?= ic('leaf',12) ?> ดูดกลับ</span>'
+                        : '<span style="font-size:.72rem;font-weight:700;color:#92400E;background:#FEF3C7;border-radius:999px;padding:2px 10px;white-space:nowrap;"><?= ic('factory',12) ?> ปล่อย</span>';
                 }
                 // ช่อง Scope: ปล่อย → pill Scope N · ดูดกลับ/ไม่มี → -
                 function _evScopeCell(r) {
@@ -2306,8 +2306,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                             }
                             _eventCache[idxOf[r.event_id]].items.push(r);
                         });
-                        // หน้าการปล่อย → แสดงเฉพาะกิจกรรมที่มีรายการปล่อย (ดูดกลับล้วนไปดูที่ GHG Removal)
-                        _eventCache = _eventCache.filter(ev => ev.items.some(it => it.itype === 'emit'));
+                        // จำนวนครั้งที่รายงาน → แสดงทุกกิจกรรม (รวมดูดกลับล้วน) · Emission โชว์เฉพาะส่วนปล่อย (0.000 ถ้าไม่มี)
                         // จำ breadcrumb "กลับปีที่รายงาน" ไว้ใช้ตอนกลับจากหน้ารายละเอียด
                         _eventListTitle = document.getElementById('reportsModalTitle').textContent;
                         _eventYearsBreadcrumb = document.getElementById('reportsBreadcrumb').innerHTML;
@@ -2545,7 +2544,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         document.getElementById('lbCounter').textContent = '';
                         document.getElementById('lbGallery').innerHTML = `
                     <div style="width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem;">
-                        <div style="font-size:4.5rem;">📂</div>
+                        <div style="color:#D1D5DB;"><?= ic('folder',56) ?></div>
                         <div style="color:var(--text-muted);font-size:1.1rem;font-weight:600;font-family:'Kanit',sans-serif;">ไม่มีไฟล์แนบ</div>
                     </div>`;
                         return;
@@ -2561,7 +2560,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         <div onclick="showLbSingle(${i})" style="cursor:pointer;border-radius:16px;border:2px solid #E5E7EB;background:#F9FAFB;width:160px;height:140px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.04);padding:0 10px;"
                             onmouseover="this.style.borderColor='var(--clr-primary)';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 24px rgba(98,54,139,0.15)'"
                             onmouseout="this.style.borderColor='#E5E7EB';this.style.transform='translateY(0)';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
-                            <div style="font-size:2.5rem;">🔗</div>
+                            <div style="color:#4F46E5;"><?= ic('link',36) ?></div>
                             <div style="color:var(--text-muted);font-size:0.75rem;font-weight:600;text-align:center;word-break:break-all;">${lbl.substring(0, 50)}</div>
                         </div>`;
                             return;
@@ -2582,7 +2581,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         <div onclick="showLbSingle(${i})" style="cursor:pointer;border-radius:16px;border:2px solid #E5E7EB;background:#F9FAFB;width:160px;height:140px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.04);"
                             onmouseover="this.style.borderColor='var(--clr-primary)';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 24px rgba(98,54,139,0.15)'"
                             onmouseout="this.style.borderColor='#E5E7EB';this.style.transform='translateY(0)';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
-                            <div style="font-size:2.5rem;color:var(--clr-primary);">📄</div>
+                            <div style="color:var(--clr-primary);"><?= ic('doc',36) ?></div>
                             <div style="color:var(--text-primary);font-weight:800;font-size:0.9rem;">${ext}</div>
                             <div style="color:var(--text-muted);font-size:0.75rem;font-weight:600;text-align:center;padding:0 12px;word-break:break-all;">${(f.original_name || f.file_path.split('/').pop()).substring(0, 40)}</div>
                         </div>`;
@@ -2611,7 +2610,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         const lbl = String(f.label || url).replace(/</g, '&lt;');
                         document.getElementById('lbContent').innerHTML = `
                         <div style="background:white;border-radius:24px;padding:3rem 4rem;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,0.5);max-width:520px;">
-                            <div style="font-size:4rem;margin-bottom:1rem;">🔗</div>
+                            <div style="margin-bottom:1rem;color:var(--clr-primary);"><?= ic('link',48) ?></div>
                             <div style="font-size:1.1rem;font-weight:700;color:#111;margin-bottom:0.4rem;">${lbl}</div>
                             <div style="font-size:0.82rem;color:#6B7280;margin-bottom:1.5rem;word-break:break-all;max-width:400px;">${url.replace(/</g, '&lt;')}</div>
                             <a href="${safeUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;background:var(--clr-primary);color:white;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-family:'Kanit',sans-serif;">
@@ -2638,7 +2637,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     } else {
                         document.getElementById('lbContent').innerHTML = `
                     <div style="background:white;border-radius:24px;padding:3rem 4rem;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,0.5);">
-                        <div style="font-size:4rem;margin-bottom:1rem;">📄</div>
+                        <div style="margin-bottom:1rem;color:var(--clr-primary);"><?= ic('doc',48) ?></div>
                         <div style="font-size:1.2rem;font-weight:700;color:#111;margin-bottom:0.4rem;">${ext} ไฟล์</div>
                         <div style="font-size:0.82rem;color:#6B7280;margin-bottom:1.5rem;word-break:break-all;max-width:300px;">${f.original_name || f.file_path.split('/').pop()}</div>
                         <a href="${filePath}" download="${f.original_name || ''}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--clr-primary);color:white;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-family:'Kanit',sans-serif;">

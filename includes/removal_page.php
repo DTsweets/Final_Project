@@ -120,7 +120,7 @@ $page_title2 = 'GHG Removal';
         </style>
 
         <div class="co">
-            <h1>🌱 GHG Removal — การดูดกลับก๊าซเรือนกระจกของมหาวิทยาลัยพะเยา</h1>
+            <h1 style="display:inline-flex;align-items:center;gap:8px;"><?= ic('leaf',22) ?> GHG Removal — การดูดกลับก๊าซเรือนกระจกของมหาวิทยาลัยพะเยา</h1>
 
             <?php $toast_msg = $flash; $toast_type = $flash_t; include __DIR__ . '/../components/toast.php'; ?>
 
@@ -198,7 +198,7 @@ $page_title2 = 'GHG Removal';
                 <!-- Modal แก้ไข -->
                 <div id="rmEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
                     <div style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                        <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;">✏️ แก้ไขรายการดูดกลับ</h2>
+                        <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?> แก้ไขรายการดูดกลับ</h2>
                         <form method="POST">
                             <input type="hidden" name="action" value="edit_removal_item"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="item_id" id="re_id">
                             <div class="fld" style="margin-bottom:10px;"><label>ชื่อรายการ</label><input class="ti-input" style="width:100%;" name="name" id="re_name" required></div>
@@ -230,7 +230,7 @@ $page_title2 = 'GHG Removal';
                 document.getElementById('re_factor').value=b.dataset.factor;
                 document.getElementById('rmEditModal').style.display='flex';
             }
-            function rmDelete(id){ if(confirm('ลบรายการนี้ (รวมปริมาณที่กรอก)?')) document.getElementById('delRm'+id).submit(); }
+            function rmDelete(id){ confirmDelete({message:'ลบรายการนี้ รวมปริมาณที่กรอก?'}).then(function(ok){ if(ok) document.getElementById('delRm'+id).submit(); }); }
             // จำกัดทศนิยมไม่เกิน 4 ตำแหน่ง (ค่าดูดกลับ + ปริมาณ)
             document.addEventListener('input', function(e){
                 var el = e.target;
@@ -244,6 +244,7 @@ $page_title2 = 'GHG Removal';
             });
             document.getElementById('rmEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
         </script>
+        <?php include __DIR__ . '/../components/confirm_modal.php'; ?>
     </main>
 </body>
 </html>

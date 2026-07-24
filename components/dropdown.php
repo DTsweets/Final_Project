@@ -47,22 +47,26 @@ foreach ($dd_options as $key => $opt) {
         $dd_normalized[] = [
             'value' => $opt['value'] ?? $key,
             'label' => $opt['label'] ?? ($opt['value'] ?? $key),
+            'icon'  => $opt['icon'] ?? '',   // markup ไอคอน (optional) — ไม่ถูก escape
         ];
     } else {
         // list ของ value ตรงๆ เช่น [2567, 2568]
         $dd_normalized[] = [
             'value' => $opt,
             'label' => $opt,
+            'icon'  => '',
         ];
     }
 }
 
 // หา label ของค่าที่เลือกไว้ล่วงหน้า (ถ้ามี) เพื่อโชว์ใน trigger ทันทีตอน render
 $dd_selected_label = null;
+$dd_selected_icon  = '';
 if ($dd_selected !== '' && $dd_selected !== null) {
     foreach ($dd_normalized as $opt) {
         if ((string) $opt['value'] === (string) $dd_selected) {
             $dd_selected_label = $opt['label'];
+            $dd_selected_icon  = $opt['icon'];
             break;
         }
     }
@@ -84,7 +88,7 @@ $dd_has_options = count($dd_normalized) > 0;
         <?= ($dd_disabled || !$dd_has_options) ? 'disabled' : '' ?>>
         <span class="dd-label" id="<?= htmlspecialchars($dd_id) ?>_label"
             style="<?= $dd_selected_label === null ? 'color:#9CA3AF;' : 'color:#374151;' ?>">
-            <?= htmlspecialchars($dd_has_options ? ($dd_selected_label ?? $dd_placeholder) : 'ไม่มีตัวเลือก') ?>
+            <?= $dd_selected_icon ?><?= htmlspecialchars($dd_has_options ? ($dd_selected_label ?? $dd_placeholder) : 'ไม่มีตัวเลือก') ?>
         </span>
         <svg class="dd-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -97,7 +101,7 @@ $dd_has_options = count($dd_normalized) > 0;
             <div class="dd-option <?= (string) $opt['value'] === (string) $dd_selected ? 'active' : '' ?>"
                 data-value="<?= htmlspecialchars((string) $opt['value']) ?>"
                 onclick="ddSelect('<?= htmlspecialchars($dd_id) ?>', this)">
-                <?= htmlspecialchars((string) $opt['label']) ?>
+                <?= $opt['icon'] ?><?= htmlspecialchars((string) $opt['label']) ?>
             </div>
         <?php endforeach; ?>
         <?php if (!$dd_has_options): ?>
@@ -195,7 +199,13 @@ $dd_has_options = count($dd_normalized) > 0;
             font-size: 0.95rem;
             color: #374151;
             transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+        /* ไอคอน (ถ้ามี) ใน option/label — ไม่ให้ถูกบีบ */
+        .dd-option svg, .dd-label svg { flex-shrink: 0; }
+        .dd-label { display: inline-flex; align-items: center; gap: 8px; }
 
         .dd-option:hover {
             background: #F3F4F6;
@@ -316,7 +326,7 @@ $dd_has_options = count($dd_normalized) > 0;
 
             if (input) input.value = value;
             if (labelEl) {
-                labelEl.textContent = label;
+                labelEl.innerHTML = optionEl.innerHTML;   // คัดลอกไอคอน+ข้อความไปแสดงบน trigger
                 labelEl.style.color = '#374151';
             }
 

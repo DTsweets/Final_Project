@@ -116,7 +116,7 @@ $dl = 'view=' . $view . '&year=' . $selected_year;
                     </div>
                     <div style="margin-top:14px;padding-top:12px;border-top:1px solid #F1EEF5;font-size:.9rem;text-align:left;">
                         <div style="display:flex;justify-content:space-between;"><span style="color:#6B7280;">การปล่อย</span><span style="font-weight:700;"><?= number_format($total,2,'.',',') ?></span></div>
-                        <div style="display:flex;justify-content:space-between;margin-top:4px;"><span style="color:#166534;">🌱 ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?></span><span style="font-weight:700;color:#166534;"><?= number_format($removal,2,'.',',') ?></span></div>
+                        <div style="display:flex;justify-content:space-between;margin-top:4px;"><span style="color:#166534;"><?= ic('leaf',15) ?> ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?></span><span style="font-weight:700;color:#166534;"><?= number_format($removal,2,'.',',') ?></span></div>
                         <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px dashed #E7E3EC;"><span style="color:#374151;font-weight:700;">สุทธิ (Net)</span><span style="font-weight:800;color:var(--clr-primary);"><?= number_format($net,2,'.',',') ?></span></div>
                     </div>
                 </div>

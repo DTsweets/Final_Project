@@ -1152,13 +1152,13 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                                         <?php
                                         $exportCols = [
-                                            'col_no' => ['label' => '# ลำดับ', 'icon' => '🔢', 'always' => true],
-                                            'col_firstname' => ['label' => 'ชื่อ', 'icon' => '👤', 'always' => false],
-                                            'col_lastname' => ['label' => 'นามสกุล', 'icon' => '👤', 'always' => false],
-                                            'col_username' => ['label' => 'Username', 'icon' => '🔑', 'always' => false],
-                                            'col_email' => ['label' => 'Email', 'icon' => '📧', 'always' => false],
-                                            'col_affiliation' => ['label' => 'หน่วยงาน/คณะ', 'icon' => '🏢', 'always' => false],
-                                            'col_role' => ['label' => 'สิทธิ์การใช้งาน', 'icon' => '🛡️', 'always' => false],
+                                            'col_no' => ['label' => '# ลำดับ', 'icon' => ic('hash',16), 'always' => true],
+                                            'col_firstname' => ['label' => 'ชื่อ', 'icon' => ic('user',16), 'always' => false],
+                                            'col_lastname' => ['label' => 'นามสกุล', 'icon' => ic('user',16), 'always' => false],
+                                            'col_username' => ['label' => 'Username', 'icon' => ic('key',16), 'always' => false],
+                                            'col_email' => ['label' => 'Email', 'icon' => ic('mail',16), 'always' => false],
+                                            'col_affiliation' => ['label' => 'หน่วยงาน/คณะ', 'icon' => ic('building',16), 'always' => false],
+                                            'col_role' => ['label' => 'สิทธิ์การใช้งาน', 'icon' => ic('shield',16), 'always' => false],
                                         ];
                                         foreach ($exportCols as $key => $col): ?>
                                             <label class="exp-col-lbl"

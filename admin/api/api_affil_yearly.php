@@ -15,7 +15,7 @@ $affilId  = isset($_GET['affil_id']) ? (int)$_GET['affil_id'] : 0;
 $source   = $_GET['source'] ?? '';   // 'survey' | 'event' → รวมทุกคณะตาม source; ไม่ระบุ = คณะ (officer)
 
 if ($source === 'event') {
-    // ยอดรายปีของกิจกรรม — นับ "ทุกกิจกรรม" (ทั้งที่มีรายการปล่อยและ/หรือดูดกลับ)
+    // มุมการปล่อยสะสม → นับเฉพาะกิจกรรมที่ "มีรายการปล่อย" (ให้ตรงกับ drill ที่โชว์เฉพาะปล่อย)
     // total_emission = ยอดปล่อยจากกิจกรรม (ดูดกลับแยกไปหน้า GHG Removal)
     $sql = '
         SELECT y.id AS year_id, y.year,

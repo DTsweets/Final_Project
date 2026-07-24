@@ -886,7 +886,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         function deleteItem(id) {
-            if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้? การลบจะมีผลต่อการคำนวณทั้งหมดที่ใช้รายการนี้')) {
+            confirmDelete({ message: 'ต้องการลบรายการนี้? การลบจะมีผลต่อการคำนวณทั้งหมดที่ใช้รายการนี้' }).then(function (ok) {
+                if (!ok) return;
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.style.display = 'none';
@@ -903,7 +904,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                 document.body.appendChild(form);
                 form.submit();
-            }
+            });
         }
 
         // Modal Scope Search
@@ -954,6 +955,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
     </script>
+    <?php include __DIR__ . '/../components/confirm_modal.php'; ?>
 </body>
 
 </html>

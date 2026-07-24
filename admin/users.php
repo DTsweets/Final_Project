@@ -656,7 +656,7 @@ $page_title = "ข้อมูลผู้ใช้งาน";
                                     แก้ไข
                                 </button>
                                 <?php if ($u['id'] !== (int)$_SESSION['user_id']): ?>
-                                <form method="POST" onsubmit="return confirm('ยืนยันการลบผู้ใช้งานใช่หรือไม่?');" style="display:inline;">
+                                <form method="POST" onsubmit="return cfmForm(event, this, 'ต้องการลบผู้ใช้งานนี้ใช่หรือไม่?')" style="display:inline;">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
                                     <button type="submit" style="background:none; border:none; color:var(--danger); cursor:pointer;">
@@ -748,6 +748,7 @@ $page_title = "ข้อมูลผู้ใช้งาน";
         </div>
 
     </main>
+    <?php include __DIR__ . '/../components/confirm_modal.php'; ?>
 
     <script>
         // Custom Select Logic

@@ -168,3 +168,5 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
     });
 })();
 </script>
+
+<?php include __DIR__ . '/../../components/page_loader.php'; ?>

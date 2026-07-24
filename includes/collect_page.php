@@ -422,10 +422,8 @@ if ($is_survey) {
         WHERE q.year_id=:y2 AND q.audience=:grp AND q.affiliation_id=:aff2 ORDER BY qi.order_num, qi.id");
     $it->execute([':aff'=>$sel_affil, ':y'=>$selected_year, ':y2'=>$selected_year, ':grp'=>$group, ':aff2'=>$survey_affil]);
     $rows = $it->fetchAll();
-    // เลือกแบบสอบถามอยู่ → รวมเฉพาะแบบสอบถามนั้น; ยังไม่เลือก → รวมทุกแบบสอบถามของปีนี้
-    $year_total = $sel_survey_exists
-        ? array_sum(array_map(fn($r)=>(float)$r['emission'], $rows))
-        : array_sum(array_map(fn($q)=>(float)$q['tco2e'], $questionnaires));
+    // ยอดรวมมุมบน = รวมทุกแบบสอบถามของปีนี้เสมอ (ไม่เปลี่ยนตามแบบสอบถามที่เลือก)
+    $year_total = array_sum(array_map(fn($q)=>(float)$q['tco2e'], $questionnaires));
 } else { // event
     // รายชื่อผู้จัดสำหรับ dropdown (admin) = คณะในระบบ + ผู้จัดอิสระที่เคยกรอกในปีนี้
     // ตัวเลือกผู้จัดสำหรับฟอร์มเพิ่มกิจกรรม (admin) = คณะในระบบ + ผู้จัดอิสระที่เคยกรอกในปีนี้
@@ -529,12 +527,18 @@ if ($is_survey) {
             .sdot{font-size:.7rem;font-weight:800;padding:2px 8px;border-radius:6px;}
             .s1{background:#FFF7ED;color:#F97316;}.s2{background:#FDF2F8;color:#EC4899;}.s3{background:#EFF6FF;color:#3B82F6;}
             .inp{width:120px;border:1px solid #E7E3EC;border-radius:8px;padding:7px 10px;font:inherit;text-align:center;background:#fff;}
-            .del{background:none;border:1px solid #E7E3EC;border-radius:8px;color:#EF4444;cursor:pointer;padding:5px 10px;font:inherit;}
+            .del{background:none;border:1px solid #E7E3EC;border-radius:8px;color:#EF4444;cursor:pointer;padding:5px 10px;font:inherit;transition:transform .2s ease,background .2s ease,border-color .2s ease;}
+            .del:hover{transform:translateY(-2px);background:#FEF2F2;border-color:#EF4444;}
             .icobtn{border:none;width:36px;height:36px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#fff;transition:all .2s;vertical-align:middle;margin:0 3px;}
             .icobtn.edit{background:#3B82F6;box-shadow:0 4px 10px rgba(59,130,246,.2);}
             .icobtn.edit:hover{background:#2563EB;transform:translateY(-2px);}
             .icobtn.del{background:#EF4444;box-shadow:0 4px 10px rgba(239,68,68,.2);}
             .icobtn.del:hover{background:#DC2626;transform:translateY(-2px);}
+            /* ปุ่มเพิ่มแบบสอบถาม/เพิ่มกิจกรรม: ตัดเงาออก */
+            .co .btn-c.btn-noshadow,.co .btn-c.btn-noshadow:hover{box-shadow:none;}
+            /* effect การ์ดเด้งขึ้น (เหมือน .modal-box) สำหรับ modal custom ในหน้านี้ */
+            @keyframes coPop{from{opacity:0;transform:translateY(50px) scale(.9);}to{opacity:1;transform:translateY(0) scale(1);}}
+            .co-pop{animation:coPop .5s cubic-bezier(0.34,1.56,0.64,1);}
             .tot{font-weight:800;color:#62368B;} .muted{color:#6B7280;font-size:.9rem;} .foot{display:flex;justify-content:flex-end;margin-top:14px;}
             .frow{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;} .frow .fld{flex:1;min-width:150px;}
             .linkish{color:#62368B;text-decoration:none;font-weight:600;}
@@ -552,7 +556,7 @@ if ($is_survey) {
         </style>
 
         <div class="co">
-            <h1>📝 แบบสอบถาม & กิจกรรม</h1>
+            <h1 style="display:flex;align-items:center;gap:8px;"><?= ic('note',22) ?> แบบสอบถาม & กิจกรรม</h1>
             <?php if (count($TABS) > 1): ?>
             <div class="tabs">
                 <?php foreach ($TABS as $k=>$lbl):
@@ -577,7 +581,7 @@ if ($is_survey) {
                     กิจกรรมดูดกลับ: <span style="color:#166534;font-weight:800;"><?= number_format($ev_rmv_total,3) ?></span> tCO₂e
                 </span>
                 <?php else: ?>
-                <span class="muted" style="margin-left:auto;">รวม (<?= htmlspecialchars($sel_survey_exists ? $group : 'แบบสอบถาม') ?>): <span class="tot"><?= number_format($year_total,3) ?></span> tCO₂e</span>
+                <span class="muted" style="margin-left:auto;">รวมทั้งหมด (แบบสอบถาม): <span class="tot"><?= number_format($year_total,3) ?></span> tCO₂e</span>
                 <?php endif; ?>
             </div>
 
@@ -600,7 +604,7 @@ if ($is_survey) {
                         <div class="frow">
                             <div class="fld" style="flex:1;min-width:240px;"><label>ชื่อแบบสอบถาม</label>
                                 <?php $ti_id='qName';$ti_name='q_name';$ti_required=true;$ti_placeholder='เช่น นักศึกษา / บุคลากร / แบบสอบถามการเดินทาง';$ti_wrap_style='width:100%;';include __DIR__.'/../components/text_input.php'; ?></div>
-                            <div style="align-self:flex-end;"><?php $btn_label='เพิ่มแบบสอบถาม';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?></div>
+                            <div style="align-self:flex-end;"><?php $btn_label='เพิ่มแบบสอบถาม';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?></div>
                         </div>
                     </form>
                     <?php if ($is_admin): ?><p class="muted" style="margin-top:10px;">เลือกคณะที่จะสร้างแบบสอบถามให้ · ส่วนหัวข้อ/ค่าเฉลี่ยด้านล่างจะตามแบบสอบถามที่คลิกเลือกในตาราง</p><?php endif; ?>
@@ -638,7 +642,7 @@ if ($is_survey) {
                                 </td>
                                 <td class="num" style="white-space:nowrap;">
                                     <button type="button" class="icobtn edit" title="แก้ไขชื่อ" data-name="<?= htmlspecialchars($qq['name'],ENT_QUOTES) ?>" data-affid="<?= (int)$qq['affid'] ?>" onclick="qEdit(this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-                                    <form method="POST" onsubmit="return confirm('ลบแบบสอบถามนี้ทั้งหมด (รวมรายการและค่าเฉลี่ย)?')" style="display:inline;">
+                                    <form method="POST" onsubmit="return cfmForm(event, this, 'ลบแบบสอบถามนี้ทั้งหมด รวมรายการและค่าเฉลี่ย — ไม่สามารถกู้คืนได้')" style="display:inline;">
                                         <input type="hidden" name="action" value="delete_questionnaire"><input type="hidden" name="tab" value="survey"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$qq['affid'] ?>"><input type="hidden" name="q_name" value="<?= htmlspecialchars($qq['name'],ENT_QUOTES) ?>">
                                         <button class="icobtn del" title="ลบแบบสอบถาม" type="submit"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                                     </form>
@@ -649,14 +653,14 @@ if ($is_survey) {
                     </table>
                     <!-- Modal แก้ไขชื่อแบบสอบถาม -->
                     <div id="qEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                        <div style="background:#fff;border-radius:16px;padding:22px;max-width:480px;width:92%;">
-                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;">✏️ แก้ไขชื่อแบบสอบถาม</h2>
+                        <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:480px;width:92%;">
+                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขชื่อแบบสอบถาม</h2>
                             <form method="POST">
                                 <input type="hidden" name="action" value="edit_questionnaire"><input type="hidden" name="tab" value="survey"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" id="qe_maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="q_old" id="qe_old">
                                 <div class="fld" style="margin-bottom:12px;"><label>ชื่อแบบสอบถาม</label><input class="ti-input" style="width:100%;" name="q_name" id="qe_name" required maxlength="50"></div>
                                 <div style="display:flex;justify-content:flex-end;gap:10px;">
                                     <button type="button" class="del" onclick="document.getElementById('qEditModal').style.display='none'">ยกเลิก</button>
-                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?>
+                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
                                 </div>
                             </form>
                         </div>
@@ -667,6 +671,7 @@ if ($is_survey) {
                             document.getElementById('qe_name').value=b.dataset.name;
                             if(b.dataset.affid) document.getElementById('qe_maker').value=b.dataset.affid;
                             document.getElementById('qEditModal').style.display='flex';
+                            coPopRestart('qEditModal');
                         }
                         document.getElementById('qEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
                     </script>
@@ -743,8 +748,8 @@ if ($is_survey) {
                         <?php endforeach; ?>
                         <!-- Modal แก้ไขหัวข้อ -->
                         <div id="topicEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                            <div style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                                <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;">✏️ แก้ไขหัวข้อ</h2>
+                            <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
+                                <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขหัวข้อ</h2>
                                 <form method="POST">
                                     <input type="hidden" name="action" value="edit_topic"><input type="hidden" name="tab" value="<?= $tab ?>">
                                     <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="group" value="<?= htmlspecialchars($group,ENT_QUOTES) ?>">
@@ -759,7 +764,7 @@ if ($is_survey) {
                                     </div>
                                     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
                                         <button type="button" class="del" onclick="document.getElementById('topicEditModal').style.display='none'">ยกเลิก</button>
-                                        <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?>
+                                        <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
                                     </div>
                                 </form>
                             </div>
@@ -772,8 +777,9 @@ if ($is_survey) {
                                 ddSetValue('teScopeEdit', b.dataset.scope, 'Scope '+b.dataset.scope);
                                 document.getElementById('te_ad').value=b.dataset.ad;
                                 var m=document.getElementById('topicEditModal'); m.style.display='flex';
+                                coPopRestart('topicEditModal');
                             }
-                            function topicDelete(qiid){ if(confirm('ลบหัวข้อนี้?')) document.getElementById('delTopic'+qiid).submit(); }
+                            function topicDelete(qiid){ confirmDelete({message:'ต้องการลบหัวข้อนี้?'}).then(function(ok){ if(ok) document.getElementById('delTopic'+qiid).submit(); }); }
                             document.getElementById('topicEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
                         </script>
                     <?php endif; ?>
@@ -806,7 +812,7 @@ if ($is_survey) {
                                 <input type="hidden" name="event_end_date" id="evEndDateHidden"></div>
                         </div>
                         <!-- ปุ่มบันทึกไว้มุมขวาล่างของการ์ด (บรรทัดของตัวเอง) -->
-                        <div style="text-align:right;margin-top:12px;"><?php $btn_label='เพิ่มกิจกรรม';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?></div>
+                        <div style="text-align:right;margin-top:12px;"><?php $btn_label='เพิ่มกิจกรรม';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?></div>
                     </form>
                 </div>
                 <div class="card">
@@ -820,7 +826,7 @@ if ($is_survey) {
                             <col style="width:60px;">
                             <col style="width:88px;">
                             <col style="width:80px;">
-                            <col style="width:96px;">
+                            <col style="width:100px;">
                         </colgroup>
                         <thead><tr><th style="text-align:left;">กิจกรรม</th><?php if($is_admin):?><th>ผู้จัด</th><?php endif;?><th>วันที่</th><th class="num">รายการ</th><th class="num">tCO₂e</th><th style="text-align:center;">ไฟล์</th><th>จัดการ</th></tr></thead>
                         <tbody>
@@ -841,7 +847,22 @@ if ($is_survey) {
                                     if (!empty($e['event_end_date'])) echo ' - ' . htmlspecialchars($fmtDMY($e['event_end_date']));
                                 ?></td>
                                 <td class="num"><?= (int)$e['item_count'] + (int)$e['removal_count'] ?></td>
-                                <td class="num">🏭 <?= number_format((float)$e['tco2e'],3) ?><?php if ($hasRmv): ?> <span style="color:#166534;font-weight:700;white-space:nowrap;">🌱 <?= number_format((float)$e['removal_tco2e'],3) ?></span><?php endif; ?></td>
+                                <td class="num" style="white-space:nowrap;">
+                                    <div style="display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                                        <?php if ($hasEmit || !$hasRmv): /* โชว์ "ปล่อย" เฉพาะเมื่อมีรายการปล่อยจริง (หรือไม่มีทั้งปล่อย/ดูดกลับ = fallback) */ ?>
+                                        <span style="display:inline-flex;align-items:center;gap:5px;color:#62368B;font-weight:700;" title="การปล่อย (tCO₂e)">
+                                            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="flex-shrink:0;"><path d="M2 20V9l6 4V9l6 4V4h4v16z"/></svg>
+                                            <?= number_format((float)$e['tco2e'],3) ?>
+                                        </span>
+                                        <?php endif; ?>
+                                        <?php if ($hasRmv): ?>
+                                        <span style="display:inline-flex;align-items:center;gap:5px;color:#166534;font-weight:700;" title="การดูดกลับ (tCO₂e)">
+                                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
+                                            <?= number_format((float)$e['removal_tco2e'],3) ?>
+                                        </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
                                 <td style="text-align:center;">
                                     <button type="button" class="ev-open-btn" data-ev="event:<?= (int)$e['id'] ?>" title="แนบ (ไฟล์/ลิงก์)"
                                         onclick="openEvidence({type:'event', id:<?= (int)$e['id'] ?>, title:<?= htmlspecialchars(json_encode($e['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>})">
@@ -858,7 +879,7 @@ if ($is_survey) {
                                         onclick="evEdit(this)">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
                                     </button>
-                                    <form method="POST" onsubmit="return confirm('ลบกิจกรรมนี้?')" style="display:inline;">
+                                    <form method="POST" onsubmit="return cfmForm(event, this, 'ต้องการลบกิจกรรมนี้?')" style="display:inline;">
                                     <input type="hidden" name="action" value="delete_event"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $e['id'] ?>">
                                     <button class="icobtn del" title="ลบกิจกรรม" type="submit">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -868,8 +889,8 @@ if ($is_survey) {
                         </tbody>
                     </table>
                     <div id="evEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                        <div style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;">✏️ แก้ไขกิจกรรม</h2>
+                        <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
+                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขกิจกรรม</h2>
                             <form method="POST">
                                 <input type="hidden" name="action" value="edit_event"><input type="hidden" name="tab" value="event">
                                 <input type="hidden" name="year_id" value="<?= $selected_year ?>">                                <input type="hidden" name="event_id" id="ev_ed_eid">
@@ -884,7 +905,7 @@ if ($is_survey) {
                                 </div>
                                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
                                     <button type="button" class="del" onclick="document.getElementById('evEditModal').style.display='none'">ยกเลิก</button>
-                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?>
+                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
                                 </div>
                             </form>
                         </div>
@@ -896,7 +917,7 @@ if ($is_survey) {
                 <div class="card">
                     <h2>＋ เพิ่มรายการ</h2>
                     <div class="fld" style="max-width:200px;margin-bottom:14px;"><label>ประเภทรายการ</label>
-                        <?php $dd_id='evItemType';$dd_name='__itype';$dd_options=[['value'=>'emit','label'=>'🏭 ปล่อยคาร์บอน'],['value'=>'rmv','label'=>'🌱 ดูดกลับคาร์บอน']];
+                        <?php $dd_id='evItemType';$dd_name='__itype';$dd_options=[['value'=>'emit','label'=>'ปล่อยคาร์บอน','icon'=>ic('factory',16,'style="color:#62368B"')],['value'=>'rmv','label'=>'ดูดกลับคาร์บอน','icon'=>ic('leaf',16,'style="color:#166534"')]];
                             $dd_selected='emit';$dd_required=false;$dd_class='dd-field';$dd_placeholder='เลือกประเภท';$dd_style='width:100%;';include __DIR__.'/../components/dropdown.php'; ?>
                     </div>
                     <!-- ── ปล่อยคาร์บอน ── -->
@@ -934,7 +955,7 @@ if ($is_survey) {
 
                 <?php if (!empty($ef_items)): ?>
                 <div class="card">
-                    <h2>กรอกปริมาณ (ปล่อยคาร์บอน) — <?= htmlspecialchars($curEvent['name']) ?> <span class="muted" style="font-weight:500;font-size:.9rem;">· ผู้จัด: <?= htmlspecialchars($curEvent['org_label']) ?></span></h2>
+                    <h2>กรอกปริมาณปล่อยคาร์บอน — <?= htmlspecialchars($curEvent['name']) ?> <span class="muted" style="font-weight:500;font-size:.9rem;">· ผู้จัด: <?= htmlspecialchars($curEvent['org_label']) ?></span></h2>
                     <?php if (empty($ef_items)): ?>
                         <p class="muted">ยังไม่มีรายการในปีนี้ — เพิ่มด้านบน</p>
                     <?php else: ?>
@@ -979,8 +1000,8 @@ if ($is_survey) {
                     <?php endforeach; ?>
                     <p class="muted" style="margin-top:6px;">กรอกปริมาณเฉพาะรายการที่เกี่ยวข้อง (เว้นว่าง/0 = ไม่นับ) แล้วกดบันทึกทีเดียว</p>
                     <div id="evTopicEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                        <div style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;">✏️ แก้ไขรายการ</h2>
+                        <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
+                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขรายการ</h2>
                             <form method="POST">
                                 <input type="hidden" name="action" value="edit_event_topic"><input type="hidden" name="tab" value="event">
                                 <input type="hidden" name="year_id" value="<?= $selected_year ?>">                                <input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>"><input type="hidden" name="admin_item_id" id="ev_te_aiid">
@@ -994,7 +1015,7 @@ if ($is_survey) {
                                 </div>
                                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
                                     <button type="button" class="del" onclick="document.getElementById('evTopicEditModal').style.display='none'">ยกเลิก</button>
-                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?>
+                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
                                 </div>
                             </form>
                         </div>
@@ -1050,8 +1071,8 @@ if ($is_survey) {
                     <?php endforeach; ?>
                     <!-- Modal แก้ไขรายการดูดกลับ -->
                     <div id="rmEvEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                        <div style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;">✏️ แก้ไขรายการดูดกลับ</h2>
+                        <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
+                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขรายการดูดกลับ</h2>
                             <form method="POST">
                                 <input type="hidden" name="action" value="edit_event_removal"><input type="hidden" name="tab" value="event">
                                 <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>"><input type="hidden" name="rei_id" id="rmev_id">
@@ -1062,7 +1083,7 @@ if ($is_survey) {
                                 </div>
                                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
                                     <button type="button" class="del" onclick="document.getElementById('rmEvEditModal').style.display='none'">ยกเลิก</button>
-                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?>
+                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
                                 </div>
                             </form>
                         </div>
@@ -1074,13 +1095,14 @@ if ($is_survey) {
             <?php endif; ?>
         </div>
         <script>
-            function evRmDel(rid){ if(confirm('เอารายการนี้ออกจากกิจกรรม?')) document.getElementById('delEvRm'+rid).submit(); }
+            function evRmDel(rid){ confirmDelete({message:'เอารายการนี้ออกจากกิจกรรม?', confirmText:'ยืนยันการลบ'}).then(function(ok){ if(ok) document.getElementById('delEvRm'+rid).submit(); }); }
             function evRmEdit(b){
                 document.getElementById('rmev_id').value=b.dataset.rid;
                 document.getElementById('rmev_name').value=b.dataset.name;
                 document.getElementById('rmev_unit').value=b.dataset.unit;
                 document.getElementById('rmev_factor').value=b.dataset.factor;
                 document.getElementById('rmEvEditModal').style.display='flex';
+                coPopRestart('rmEvEditModal');
             }
             document.getElementById('rmEvEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
             // ── สลับฟอร์มเพิ่มรายการ: ปล่อย (emit) / ดูดกลับ (rmv) ──
@@ -1146,6 +1168,22 @@ if ($is_survey) {
                 sd.addEventListener('input', function(){ sd.value=mask(sd.value); sh.value=toISO(sd.value); validateRange(); });
                 if(ed) ed.addEventListener('input', function(){ ed.value=mask(ed.value); eh.value=toISO(ed.value); validateRange(); });
             })();
+            // restart animation coPop ทุกครั้งที่เปิด modal (parent toggle display ไม่ re-trigger เอง) + ล็อกสกรอลล์หน้า
+            window.coPopRestart = function(modalId){
+                document.body.style.overflow = 'hidden';   // fix หน้า ไม่ให้เลื่อนหลัง modal
+                var box = document.querySelector('#'+modalId+' .co-pop');
+                if(!box) return;
+                box.style.animation='none'; void box.offsetWidth; box.style.animation='';
+            };
+            // คืนสกรอลล์อัตโนมัติเมื่อ modal custom ทุกตัวปิด (รองรับทุกทางปิด: ยกเลิก/คลิกนอก/บันทึก)
+            (function(){
+                var ids = ['qEditModal','topicEditModal','evEditModal','evTopicEditModal','rmEvEditModal'];
+                var nodes = ids.map(function(id){ return document.getElementById(id); }).filter(Boolean);
+                if(!nodes.length || typeof MutationObserver === 'undefined') return;
+                function anyOpen(){ return nodes.some(function(m){ return m.style.display === 'flex'; }); }
+                var obs = new MutationObserver(function(){ if(!anyOpen()) document.body.style.overflow = ''; });
+                nodes.forEach(function(m){ obs.observe(m, {attributes:true, attributeFilter:['style']}); });
+            })();
             // ── แก้ไขกิจกรรม (ชื่อ/วันที่เริ่ม/วันสิ้นสุด) ──
             (function(){
                 function toISO(v){
@@ -1174,13 +1212,15 @@ if ($is_survey) {
                     document.getElementById('ev_ed_end').value=toDMY(b.dataset.end);
                     document.getElementById('ev_ed_endH').value=b.dataset.end||'';
                     document.getElementById('evEditModal').style.display='flex';
+                    coPopRestart('evEditModal');
                 };
                 document.getElementById('evEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
             })();
             // ── ลบ/แก้ไขรายการ EF ของกิจกรรม (นอก form บันทึก) ──
             window.evTopicDelete = function(id){
-                if(confirm('ลบรายการนี้? (จะลบปริมาณของทุกกิจกรรมที่ใช้รายการนี้ด้วย)'))
-                    document.getElementById('delEvTopic'+id)?.submit();
+                confirmDelete({message:'ลบรายการนี้? จะลบปริมาณของทุกกิจกรรมที่ใช้รายการนี้ด้วย'}).then(function(ok){
+                    if(ok) document.getElementById('delEvTopic'+id)?.submit();
+                });
             };
             window.evTopicEdit = function(b){
                 document.getElementById('ev_te_aiid').value=b.dataset.aiid;
@@ -1189,6 +1229,7 @@ if ($is_survey) {
                 ddSetValue('evScopeEdit', b.dataset.scope, 'Scope '+b.dataset.scope);
                 document.getElementById('ev_te_ad').value=b.dataset.ad;
                 document.getElementById('evTopicEditModal').style.display='flex';
+                coPopRestart('evTopicEditModal');
             };
             document.getElementById('evTopicEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
             // ── ตารางกิจกรรม: คำนวณ tCO₂e ต่อแถวสด ๆ ตอนพิมพ์ Vol (Vol×EF÷1000) ──
@@ -1238,6 +1279,8 @@ if ($is_survey) {
         </script>
 
         <?php include __DIR__ . '/../components/evidence_modal.php'; ?>
+        <?php include __DIR__ . '/../components/confirm_modal.php'; ?>
+
     </main>
 </body>
 </html>
