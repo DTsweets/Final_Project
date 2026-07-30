@@ -19,7 +19,10 @@ $selected_year = isset($_GET['year']) ? (int)$_GET['year'] : ($years[0]['year_id
 $year_label = '';
 foreach ($years as $y) { if ($y['year_id'] == $selected_year) { $year_label = $y['year']; break; } }
 
-$view = ($_GET['view'] ?? 'system') === 'faculty' ? 'faculty' : 'system';
+// dean เห็นเฉพาะคณะตัวเอง → บังคับ view=faculty (admin เลือกได้ทั้งสองมุมมอง)
+$view = (($_SESSION['role'] ?? '') === 'dean')
+    ? 'faculty'
+    : (($_GET['view'] ?? 'system') === 'faculty' ? 'faculty' : 'system');
 
 // ── ข้อมูลตามมุมมอง ──
 $scope = ghg_scope_totals($pdo, $selected_year, $view === 'faculty' ? $affil_id : null);
@@ -86,8 +89,10 @@ $dl = 'view=' . $view . '&year=' . $selected_year;
             <!-- View toggle + downloads -->
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem;">
                 <div style="display:flex;gap:8px;">
+                    <?php if (($_SESSION['role'] ?? '') !== 'dean'): /* dean ไม่มีสวิตช์มุมมอง — เห็นเฉพาะคณะตัวเอง */ ?>
                     <a href="?view=system&year=<?= $selected_year ?>" class="tab-item <?= $view==='system'?'active':'' ?>" style="padding:8px 20px;">ทั้งระบบ</a>
                     <a href="?view=faculty&year=<?= $selected_year ?>" class="tab-item <?= $view==='faculty'?'active':'' ?>" style="padding:8px 20px;">คณะของฉัน</a>
+                    <?php endif; ?>
                 </div>
                 <div style="display:flex;gap:8px;">
                     <a href="export_report.php?<?= $dl ?>" class="f-btn" style="background:#4B8BF5;color:#fff;padding:9px 18px;border-radius:12px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:6px;">

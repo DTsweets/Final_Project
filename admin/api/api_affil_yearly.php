@@ -40,7 +40,7 @@ if ($source === 'survey') {
     // ยอดรายปีของแบบสอบถาม (รวมทุกคณะ)
     $sql = '
         SELECT y.id AS year_id, y.year,
-               COUNT(DISTINCT ui.id) AS entry_count,
+               (SELECT COUNT(*) FROM questionnaire q WHERE q.year_id = y.id) AS entry_count,   /* นับจำนวนแบบสอบถาม (กลุ่ม) ไม่ใช่แถวย่อย */
                COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
         FROM admin_year y
         LEFT JOIN user_item ui ON ui.year_id = y.id AND ui.source = :src

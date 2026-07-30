@@ -44,7 +44,7 @@ if ($mode === 'years') {
         // แบบสอบถาม = รวมทุกคณะ
         $sql = '
             SELECT ay.id AS year_id, ay.year AS year_label,
-                   COUNT(DISTINCT ui.id) AS item_count,
+                   (SELECT COUNT(*) FROM questionnaire q WHERE q.year_id = ay.id) AS item_count,   /* นับจำนวนแบบสอบถาม (กลุ่ม) ไม่ใช่แถวย่อย */
                    COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
             FROM user_item ui
             JOIN admin_year ay ON ay.id = ui.year_id

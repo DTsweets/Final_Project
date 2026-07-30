@@ -162,12 +162,12 @@ $page_title2 = 'GHG Removal';
                 <form method="POST">
                     <input type="hidden" name="action" value="save_removal"><input type="hidden" name="year_id" value="<?= $selected_year ?>">
                     <table class="t">
-                        <thead><tr><th style="text-align:left;">รายการ</th><th style="text-align:center;">หน่วย</th><th class="num">ค่าดูดกลับ (kgCO₂e/หน่วย)</th><th style="text-align:center;">ปริมาณ</th><th class="num">tCO₂e</th><th style="text-align:center;">จัดการ</th></tr></thead>
+                        <thead><tr><th style="text-align:left;">รายการ</th><th style="text-align:center;">หน่วย</th><th class="num">ค่าดูดกลับ<br>(kgCO₂e/หน่วย)</th><th style="text-align:center;">ปริมาณ</th><th class="num">tCO₂e</th><th style="text-align:center;">จัดการ</th></tr></thead>
                         <tbody>
                         <?php foreach ($rows as $r): ?>
                             <tr>
-                                <td style="font-weight:600;"><?= htmlspecialchars($r['name_tiem']) ?></td>
-                                <td style="text-align:center;color:#6B7280;"><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
+                                <td style="font-weight:600;"><div style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($r['name_tiem'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['name_tiem']) ?></div></td>
+                                <td style="text-align:center;color:#6B7280;white-space:nowrap;"><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
                                 <td class="num"><?= number_format((float)$r['factor'],4) ?></td>
                                 <td style="text-align:center;"><input class="ti-input ti-qty" style="width:130px;" type="number" min="0" step="0.0001" name="qty[<?= (int)$r['id'] ?>]" value="<?= (float)$r['qty']!=0 ? htmlspecialchars(rtrim(rtrim(number_format((float)$r['qty'],4,'.',''),'0'),'.')) : '' ?>" placeholder="0"></td>
                                 <td class="num" style="font-weight:700;color:#166534;"><?= number_format((float)$r['emission'],4) ?></td>

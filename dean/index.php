@@ -30,7 +30,7 @@ if ($affil_id) {
         FROM admin_item ai
         JOIN admin_g ag ON ai.scope = ag.id
         LEFT JOIN user_item ui ON ui.admin_item_id = ai.id AND ui.affiliation_id = :aff AND ui.year_id = :y AND ui.source = 'officer'
-        WHERE ai.year_id = :y2
+        WHERE ai.year_id = :y2 AND ai.data_source = 'officer'
         ORDER BY ag.scope ASC, ai.id ASC");
     $stmt->execute([':aff' => $affil_id, ':y' => $selected_year, ':y2' => $selected_year]);
     foreach ($stmt->fetchAll() as $r) {
@@ -49,6 +49,20 @@ $sys_affil = ghg_by_affiliation($pdo, $selected_year);
 // ── การดูดกลับ: คณะตน (จากกิจกรรม) + ระดับมหาวิทยาลัย (สำหรับส่วนภาพรวมระบบ) ──
 $removal_activity = $affil_id ? removal_activity_total($pdo, $selected_year, $affil_id) : 0;
 $removal_rows     = $affil_id ? removal_activity_list($pdo, $selected_year, $affil_id) : [];
+
+// ── การปล่อยจากกิจกรรมของคณะ (source='event') — แยกจากยอดหลัก (officer) ──
+$event_emission = 0.0; $event_count = 0; $emission_rows = [];
+if ($affil_id) {
+    $ev_stmt = $pdo->prepare("SELECT COALESCE(SUM(ui.Vol * ai.AD)/1000, 0)
+        FROM user_item ui JOIN admin_item ai ON ai.id = ui.admin_item_id
+        WHERE ui.affiliation_id = :a AND ui.year_id = :y AND ui.source = 'event'");
+    $ev_stmt->execute([':a' => $affil_id, ':y' => $selected_year]);
+    $event_emission = (float) $ev_stmt->fetchColumn();
+    $evc_stmt = $pdo->prepare("SELECT COUNT(*) FROM event WHERE affiliation_id = :a AND year_id = :y");
+    $evc_stmt->execute([':a' => $affil_id, ':y' => $selected_year]);
+    $event_count = (int) $evc_stmt->fetchColumn();
+    $emission_rows = event_emission_list($pdo, $selected_year, $affil_id);
+}
 $sys_removal      = removal_total($pdo, $selected_year);
 ?>
 <!DOCTYPE html>
@@ -62,6 +76,22 @@ $sys_removal      = removal_total($pdo, $selected_year);
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
+    <style>
+        /* accordion การดูดกลับจากกิจกรรม (removal modal) — ยุบ/กางเมื่อคลิก */
+        .rmx-act { border:1px solid #E7E3EC; border-radius:12px; overflow:hidden; margin-bottom:12px; }
+        .rmx-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:12px 16px; background:#F6F4F9; cursor:pointer; transition:background .15s; }
+        .rmx-head:hover { background:#EFEAF5; }
+        .rmx-title { font-weight:800; color:#2A2233; min-width:0; flex:1; display:flex; align-items:flex-start; gap:8px; }
+        .rmx-text { min-width:0; line-height:1.5; overflow-wrap:anywhere; word-break:break-word; }
+        .rmx-chev { color:#8A8194; transition:transform .2s; flex-shrink:0; margin-top:4px; }
+        .rmx-act.open .rmx-chev { transform:rotate(90deg); }
+        .rmx-body { display:none; padding:6px 16px 10px; }
+        .rmx-act.open .rmx-body { display:block; }
+        /* ตารางในโมดัล: ตัดคำเฉพาะคอลัมน์แรก (ชื่อรายการยาว/ไทยไม่มีเว้นวรรค) — คอลัมน์อื่น (หน่วย/จำนวน/ตัวเลข) ปล่อย default ไม่แตกกลางคำ */
+        .detail-modal-body .data-table th:first-child, .detail-modal-body .data-table td:first-child { overflow-wrap:anywhere; }
+        .rmx-body .data-table { table-layout:fixed; width:100%; }
+        .rmx-body .data-table th:first-child, .rmx-body .data-table td:first-child { width:34%; overflow-wrap:anywhere; word-break:break-word; }
+    </style>
 </head>
 <body class="light-theme">
 
@@ -97,8 +127,8 @@ $sys_removal      = removal_total($pdo, $selected_year);
                     <div class="db-card-inner">
                         <div class="db-card-text">
                             <div class="db-big-num"><?= number_format($own_total, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
-                            <div class="db-card-desc">การปล่อยก๊าซเรือนกระจกทั้งหมด (คณะ)</div>
-                            <div class="db-card-subdesc">TOTAL EMISSION</div>
+                            <div class="db-card-desc">การปล่อยจากการดำเนินงานของคณะ</div>
+                            <div class="db-card-subdesc">FACULTY OPERATIONS</div>
                         </div>
                         <div class="db-card-illus">
                             <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
@@ -137,6 +167,37 @@ $sys_removal      = removal_total($pdo, $selected_year);
                 </div>
             </div>
 
+            <?php if ($event_count > 0): ?>
+            <!-- การปล่อยจากกิจกรรมของคณะ (แยกจากยอดหลัก) -->
+            <div class="db-section-label">กิจกรรมของคณะ ปี <?= htmlspecialchars($year_label) ?></div>
+            <div style="margin-bottom:1.5rem;">
+                <div class="db-card db-card-white">
+                    <div class="db-card-inner">
+                        <div class="db-card-text">
+                            <div class="db-big-num"><?= number_format($event_emission, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
+                            <div class="db-card-desc">การปล่อยจากกิจกรรมที่คณะจัด</div>
+                            <div class="db-card-subdesc">ACTIVITIES — แยกจากยอดหลักด้านบน</div>
+                        </div>
+                        <div class="db-card-illus">
+                            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+                                <rect x="14" y="18" width="44" height="40" rx="6" fill="#FDE68A" />
+                                <rect x="14" y="18" width="44" height="12" rx="6" fill="#F59E0B" opacity=".55" />
+                                <rect x="22" y="12" width="4" height="12" rx="2" fill="#B45309" />
+                                <rect x="46" y="12" width="4" height="12" rx="2" fill="#B45309" />
+                                <circle cx="27" cy="42" r="3" fill="#F59E0B" />
+                                <circle cx="36" cy="42" r="3" fill="#F59E0B" />
+                                <circle cx="45" cy="42" r="3" fill="#F59E0B" />
+                            </svg>
+                        </div>
+                    </div>
+                    <button onclick="openEmissionModal()" class="db-card-btn db-btn-green" style="border:none;cursor:pointer;">
+                        ดูรายละเอียด
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+                    </button>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <div class="db-scope-row">
                 <div class="db-card db-card-scope1">
                     <div class="db-card-inner"><div class="db-card-text">
@@ -158,7 +219,8 @@ $sys_removal      = removal_total($pdo, $selected_year);
                 </div>
             </div>
 
-            <!-- ===== ส่วนที่ 2: ภาพรวมทั้งระบบ ===== -->
+            <?php if (($_SESSION['role'] ?? '') !== 'dean'): /* dean เห็นเฉพาะคณะตัวเอง — ซ่อนภาพรวมทั้งระบบ */ ?>
+            <!-- ===== ส่วนที่ 2: ภาพรวมทั้งระบบ (เฉพาะ admin) ===== -->
             <div class="db-section-label" style="margin-top:2rem;">ผลรวมทั้งระบบ — ทุกคณะ (ปี <?= htmlspecialchars($year_label) ?>)</div>
             <div style="display:grid;grid-template-columns:320px 1fr;gap:1.5rem;align-items:start;">
                 <div class="db-card db-card-white" style="text-align:center;">
@@ -192,19 +254,20 @@ $sys_removal      = removal_total($pdo, $selected_year);
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
 
         <!-- Detail Modal (คณะของฉัน) -->
         <div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeDetailModal()">
-            <div class="modal-box" style="max-width:780px; padding:0; overflow:hidden;">
+            <div class="modal-box" style="max-width:780px; padding:0 0 18px; overflow:hidden;">
                 <div id="detailModalHeader" style="padding:2rem 2.5rem; color:#fff;">
                     <button class="modal-close-btn" onclick="closeDetailModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
                     <div style="font-size:.8rem; opacity:.8; text-transform:uppercase; letter-spacing:.05em;">รายละเอียดการปล่อยก๊าซเรือนกระจก (คณะ)</div>
                     <h3 id="detailModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">—</h3>
                 </div>
-                <div style="padding:1.5rem 2.5rem; max-height:58vh; overflow-y:auto;">
+                <div class="detail-modal-body">
                     <table class="data-table" style="width:100%;">
-                        <thead><tr><th>รายการ</th><th>หน่วย</th><th style="text-align:right;">จำนวน</th><th style="text-align:right;">tCO₂e</th></tr></thead>
+                        <thead><tr><th>รายการ</th><th style="text-align:center;">หน่วย</th><th style="text-align:center;">จำนวน</th><th style="text-align:center;">tCO₂e</th></tr></thead>
                         <tbody id="detailModalBody"></tbody>
                     </table>
                 </div>
@@ -213,22 +276,41 @@ $sys_removal      = removal_total($pdo, $selected_year);
 
         <!-- Removal Modal (การดูดกลับจากกิจกรรมของคณะ — read-only accordion) -->
         <div class="modal-overlay" id="removalModal" onclick="if(event.target===this)closeRemovalModal()">
-            <div class="modal-box" style="max-width:820px; padding:0; overflow:hidden;">
+            <div class="modal-box" style="max-width:820px; padding:0 0 18px; overflow:hidden;">
                 <div style="padding:2rem 2.5rem; color:#fff; background:linear-gradient(135deg,#2E7D32,#66BB6A);">
                     <button class="modal-close-btn" onclick="closeRemovalModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
                     <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">การดูดกลับจากกิจกรรมของคณะ</div>
                     <h3 style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;"><?= ic('leaf',20) ?> รวม <?= number_format($removal_activity, 4) ?> tCO₂e</h3>
                 </div>
-                <div style="padding:1.5rem 2.5rem; max-height:58vh; overflow-y:auto;">
+                <div class="detail-modal-body">
                     <p class="muted" style="margin:0 0 12px;color:#8A8194;">คลิกที่กิจกรรมเพื่อดูรายละเอียด</p>
                     <div id="removalModalBody"></div>
                 </div>
             </div>
         </div>
 
+        <!-- Emission Modal (การปล่อยจากกิจกรรมของคณะ — read-only accordion) -->
+        <div class="modal-overlay" id="emissionModal" onclick="if(event.target===this)closeEmissionModal()">
+            <div class="modal-box" style="max-width:820px; padding:0 0 18px; overflow:hidden;">
+                <div class="modal-breadcrumb" id="emBreadcrumb" style="display:none;">
+                    <span class="back-btn-pill" onclick="emRenderList()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> ย้อนกลับหน้ารายการกิจกรรม</span>
+                </div>
+                <div style="padding:3.2rem 2.5rem 2rem; color:#fff; background:linear-gradient(135deg,#F59E0B,#F97316);">
+                    <button class="modal-close-btn" onclick="closeEmissionModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
+                    <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">รายละเอียดการปล่อยจากกิจกรรม</div>
+                    <h3 style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">การปล่อยจากกิจกรรมที่คณะจัด</h3>
+                </div>
+                <div class="detail-modal-body">
+                    <div id="emissionModalBody"></div>
+                </div>
+            </div>
+        </div>
+
         <script src="<?= $root ?>assets/js/ghg-charts.js<?= asset_v('assets/js/ghg-charts.js') ?>"></script>
+        <script src="<?= $root ?>assets/js/activity-modal.js<?= asset_v('assets/js/activity-modal.js') ?>"></script>
         <script>
             window.REMOVAL_ROWS = <?= json_encode($removal_rows, JSON_UNESCAPED_UNICODE) ?>;
+            window.EMISSION_ROWS = <?= json_encode($emission_rows, JSON_UNESCAPED_UNICODE) ?>;
             window.DETAIL_ITEMS = <?= json_encode($items, JSON_UNESCAPED_UNICODE) ?>;
             window.SYS_SCOPE = <?= json_encode([$sys_scope[1], $sys_scope[2], $sys_scope[3]]) ?>;
             window.SCOPE_BG = {0:'linear-gradient(135deg, var(--clr-primary), #8B5CF6)',1:'linear-gradient(135deg, #F97316, #EA580C)',2:'linear-gradient(135deg, #EC4899, #BE185D)',3:'linear-gradient(135deg, #3B82F6, #1D4ED8)'};
@@ -238,12 +320,12 @@ $sys_removal      = removal_total($pdo, $selected_year);
                 window.location = '?year=' + e.detail.value;
             });
             window.openDetailModal = function (scope) {
-                const title = scope === 0 ? 'การปล่อยก๊าซเรือนกระจกทั้งหมด (คณะ)' : ('Scope ' + scope);
+                const title = scope === 0 ? 'การปล่อยจากการดำเนินงานของคณะ' : ('Scope ' + scope);
                 document.getElementById('detailModalTitle').textContent = title;
                 document.getElementById('detailModalHeader').style.background = window.SCOPE_BG[scope];
                 const rows = window.DETAIL_ITEMS.filter(it => scope === 0 || it.scope === scope);
                 const body = document.getElementById('detailModalBody');
-                body.innerHTML = rows.length ? rows.map(it => `<tr><td>${it.name}</td><td>${it.unit ?? '-'}</td><td style="text-align:right;">${Number(it.vol).toLocaleString('th-TH',{maximumFractionDigits:4})}</td><td style="text-align:right;font-weight:700;color:var(--clr-primary);">${Number(it.emission).toLocaleString('th-TH',{minimumFractionDigits:4,maximumFractionDigits:4})}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;padding:24px;color:#9CA3AF;">ไม่มีข้อมูล</td></tr>';
+                body.innerHTML = rows.length ? rows.map(it => `<tr><td>${it.name}</td><td style="text-align:center;">${it.unit ?? '-'}</td><td style="text-align:center;">${Number(it.vol).toLocaleString('th-TH',{maximumFractionDigits:4})}</td><td style="text-align:center;font-weight:700;color:var(--clr-primary);">${Number(it.emission).toLocaleString('th-TH',{minimumFractionDigits:4,maximumFractionDigits:4})}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;padding:24px;color:#9CA3AF;">ไม่มีข้อมูล</td></tr>';
                 document.getElementById('detailModal').style.display = 'flex'; document.body.style.overflow = 'hidden';
             };
             window.closeDetailModal = function () { document.getElementById('detailModal').style.display = 'none'; document.body.style.overflow = ''; };
@@ -267,9 +349,12 @@ $sys_removal      = removal_total($pdo, $selected_year);
             };
             window.closeRemovalModal = function () { document.getElementById('removalModal').style.display = 'none'; document.body.style.overflow = ''; };
 
+            // Emission modal (2-level list→detail) — logic อยู่ที่ assets/js/activity-modal.js (openEmissionModal/closeEmissionModal)
+
             (function initDeanDash() {
-                if (window.drawGhgDonut) {
-                    drawGhgDonut(document.getElementById('sysDonut'), [
+                var __sysDonut = document.getElementById('sysDonut');
+                if (window.drawGhgDonut && __sysDonut) {
+                    drawGhgDonut(__sysDonut, [
                         {label:'Scope 1', value: window.SYS_SCOPE[0], color:'#F97316'},
                         {label:'Scope 2', value: window.SYS_SCOPE[1], color:'#EC4899'},
                         {label:'Scope 3', value: window.SYS_SCOPE[2], color:'#3B82F6'}
@@ -279,7 +364,7 @@ $sys_removal      = removal_total($pdo, $selected_year);
 
             if (!window.__deanDashBound) {
                 window.__deanDashBound = true;
-                document.addEventListener('keydown', e => { if (e.key === 'Escape') window.closeDetailModal(); });
+                document.addEventListener('keydown', e => { if (e.key === 'Escape') { window.closeDetailModal(); window.closeRemovalModal(); window.closeEmissionModal(); } });
             }
         </script>
     </main>

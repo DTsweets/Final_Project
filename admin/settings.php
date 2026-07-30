@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/affiliation.php';
 require_role(['admin']);
 
 $root = '../';
@@ -79,9 +80,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $affiliation = !empty($_POST['affiliation']) ? (int) $_POST['affiliation'] : null;
 
         try {
+            // "เพิ่มหน่วยงานใหม่" (พิมพ์เอง) — admin เท่านั้น (หน้านี้ require admin แล้ว)
+            // ถ้าชื่อซ้ำกับที่มีอยู่ → ใช้ id เดิม (นโยบาย ก)
+            if (($_POST['affiliation'] ?? '') === '__new__') {
+                $affiliation = create_or_get_affiliation($pdo, $_POST['new_affiliation'] ?? '');
+            }
             $stmt = $pdo->prepare('INSERT INTO users (username, password, firstname, lastname, email, role, Affiliation) VALUES (?, ?, ?, ?, ?, ?, ?)');
             $stmt->execute([$username, $password, $firstname, $lastname, $email, $role, $affiliation]);
             $msg = "เพิ่มสมาชิก $firstname $lastname เรียบร้อยแล้ว";
+        } catch (InvalidArgumentException $e) {
+            $msg_type = 'alert-danger';
+            $msg = $e->getMessage();
         } catch (PDOException $e) {
             $msg_type = 'alert-danger';
             $msg = "ไม่สามารถเพิ่มสมาชิกได้: " . ($e->getCode() == 23000 ? "Username หรือ Email ซ้ำ" : $e->getMessage());
@@ -615,14 +624,18 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="settings-form-row">
                                     <div class="form-group-light" style="grid-column: 1 / -1;">
                                         <label class="form-label-light">หน่วยงาน/คณะ</label>
-                                        <select name="affiliation" class="form-control-light">
+                                        <select name="affiliation" id="add_affiliation" class="form-control-light">
                                             <option value="">-- เลือกหน่วยงาน --</option>
                                             <?php foreach ($affiliations as $aff): ?>
                                                 <option value="<?= $aff['id'] ?>">
                                                     <?= htmlspecialchars($aff['affiliation_item']) ?>
                                                 </option>
                                             <?php endforeach; ?>
+                                            <option value="__new__">เพิ่มหน่วยงานใหม่…</option>
                                         </select>
+                                        <input type="text" name="new_affiliation" id="add_new_affiliation"
+                                            class="form-control-light" placeholder="พิมพ์ชื่อหน่วยงานใหม่"
+                                            maxlength="100" style="display:none; margin-top:10px;">
                                     </div>
                                 </div>
                                 <div
@@ -1355,6 +1368,13 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                             background: #C49A6C;
                             border-radius: 4px;
                         }
+
+                        /* scrollbar บางของ dropdown (custom select) — กัน native scrollbar โผล่ทับมุมโค้ง */
+                        .f-opt-scroll::-webkit-scrollbar { width: 6px; }
+                        .f-opt-scroll::-webkit-scrollbar-track { background: transparent; }
+                        .f-opt-scroll::-webkit-scrollbar-thumb { background: #D8CBE4; border-radius: 999px; }
+                        .f-opt-scroll::-webkit-scrollbar-thumb:hover { background: #B9A5CE; }
+                        .f-opt-scroll { scrollbar-width: thin; scrollbar-color: #D8CBE4 transparent; }
                     </style>
                     <script>
                         (function () {
@@ -1868,26 +1888,34 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                         arrow.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#9CA3AF" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
                         arrow.style.transition = 'transform 0.2s';
                         arrow.style.marginLeft = '12px';
+                        arrow.style.marginRight = '6px';   // เว้นจากขอบขวา ไม่ให้ลูกศรชิดเกินไป
+                        arrow.style.flexShrink = '0';
 
                         pillWrap.appendChild(pill);
                         pillWrap.appendChild(arrow);
                         wrapper.appendChild(pillWrap);
 
-                        // Dropdown List
+                        // Dropdown List — shell ชั้นนอก (มุมโค้ง + overflow:hidden) ครอบ scroller ชั้นใน
+                        // ให้มุมโค้ง clip scrollbar เอง จึงไม่มีทางชิด/เลยขอบโค้ง (การันตีทุกเบราว์เซอร์)
+                        const optShell = document.createElement('div');
+                        optShell.style.position = 'absolute';
+                        optShell.style.top = 'calc(100% + 6px)';
+                        optShell.style.left = '0';
+                        optShell.style.width = '100%';
+                        optShell.style.background = '#FFFFFF';
+                        optShell.style.border = '1px solid #E8DDCE';
+                        optShell.style.borderRadius = '14px';
+                        optShell.style.boxShadow = '0 12px 30px rgba(0,0,0,0.08)';
+                        optShell.style.zIndex = '9999';
+                        optShell.style.display = 'none';
+                        optShell.style.overflow = 'hidden';   // มุมโค้ง clip scrollbar ชั้นใน
+                        optShell.style.padding = '6px';
+
                         const optBox = document.createElement('div');
-                        optBox.style.position = 'absolute';
-                        optBox.style.top = 'calc(100% + 6px)';
-                        optBox.style.left = '0';
-                        optBox.style.width = '100%';
-                        optBox.style.background = '#FFFFFF';
-                        optBox.style.border = '1px solid #E8DDCE';
-                        optBox.style.borderRadius = '14px';
-                        optBox.style.boxShadow = '0 12px 30px rgba(0,0,0,0.08)';
-                        optBox.style.zIndex = '9999';
-                        optBox.style.display = 'none';
-                        optBox.style.padding = '8px';
+                        optBox.className = 'f-opt-scroll';
                         optBox.style.maxHeight = '230px';
                         optBox.style.overflowY = 'auto';
+                        optShell.appendChild(optBox);
 
                         // Sync value func
                         function updateSelection() {
@@ -1903,12 +1931,17 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
 
                             let item = document.createElement('div');
                             item.dataset.index = index; // Store original index
-                            item.textContent = opt.text;
+                            if (opt.value === '__new__') {
+                                // ไอคอน + (ic('add')) แทนอักขระ ➕
+                                item.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:8px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' + opt.text;
+                            } else {
+                                item.textContent = opt.text;
+                            }
                             item.style.padding = '10px 14px';
                             item.style.borderRadius = '10px';
                             item.style.fontSize = '0.95rem';
-                            item.style.fontWeight = '500';
-                            item.style.color = '#4B5563';
+                            item.style.fontWeight = (opt.value === '__new__') ? '600' : '500';
+                            item.style.color = (opt.value === '__new__') ? '#62368B' : '#4B5563';
                             item.style.cursor = 'pointer';
                             item.style.transition = 'all 0.15s';
 
@@ -1932,7 +1965,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                             optBox.appendChild(item);
                         });
 
-                        wrapper.appendChild(optBox);
+                        wrapper.appendChild(optShell);
 
                         // Listen to external changes (like from Edit Modal population)
                         select.addEventListener('change', () => {
@@ -1959,11 +1992,29 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                             closeDrops();
                             if (!isOpen) {
                                 wrapper.classList.add('open');
-                                optBox.style.display = 'block';
+                                optShell.style.display = 'block';
                                 wrapper.style.borderColor = '#62368B';
                                 wrapper.style.boxShadow = '0 0 0 4px rgba(98,54,139,0.08)';
                                 arrow.style.transform = 'rotate(180deg)';
+                                positionDrop();   // เลือกทิศเปิด (บน/ล่าง) + จำกัดความสูง ไม่ให้ทะลุ modal
                             }
+                        }
+
+                        // เลือกทิศเปิด dropdown ให้อยู่ในกรอบ modal เสมอ (กันเมนูทะลุออกนอก)
+                        function positionDrop() {
+                            const container = wrapper.closest('.modal-content') || document.documentElement;
+                            const crect = container.getBoundingClientRect();
+                            const rect  = wrapper.getBoundingClientRect();
+                            const GAP = 6, PAD = 8;
+                            const spaceBelow = crect.bottom - rect.bottom - GAP - PAD;
+                            const spaceAbove = rect.top - crect.top - GAP - PAD;
+                            const SHELL_PAD = 12;   // padding บน+ล่างของ optShell (6px×2)
+                            const wantH = Math.min(230, optBox.scrollHeight) + SHELL_PAD;
+                            const up = (spaceBelow < wantH) && (spaceAbove > spaceBelow);   // ล่างไม่พอ + บนมากกว่า → เปิดขึ้นบน
+                            const avail = Math.max(120, Math.floor(up ? spaceAbove : spaceBelow)) - SHELL_PAD;
+                            optBox.style.maxHeight = Math.min(230, avail) + 'px';
+                            if (up) { optShell.style.top = 'auto'; optShell.style.bottom = 'calc(100% + 6px)'; }
+                            else    { optShell.style.bottom = 'auto'; optShell.style.top = 'calc(100% + 6px)'; }
                         }
 
                         function closeDrops() {
@@ -1988,6 +2039,23 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                         }
                     });
                 }
+
+                // ── "เพิ่มหน่วยงานใหม่…" — แสดง/ซ่อนช่องพิมพ์ตามการเลือกใน dropdown หน่วยงาน ──
+                (function () {
+                    const sel = document.getElementById('add_affiliation');
+                    const inp = document.getElementById('add_new_affiliation');
+                    if (!sel || !inp) return;
+                    // ย้ายช่องพิมพ์ไปอยู่ "ใต้" dropdown (custom-select ถูก append ต่อท้าย form-group)
+                    const fg = sel.closest('.form-group-light');
+                    if (fg) fg.appendChild(inp);
+                    sel.addEventListener('change', function () {
+                        const isNew = sel.value === '__new__';
+                        inp.style.display = isNew ? 'block' : 'none';
+                        inp.required = isNew;
+                        if (isNew) { setTimeout(() => inp.focus(), 50); }
+                        else { inp.value = ''; }
+                    });
+                })();
             </script>
 
         </div><!-- /.settings-container -->

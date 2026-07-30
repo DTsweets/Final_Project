@@ -671,7 +671,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                             </svg>
                         </div>
                         <div style="position:relative; z-index:1;">
-                            <div class="detail-modal-label">การดูดกลับก๊าซเรือนกระจก — รายการดูดกลับ (ระดับมหาวิทยาลัย)</div>
+                            <div class="detail-modal-label">การดูดกลับก๊าซเรือนกระจก — รายการดูดกลับ</div>
                             <h3 class="detail-modal-title" id="removalTitle">—</h3>
                         </div>
                     </div>
@@ -833,13 +833,13 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     /* ─ Legend (Top 5 + อื่นๆ) ─ */
                     let legendHtml = '<div style="display:flex;flex-direction:column;gap:12px;">';
                     pieData.forEach((r, i) => {
-                        const pct = total > 0 ? parseFloat((r.emission / total * 100).toFixed(2)) : 0;
+                        const pct = total > 0 ? (r.emission / total * 100).toFixed(2) : '0.00';   // แสดง 2 ทศนิยมเสมอ (0.00% แทน 0%)
                         const color = getFacultyColor(r.name, i);
                         legendHtml += `<div style="display:flex;align-items:center;gap:14px;font-size:0.95rem;min-width:0;padding:8px 12px;background:#FFFFFF;border:1px solid #F3F4F6;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.02);">
                     <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                         <span style="width:14px;height:14px;border-radius:5vh;background:${color};display:inline-block;"></span>
                     </div>
-                    <span style="color:#1F2937;flex:1;font-weight:600;white-space:nowrap;">${r.name}</span>
+                    <span style="color:#1F2937;flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(r.name || '').replace(/"/g, '&quot;')}">${r.name}</span>
                     <div style="text-align:right;flex-shrink:0;">
                         <div style="color:var(--clr-primary);font-weight:800;font-size:1.05rem;line-height:1;">${pct}%</div>
                         <div style="color:var(--text-muted);font-weight:600;font-size:0.75rem;margin-top:4px;">${r.emission.toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} tCO₂e</div>
@@ -855,7 +855,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     } else {
                         data.forEach((r, i) => {
                             const pct = total > 0 ? (r.emission / total * 100) : 0;
-                            const pctDisplay = total > 0 ? parseFloat(pct.toFixed(2)) : 0;
+                            const pctDisplay = total > 0 ? pct.toFixed(2) : '0.00';   // แสดง 2 ทศนิยมเสมอ (0.00% แทน 0%)
                             const hasEmission = r.emission > 0;
                             const color = hasEmission ? getFacultyColor(r.name, i) : _GRAY;
                             rowsHtml += `<tr>
@@ -917,7 +917,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                 <thead><tr>
                     <th>#</th>
                     <th>รายการ (คณะ / แบบสอบถาม / กิจกรรม)</th>
-                    <th style="text-align:right;">Total Emission (tCO₂e)</th>
+                    <th style="text-align:right;">Total Emission<br>(tCO₂e/ต่อปี)</th>
                     <th style="text-align:right;">สัดส่วน</th>
                 </tr></thead>
                 <tbody>${rowsHtml}</tbody>
@@ -991,13 +991,13 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     /* ─ Legend (Top 5 + อื่นๆ) ─ */
                     let legendHtml = '<div style="display:flex;flex-direction:column;gap:12px;">';
                     pieData.forEach((r, i) => {
-                        const pct = total > 0 ? parseFloat((r.emission / total * 100).toFixed(2)) : 0;
+                        const pct = total > 0 ? (r.emission / total * 100).toFixed(2) : '0.00';   // แสดง 2 ทศนิยมเสมอ (0.00% แทน 0%)
                         const color = getFacultyColor(r.name, i);
                         legendHtml += `<div style="display:flex;align-items:center;gap:14px;font-size:0.95rem;min-width:0;padding:8px 12px;background:#FFFFFF;border:1px solid #F3F4F6;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.02);">
                     <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                         <span style="width:14px;height:14px;border-radius:5vh;background:${color};display:inline-block;"></span>
                     </div>
-                    <span style="color:#1F2937;flex:1;font-weight:600;white-space:nowrap;">${r.name}</span>
+                    <span style="color:#1F2937;flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(r.name || '').replace(/"/g, '&quot;')}">${r.name}</span>
                     <div style="text-align:right;flex-shrink:0;">
                         <div style="color:#166534;font-weight:800;font-size:1.05rem;line-height:1;">${pct}%</div>
                         <div style="color:var(--text-muted);font-weight:600;font-size:0.75rem;margin-top:4px;">${r.emission.toLocaleString('th-TH', { maximumFractionDigits: 4 })} tCO₂e</div>
@@ -1013,7 +1013,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     } else {
                         data.forEach((r, i) => {
                             const pct = total > 0 ? (r.emission / total * 100) : 0;
-                            const pctDisplay = total > 0 ? parseFloat(pct.toFixed(2)) : 0;
+                            const pctDisplay = total > 0 ? pct.toFixed(2) : '0.00';   // แสดง 2 ทศนิยมเสมอ (0.00% แทน 0%)
                             const has = r.emission > 0;
                             const color = has ? (rankColor[r.name] || getFacultyColor(r.name, i)) : _GRAY;
                             rowsHtml += `<tr>
@@ -1021,7 +1021,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                             <span style="display:inline-block;width:10px;height:10px;border-radius:5vh;background:${color};margin-right:6px;vertical-align:middle;"></span>
                             ${r.name}
                         </td>
-                        <td style="text-align:center;color:var(--text-muted);">${r.unit}</td>
+                        <td style="text-align:center;color:var(--text-muted);white-space:nowrap;">${r.unit}</td>
                         <td style="text-align:right;color:var(--text-muted);">${r.factor.toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</td>
                         <td style="text-align:right;font-weight:600;">${r.qty.toLocaleString('th-TH', { maximumFractionDigits: 4 })}</td>
                         <td style="text-align:right;font-weight:700;color:${has ? '#166534' : '#9CA3AF'};">
@@ -1064,8 +1064,8 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         activityHtml = `
             <div style="font-size:0.95rem;font-weight:800;color:var(--text-secondary);margin:2rem 0 0.75rem;"><?= ic('leaf',16) ?> การดูดกลับจากกิจกรรม</div>
             <table class="detail-table" style="table-layout:fixed;width:100%;">
-                <colgroup><col style="width:2.5rem;"><col><col style="width:200px;"><col style="width:130px;"><col style="width:150px;"></colgroup>
-                <thead><tr><th>#</th><th>กิจกรรม</th><th>ผู้จัด</th><th style="text-align:right;">รวม (tCO₂e)</th><th style="text-align:center;">รายละเอียด</th></tr></thead>
+                <colgroup><col style="width:2.5rem;"><col><col style="width:200px;"><col style="width:155px;"><col style="width:150px;"></colgroup>
+                <thead><tr><th>#</th><th>กิจกรรม</th><th>ผู้จัด</th><th style="text-align:right;white-space:nowrap;">Total Emission<br>(tCO₂e/ต่อปี)</th><th style="text-align:center;">รายละเอียด</th></tr></thead>
                 <tbody>${arows}</tbody>
             </table>`;
                     }
@@ -1104,18 +1104,18 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
             <table class="detail-table" style="table-layout:fixed;width:100%;">
                 <colgroup>
                     <col>
-                    <col style="width:80px;">
+                    <col style="width:100px;">
                     <col style="width:200px;">
                     <col style="width:110px;">
-                    <col style="width:120px;">
+                    <col style="width:150px;">
                     <col style="width:130px;">
                 </colgroup>
                 <thead><tr style="vertical-align:bottom;">
                     <th style="text-align:left;">รายการดูดกลับ</th>
                     <th style="text-align:center;">หน่วย</th>
-                    <th style="text-align:right;">ค่าดูดกลับ (kgCO₂e/หน่วย)</th>
+                    <th style="text-align:right;">ค่าดูดกลับ<br>(kgCO₂e/หน่วย)</th>
                     <th style="text-align:right;">ปริมาณ</th>
-                    <th style="text-align:right;">tCO₂e</th>
+                    <th style="text-align:right;">Total Emission<br>(tCO₂e/ต่อปี)</th>
                     <th style="text-align:right;">สัดส่วน</th>
                 </tr></thead>
                 <tbody>${rowsHtml}</tbody>
@@ -1174,8 +1174,8 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     let rows = '';
                     items.forEach(a => {
                         rows += `<tr>
-                        <td style="font-weight:600;">${esc(a.name_tiem)}</td>
-                        <td style="text-align:center;color:var(--text-muted);">${esc(a.unit || '-')}</td>
+                        <td style="font-weight:600;"><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(a.name_tiem)}">${esc(a.name_tiem)}</div></td>
+                        <td style="text-align:center;color:var(--text-muted);white-space:nowrap;">${esc(a.unit || '-')}</td>
                         <td style="text-align:right;">${f4(a.factor)}</td>
                         <td style="text-align:right;">${(parseFloat(a.qty)||0).toLocaleString('th-TH', { maximumFractionDigits: 4 })}</td>
                         <td style="text-align:right;font-weight:700;color:#166534;">${f4(a.emission)}</td>
@@ -1188,7 +1188,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                             <div class="detail-stat"><div class="detail-stat-label">รวมการดูดกลับ (tCO₂e)</div><div class="detail-stat-value" style="color:#166534;">${f4(sub)}</div></div>
                         </div>
                         <table class="detail-table" style="width:100%;">
-                            <thead><tr><th style="text-align:left;">รายการดูดกลับ</th><th style="text-align:center;">หน่วย</th><th style="text-align:right;">ค่าดูดกลับ (kgCO₂e/หน่วย)</th><th style="text-align:right;">ปริมาณ</th><th style="text-align:right;">tCO₂e</th></tr></thead>
+                            <thead><tr><th style="text-align:left;">รายการดูดกลับ</th><th style="text-align:center;">หน่วย</th><th style="text-align:right;">ค่าดูดกลับ<br>(kgCO₂e/หน่วย)</th><th style="text-align:right;">ปริมาณ</th><th style="text-align:right;">tCO₂e</th></tr></thead>
                             <tbody>${rows}</tbody>
                         </table>`;
                     document.getElementById('removalActModal').style.display = 'flex';
@@ -1268,9 +1268,12 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         ctx.closePath();
                         ctx.fillStyle = getFacultyColor(d.name, i);
                         ctx.fill();
-                        ctx.strokeStyle = '#fff';
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
+                        /* ตีเส้นคั่นสีขาวเฉพาะชิ้นที่ใหญ่พอ (>1%) — กันเส้นขาวแนวรัศมีของชิ้นจิ๋วเบียดกันเป็นรอยหยักในวงโดนัท */
+                        if (slice > 0.01 * 2 * Math.PI) {
+                            ctx.strokeStyle = '#fff';
+                            ctx.lineWidth = 2;
+                            ctx.stroke();
+                        }
                         startAngle += slice;
                     });
 
@@ -1304,13 +1307,13 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     /* ─ Legend (Top 5 + อื่นๆ) ─ */
                     let legendHtml = '<div style="display:flex;flex-direction:column;gap:12px;">';
                     pieData.forEach((r, i) => {
-                        const pct = total > 0 ? parseFloat((r.emission / total * 100).toFixed(2)) : 0;
+                        const pct = total > 0 ? (r.emission / total * 100).toFixed(2) : '0.00';   // แสดง 2 ทศนิยมเสมอ (0.00% แทน 0%)
                         const color = getFacultyColor(r.name, i);
                         legendHtml += `<div style="display:flex;align-items:center;gap:14px;font-size:0.95rem;min-width:0;padding:8px 12px;background:#FFFFFF;border:1px solid #F3F4F6;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.02);transition:transform 0.2s;">
                     <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                         <span style="width:14px;height:14px;border-radius:5vh;background:${color};display:inline-block;"></span>
                     </div>
-                    <span style="color:#1F2937;flex:1;font-weight:600;white-space:nowrap;">${r.name}</span>
+                    <span style="color:#1F2937;flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(r.name || '').replace(/"/g, '&quot;')}">${r.name}</span>
                     <div style="text-align:right;flex-shrink:0;">
                         <div style="color:var(--clr-primary);font-weight:800;font-size:1.05rem;line-height:1;">${pct}%</div>
                         <div style="color:var(--text-muted);font-weight:600;font-size:0.75rem;margin-top:4px;">${r.emission.toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} tCO₂e</div>
@@ -1323,7 +1326,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     let rowsHtml = '';
                     _cumulData.forEach((r, i) => {
                         const pct = total > 0 ? (r.emission / total * 100) : 0;
-                        const pctDisplay = total > 0 ? parseFloat(pct.toFixed(2)) : 0;
+                        const pctDisplay = total > 0 ? pct.toFixed(2) : '0.00';   // แสดง 2 ทศนิยมเสมอ (0.00% แทน 0%)
                         const hasEmission = r.emission > 0;
                         const color = hasEmission ? getFacultyColor(r.name, i) : _GRAY;
                         rowsHtml += `<tr>
@@ -1392,7 +1395,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                 <thead><tr>
                     <th>#</th>
                     <th>คณะ / หน่วยงาน</th>
-                    <th style="text-align:right;">Total Emission (tCO₂e)</th>
+                    <th style="text-align:right;">Total Emission<br>(tCO₂e/ต่อปี)</th>
                     <th style="text-align:right;">สัดส่วน</th>
                     <th style="text-align:center;">รายละเอียด</th>
                 </tr></thead>
@@ -1441,13 +1444,13 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     /* ─ Legend ─ */
                     let legendHtml = '<div style="display:flex;flex-direction:column;gap:12px;">';
                     pieData.forEach((r, i) => {
-                        const pct   = total > 0 ? parseFloat((r.emission / total * 100).toFixed(2)) : 0;
+                        const pct   = total > 0 ? (r.emission / total * 100).toFixed(2) : '0.00';   // แสดง 2 ทศนิยมเสมอ
                         const color = getFacultyColor(r.name, i);
                         legendHtml += `<div style="display:flex;align-items:center;gap:14px;font-size:0.95rem;min-width:0;padding:8px 12px;background:#FFFFFF;border:1px solid #F3F4F6;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.02);">
                             <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <span style="width:14px;height:14px;border-radius:5vh;background:${color};display:inline-block;"></span>
                             </div>
-                            <span style="color:#1F2937;flex:1;font-weight:600;white-space:nowrap;">${r.name}</span>
+                            <span style="color:#1F2937;flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(r.name || '').replace(/"/g, '&quot;')}">${r.name}</span>
                             <div style="text-align:right;flex-shrink:0;">
                                 <div style="color:var(--clr-primary);font-weight:800;font-size:1.05rem;line-height:1;">${pct}%</div>
                                 <div style="color:var(--text-muted);font-weight:600;font-size:0.75rem;margin-top:4px;">${r.emission.toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} tCO₂e</div>
@@ -1463,7 +1466,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     } else {
                         data.forEach((r, i) => {
                             const pct        = total > 0 ? (r.emission / total * 100) : 0;
-                            const pctDisplay = total > 0 ? parseFloat(pct.toFixed(2)) : 0;
+                            const pctDisplay = total > 0 ? pct.toFixed(2) : '0.00';   // แสดง 2 ทศนิยมเสมอ (0.00% แทน 0%)
                             const hasEmission = r.emission > 0;
                             const color      = hasEmission ? getFacultyColor(r.name, i) : _GRAY;
                             rowsHtml += `<tr>
@@ -1524,7 +1527,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         <thead><tr>
                             <th>#</th>
                             <th>คณะ / หน่วยงาน</th>
-                            <th style="text-align:right;">Total Emission (tCO₂e)</th>
+                            <th style="text-align:right;">Total Emission<br>(tCO₂e/ต่อปี)</th>
                             <th style="text-align:right;">สัดส่วน</th>
                         </tr></thead>
                         <tbody>${rowsHtml}</tbody>
@@ -1648,7 +1651,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                 <th style="text-align:center;">Scope</th>
                 <th>ประเภทกิจกรรม (กลุ่ม)</th>
 
-                <th style="text-align:right;">Emission (tCO₂e)</th>
+                <th style="text-align:right;">Emission<br>(tCO₂e/ต่อปี)</th>
                 <th style="text-align:center;">ดูรายการย่อย</th>
             </tr></thead>
             <tbody id="detail-tbody-l3">`;
@@ -1724,7 +1727,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
             <thead><tr>
                 <th>ปี</th>
                 <th style="text-align:center;">จำนวนรายการ</th>
-                <th style="text-align:right;">Emission (tCO₂e)</th>
+                <th style="text-align:right;">Emission<br>(tCO₂e/ต่อปี)</th>
                 <th style="text-align:center;">ดูรายการย่อย</th>
             </tr></thead>
             <tbody>`;
@@ -1819,14 +1822,14 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     let html = `<div class="modal-search-wrap"><input type="text" class="modal-search-input" placeholder="ค้นหากิจกรรม..." oninput="filterTable(this,'tbody-sy')"></div>
         <table class="detail-table" style="table-layout:fixed;"><thead><tr>
             <th>กิจกรรม</th>
-            <th style="text-align:center;width:13rem;">วันที่</th><th style="text-align:right;width:10rem;">Emission (tCO₂e)</th><th style="text-align:center;width:8rem;">ดูรายละเอียด</th>
+            <th style="text-align:center;width:13rem;">วันที่</th><th style="text-align:right;width:10rem;">Emission<br>(tCO₂e/ต่อปี)</th><th style="text-align:center;width:8rem;">ดูรายละเอียด</th>
         </tr></thead><tbody id="tbody-sy">`;
                     _symEvents.forEach((ev, i) => {
                         const emit = ev.items.reduce((s, it) => s + (it.itype === 'emit' ? Number(it.emission || 0) : 0), 0);
                         html += `<tr>
             <td style="font-weight:600;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(ev.name || '').replace(/"/g, '&quot;')}">${ev.name}</div></td>
             <td style="text-align:center;white-space:nowrap;">${_dateRange(ev)}</td>
-            <td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emit.toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
+            <td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emit.toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</td>
             <td style="text-align:center;"><button class="btn-detail" onclick="openSymEventDetail(${i})">ดูรายละเอียด</button></td>
         </tr>`;
                     });
@@ -1849,8 +1852,8 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
         </tr></thead><tbody id="tbody-sy">`;
                     ev.items.filter(r => r.itype === 'emit').forEach(r => {   // มุมการปล่อยสะสม → เฉพาะรายการปล่อย (ดูดกลับไปดูที่ GHG Removal)
                         const vol = Number(r.vol).toLocaleString('th-TH', { maximumFractionDigits: 4 });
-                        const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-                        html += `<tr><td style="font-weight:600;">${r.name_tiem}</td><td style="text-align:center;">${_evTypeBadge(r.itype)}</td><td style="text-align:center;">${_evScopeCell(r)}</td><td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td><td style="text-align:right;font-weight:700;">${vol}</td><td style="text-align:right;font-weight:700;color:${r.itype === 'rmv' ? '#166534' : 'var(--clr-primary)'};">${emi}</td></tr>`;
+                        const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+                        html += `<tr><td style="font-weight:600;"><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(r.name_tiem || '').replace(/"/g, '&quot;')}">${r.name_tiem}</div></td><td style="text-align:center;">${_evTypeBadge(r.itype)}</td><td style="text-align:center;">${_evScopeCell(r)}</td><td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td><td style="text-align:right;font-weight:700;">${vol}</td><td style="text-align:right;font-weight:700;color:${r.itype === 'rmv' ? '#166534' : 'var(--clr-primary)'};">${emi}</td></tr>`;
                     });
                     html += '</tbody></table>';
                     document.getElementById('detailModalBody').innerHTML = html;
@@ -1900,7 +1903,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     g.items.forEach(r => {
                         const avg = Number(r.avg_value).toLocaleString('th-TH', { maximumFractionDigits: 4 });
                         const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
-                        html += `<tr><td style="font-weight:600;">${r.name_tiem}</td><td style="text-align:right;">${avg}</td><td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td><td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emi}</td></tr>`;
+                        html += `<tr><td style="font-weight:600;"><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(r.name_tiem || '').replace(/"/g, '&quot;')}">${r.name_tiem}</div></td><td style="text-align:right;">${avg}</td><td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td><td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emi}</td></tr>`;
                     });
                     html += '</tbody></table>';
                     document.getElementById('detailModalBody').innerHTML = html;
@@ -1966,7 +1969,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         const cnt = parseInt(r.year_count || 0);
                         const badgeColor = cnt > 0 ? 'var(--clr-primary)' : '#9CA3AF';
                         html += `<tr>
-                <td style="font-weight:600;">${r.affil_name}</td>
+                <td style="font-weight:600;"><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(r.affil_name || '').replace(/"/g, '&quot;')}">${r.affil_name}</div></td>
                 <td style="text-align:center;">
                     <span style="display:inline-block;padding:4px 14px;border-radius:999px;font-size:0.82rem;font-weight:700;background:${cnt > 0 ? '#F3EAFF' : '#F3F4F6'};color:${badgeColor};">${cnt} ปี</span>
                 </td>
@@ -2107,7 +2110,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
             <thead><tr>
                 <th>กิจกรรม</th>
                 <th style="text-align:center;width:13rem;">วันที่</th>
-                <th style="text-align:right;width:10rem;">Emission (tCO₂e)</th>
+                <th style="text-align:right;width:10rem;">Emission<br>(tCO₂e/ต่อปี)</th>
                 <th style="text-align:center;width:8rem;">ดูรายละเอียด</th>
                 <th style="text-align:center;width:7rem;">ไฟล์</th>
             </tr></thead>
@@ -2117,7 +2120,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         html += `<tr>
                 <td style="font-weight:600;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(ev.name || '').replace(/"/g, '&quot;')}">${ev.name}</div></td>
                 <td style="text-align:center;white-space:nowrap;">${_dateRange(ev)}</td>
-                <td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emit.toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
+                <td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emit.toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</td>
                 <td style="text-align:center;">
                     <button class="btn-detail" onclick="openEventDetail(${i})">ดูรายละเอียด</button>
                 </td>
@@ -2153,9 +2156,9 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
             <tbody id="tbody-l3">`;
                     ev.items.filter(r => r.itype !== 'none').forEach(r => {
                         const vol = Number(r.vol).toLocaleString('th-TH', { maximumFractionDigits: 4 });
-                        const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                        const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
                         html += `<tr>
-                <td style="font-weight:600;">${r.name_tiem}</td>
+                <td style="font-weight:600;"><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(r.name_tiem || '').replace(/"/g, '&quot;')}">${r.name_tiem}</div></td>
                 <td style="text-align:center;">${_evTypeBadge(r.itype)}</td>
                 <td style="text-align:center;">${_evScopeCell(r)}</td>
                 <td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td>
@@ -2199,18 +2202,17 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
         </div>
         <table class="detail-table" style="table-layout:fixed;">
             <thead><tr>
-                <th style="text-align:center;width:6.5rem;">Scope</th>
                 <th>กลุ่ม</th>
+                <th style="text-align:right;width:10rem;">Emission<br>(tCO₂e/ต่อปี)</th>
                 <th style="text-align:center;width:8rem;">ดูรายละเอียด</th>
                 <th style="text-align:center;width:7rem;">ไฟล์</th>
             </tr></thead>
             <tbody id="tbody-l3">`;
                     _surveyCache.forEach((g, i) => {
-                        const scopes = [...new Set(g.items.map(it => Number(it.scope)))].sort();
-                        const pills = scopes.map(s => `<span class="scope-pill s${s}" style="white-space:nowrap;">Scope ${s}</span>`).join(' ');
+                        const emi = g.items.reduce((s, it) => s + (Number(it.emission) || 0), 0);
                         html += `<tr>
-                <td style="text-align:center;">${pills}</td>
                 <td style="font-weight:600;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(g.audience || '').replace(/"/g, '&quot;')}">${g.audience}</div></td>
+                <td style="text-align:right;font-weight:700;color:var(--clr-primary);">${emi.toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</td>
                 <td style="text-align:center;">
                     <button class="btn-detail" onclick="openSurveyDetail(${i})">ดูรายละเอียด</button>
                 </td>
@@ -2237,6 +2239,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
         <table class="detail-table">
             <thead><tr>
                 <th>คำถาม</th>
+                <th style="text-align:center;width:6.5rem;">Scope</th>
                 <th style="text-align:right;width:7rem;">จำนวนผู้ตอบ</th>
                 <th style="text-align:right;width:6rem;">เฉลี่ย/คน</th>
                 <th style="text-align:center;width:5rem;">หน่วย</th>
@@ -2248,7 +2251,8 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         const avg = Number(r.avg_value).toLocaleString('th-TH', { maximumFractionDigits: 4 });
                         const emi = Number(r.emission).toLocaleString('th-TH', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
                         html += `<tr>
-                <td style="font-weight:600;">${r.name_tiem}</td>
+                <td style="font-weight:600;"><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(r.name_tiem || '').replace(/"/g, '&quot;')}">${r.name_tiem}</div></td>
+                <td style="text-align:center;">${r.scope ? `<span class="scope-pill s${r.scope}" style="white-space:nowrap;">Scope ${r.scope}</span>` : '-'}</td>
                 <td style="text-align:right;font-weight:700;">${resp}</td>
                 <td style="text-align:right;">${avg}</td>
                 <td style="text-align:center;color:var(--text-muted);">${r.unit ?? '-'}</td>

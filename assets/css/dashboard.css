@@ -210,7 +210,7 @@
 .db-big-num {
     font-size: 2.5rem;
     font-weight: 900;
-    letter-spacing: -0.06em;
+    letter-spacing: normal;
     color: var(--text-secondary), (gray);
     line-height: 1;
     margin-bottom: 0.5rem;

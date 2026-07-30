@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         // ---- survey: เพิ่มแบบสอบถาม (สร้าง questionnaire ใหม่ ของคณะเจ้าของ = $smaker) ----
         if ($action === 'add_questionnaire') {
-            $qname = trim($_POST['q_name'] ?? '');
+            $qname = mb_substr(trim($_POST['q_name'] ?? ''), 0, 100);
             if ($qname === '') throw new Exception('กรุณาระบุชื่อแบบสอบถาม');
             ensure_questionnaire($pdo, $pyear, $qname, $smaker, $_SESSION['user_id'] ?? null);
             header("Location: collect.php?year=$pyear&tab=survey".($is_admin?"&maker=$smaker":'')."&group=" . urlencode($qname) . "&msg=" . urlencode('เพิ่มแบบสอบถามแล้ว')); exit;
@@ -121,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         // ---- survey: แก้ไขชื่อแบบสอบถาม (rename audience) ของคณะเจ้าของ ----
         if ($action === 'edit_questionnaire') {
-            $old = trim($_POST['q_old'] ?? ''); $new = trim($_POST['q_name'] ?? '');
+            $old = trim($_POST['q_old'] ?? ''); $new = mb_substr(trim($_POST['q_name'] ?? ''), 0, 100);
             if ($new === '') throw new Exception('กรุณาระบุชื่อแบบสอบถาม');
             if ($old === '') throw new Exception('ไม่พบแบบสอบถามเดิม');
             if ($new !== $old) {
@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         // ---- survey: เพิ่มหัวข้อ (หัวข้อผูกคณะเจ้าของ $smaker) ----
         if ($action === 'add_topic') {
-            $label=trim($_POST['label']); $unit=trim($_POST['unit']);
+            $label=mb_substr(trim($_POST['label']),0,100); $unit=mb_substr(trim($_POST['unit']),0,100);
             $scope=(int)$_POST['scope']; $ad=(float)$_POST['ad'];
             if ($pgroup==='') throw new Exception('กรุณาระบุกลุ่ม');
             $agid=(int)$pdo->query("SELECT id FROM admin_g WHERE scope=$scope ORDER BY id LIMIT 1")->fetchColumn();
@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($action === 'edit_topic') {
             $qiid=(int)$_POST['qitem_id'];
-            $label=trim($_POST['label']); $unit=trim($_POST['unit']);
+            $label=mb_substr(trim($_POST['label']),0,100); $unit=mb_substr(trim($_POST['unit']),0,100);
             $scope=(int)$_POST['scope']; $ad=(float)$_POST['ad'];
             // สิทธิ์: แก้ได้เฉพาะหัวข้อของแบบสอบถามคณะเจ้าของ (ตรวจผ่าน qi → q.affiliation_id)
             $chk=$pdo->prepare("SELECT qi.admin_item_id FROM questionnaire_item qi JOIN questionnaire q ON q.id=qi.questionnaire_id WHERE qi.id=? AND q.affiliation_id=?");
@@ -410,6 +410,11 @@ if ($is_survey) {
     $sel_survey_exists = false;
     foreach ($questionnaires as $qq) { if ($qq['name'] === $group && (int)$qq['affid'] === (int)$survey_affil) { $sel_survey_exists = true; break; } }
 
+    // ชื่อคณะของ "ผู้จัดทำ" ปัจจุบัน — ใช้แสดงต่อท้ายหัวข้อ (ให้เข้าชุดกับฝั่งกิจกรรม)
+    $snm = $pdo->prepare("SELECT affiliation_item FROM affiliation_id WHERE id=?");
+    $snm->execute([$survey_affil]);
+    $survey_affil_name = (string)($snm->fetchColumn() ?: '');
+
     $it = $pdo->prepare("
         SELECT qi.id AS qiid, ai.name_tiem AS label, qi.admin_item_id, ai.unit, ai.AD, ag.scope,
                COALESCE(ss.respondents,0) AS respondents, COALESCE(ss.avg_value,0) AS avg_value,
@@ -603,7 +608,7 @@ if ($is_survey) {
                         <?php endif; ?>
                         <div class="frow">
                             <div class="fld" style="flex:1;min-width:240px;"><label>ชื่อแบบสอบถาม</label>
-                                <?php $ti_id='qName';$ti_name='q_name';$ti_required=true;$ti_placeholder='เช่น นักศึกษา / บุคลากร / แบบสอบถามการเดินทาง';$ti_wrap_style='width:100%;';include __DIR__.'/../components/text_input.php'; ?></div>
+                                <?php $ti_id='qName';$ti_name='q_name';$ti_required=true;$ti_maxlength=100;$ti_placeholder='เช่น นักศึกษา / บุคลากร / แบบสอบถามการเดินทาง';$ti_wrap_style='width:100%;';include __DIR__.'/../components/text_input.php'; ?></div>
                             <div style="align-self:flex-end;"><?php $btn_label='เพิ่มแบบสอบถาม';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?></div>
                         </div>
                     </form>
@@ -657,7 +662,7 @@ if ($is_survey) {
                             <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขชื่อแบบสอบถาม</h2>
                             <form method="POST">
                                 <input type="hidden" name="action" value="edit_questionnaire"><input type="hidden" name="tab" value="survey"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" id="qe_maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="q_old" id="qe_old">
-                                <div class="fld" style="margin-bottom:12px;"><label>ชื่อแบบสอบถาม</label><input class="ti-input" style="width:100%;" name="q_name" id="qe_name" required maxlength="50"></div>
+                                <div class="fld" style="margin-bottom:12px;"><label>ชื่อแบบสอบถาม</label><input class="ti-input" style="width:100%;" name="q_name" id="qe_name" required maxlength="100"></div>
                                 <div style="display:flex;justify-content:flex-end;gap:10px;">
                                     <button type="button" class="del" onclick="document.getElementById('qEditModal').style.display='none'">ยกเลิก</button>
                                     <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
@@ -680,16 +685,16 @@ if ($is_survey) {
 
                 <?php if ($sel_survey_exists): ?>
                 <div class="card">
-                    <h2>＋ เพิ่มรายการสอบถาม (<?= htmlspecialchars($group) ?>)</h2>
+                    <h2 style="overflow-wrap:anywhere;word-break:break-word;">＋ เพิ่มรายการสอบถาม (<span title="<?= htmlspecialchars($group,ENT_QUOTES) ?>"><?= htmlspecialchars($group) ?></span>)<?php if($survey_affil_name!==''):?> <span class="muted" style="font-weight:500;font-size:.9rem;">· ผู้จัดทำ: <?= htmlspecialchars($survey_affil_name) ?></span><?php endif;?></h2>
                     <form method="POST">
                         <input type="hidden" name="action" value="add_topic"><input type="hidden" name="tab" value="<?= $tab ?>">
                         <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>">
                         <input type="hidden" name="group" value="<?= htmlspecialchars($group,ENT_QUOTES) ?>">
                         <div class="grid">
                             <div class="fld full"><label>คำถาม (ที่ผู้ตอบเห็นในฟอร์ม)</label>
-                                <?php $ti_id='coLabel';$ti_name='label';$ti_required=true;$ti_placeholder='เช่น ระยะทางเดินทางมามหาลัย (มอเตอร์ไซค์) กม./ปี';include __DIR__.'/../components/text_input.php'; ?></div>
+                                <?php $ti_id='coLabel';$ti_name='label';$ti_required=true;$ti_maxlength=100;$ti_placeholder='เช่น ระยะทางเดินทางมามหาลัย (มอเตอร์ไซค์) กม./ปี';include __DIR__.'/../components/text_input.php'; ?></div>
                             <div class="fld"><label>หน่วย</label>
-                                <?php $ti_id='coUnit';$ti_name='unit';$ti_required=true;$ti_placeholder='กม. / มื้อ / kg';include __DIR__.'/../components/text_input.php'; ?></div>
+                                <?php $ti_id='coUnit';$ti_name='unit';$ti_required=true;$ti_maxlength=100;$ti_placeholder='กม. / มื้อ / kg';include __DIR__.'/../components/text_input.php'; ?></div>
                             <div class="fld"><label>ขอบเขต (Scope)</label>
                                 <?php $dd_id='coScope';$dd_name='scope';$dd_options=[['value'=>3,'label'=>'Scope 3'],['value'=>1,'label'=>'Scope 1'],['value'=>2,'label'=>'Scope 2']];
                                     $dd_selected=3;$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือก Scope';$dd_style='';include __DIR__.'/../components/dropdown.php'; ?></div>
@@ -701,7 +706,7 @@ if ($is_survey) {
                 </div>
 
                 <div class="card">
-                    <h2>กรอกค่าเฉลี่ย (<?= htmlspecialchars($group) ?>)</h2>
+                    <h2 style="overflow-wrap:anywhere;word-break:break-word;">กรอกค่าเฉลี่ย (<span title="<?= htmlspecialchars($group,ENT_QUOTES) ?>"><?= htmlspecialchars($group) ?></span>)<?php if($survey_affil_name!==''):?> <span class="muted" style="font-weight:500;font-size:.9rem;">· ผู้จัดทำ: <?= htmlspecialchars($survey_affil_name) ?></span><?php endif;?></h2>
                     <?php if (empty($rows)): ?>
                         <p class="muted">ยังไม่มีหัวข้อในกลุ่มนี้ — เพิ่มด้านบน</p>
                     <?php else: ?>
@@ -713,11 +718,11 @@ if ($is_survey) {
                             <tbody>
                             <?php foreach ($rows as $r): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($r['label']) ?></td>
+                                    <td><div style="max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($r['label'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['label']) ?></div></td>
                                     <td><span class="sdot s<?= (int)$r['scope'] ?>">S<?= (int)$r['scope'] ?></span></td>
                                     <td class="num"><input class="ti-input" style="width:120px;text-align:center;" type="number" min="0" step="1" name="resp[<?= (int)$r['qiid'] ?>]" value="<?= (int)$r['respondents']?:'' ?>" placeholder="0"></td>
                                     <td class="num"><input class="ti-input" style="width:120px;text-align:center;" type="number" min="0" step="0.0001" name="avg[<?= (int)$r['qiid'] ?>]" value="<?= (float)$r['avg_value']!=0?htmlspecialchars(rtrim(rtrim(number_format((float)$r['avg_value'],4,'.',''),'0'),'.')):'' ?>" placeholder="0"></td>
-                                    <td><?= htmlspecialchars($r['unit']) ?></td>
+                                    <td><div style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($r['unit'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['unit']) ?></div></td>
                                     <td class="num" style="color:var(--clr-primary);font-weight:700;"><?= number_format((float)$r['emission'],4) ?></td>
                                     <td class="num" style="white-space:nowrap;">
                                         <button type="button" class="icobtn edit" title="แก้ไขหัวข้อ"
@@ -754,9 +759,9 @@ if ($is_survey) {
                                     <input type="hidden" name="action" value="edit_topic"><input type="hidden" name="tab" value="<?= $tab ?>">
                                     <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="group" value="<?= htmlspecialchars($group,ENT_QUOTES) ?>">
                                     <input type="hidden" name="qitem_id" id="te_qiid">
-                                    <div class="fld" style="margin-bottom:10px;"><label>คำถาม</label><input class="ti-input" style="width:100%;" name="label" id="te_label" required></div>
+                                    <div class="fld" style="margin-bottom:10px;"><label>คำถาม</label><input class="ti-input" style="width:100%;" name="label" id="te_label" required maxlength="100"></div>
                                     <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-                                        <div class="fld" style="flex:1;min-width:120px;"><label>หน่วย</label><input class="ti-input" style="width:100%;" name="unit" id="te_unit" required></div>
+                                        <div class="fld" style="flex:1;min-width:120px;"><label>หน่วย</label><input class="ti-input" style="width:100%;" name="unit" id="te_unit" required maxlength="100"></div>
                                         <div class="fld" style="width:130px;"><label>Scope</label>
                                             <?php $dd_id='teScopeEdit';$dd_name='scope';$dd_options=[['value'=>1,'label'=>'Scope 1'],['value'=>2,'label'=>'Scope 2'],['value'=>3,'label'=>'Scope 3']];
                                                 $dd_selected=1;$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือก Scope';$dd_style='';include __DIR__.'/../components/dropdown.php'; ?></div>
@@ -966,7 +971,7 @@ if ($is_survey) {
                             <tbody>
                             <?php foreach ($ef_items as $x): $v=$curVol[(int)$x['id']]??0; ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($x['name_tiem']) ?></td>
+                                    <td><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($x['name_tiem'],ENT_QUOTES) ?>"><?= htmlspecialchars($x['name_tiem']) ?></div></td>
                                     <td><span class="sdot s<?= (int)$x['scope'] ?>">S<?= (int)$x['scope'] ?></span></td>
                                     <td><?= htmlspecialchars($x['unit']) ?></td>
                                     <td class="num"><?= number_format((float)$x['AD'],4) ?></td>
@@ -1039,7 +1044,7 @@ if ($is_survey) {
                             <tbody>
                             <?php foreach ($rm_rows as $m): $q=(float)$m['qty']; ?>
                                 <tr>
-                                    <td style="font-weight:600;"><?= htmlspecialchars($m['name_tiem']) ?></td>
+                                    <td style="font-weight:600;"><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($m['name_tiem'],ENT_QUOTES) ?>"><?= htmlspecialchars($m['name_tiem']) ?></div></td>
                                     <td><?= htmlspecialchars($m['unit'] ?: '-') ?></td>
                                     <td class="num"><?= number_format((float)$m['factor'],4) ?></td>
                                     <td class="num"><input class="ti-input evRmQty" style="width:120px;text-align:center;" type="number" min="0" step="0.0001" data-factor="<?= (float)$m['factor'] ?>" name="qty[<?= (int)$m['rid'] ?>]" value="<?= $q!=0?htmlspecialchars(rtrim(rtrim(number_format($q,4,'.',''),'0'),'.')):'' ?>" placeholder="0"></td>

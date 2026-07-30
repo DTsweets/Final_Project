@@ -174,6 +174,32 @@ function removal_activity_list(PDO $pdo, int $year, ?int $affil = null): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+/** รายการ "การปล่อย" จากกิจกรรมคณะของปี (event_item) — แยกรายกิจกรรม สำหรับ dashboard (read-only)
+ *  $affil = null → ทุกคณะ; ระบุ affil → เฉพาะกิจกรรมของคณะนั้น
+ *  alias AD→factor, Vol→qty ให้โครงสร้างตรงกับ removal_activity_list (reuse accordion เดียวกันได้) */
+function event_emission_list(PDO $pdo, int $year, ?int $affil = null): array
+{
+    $sql = '
+        SELECT ei.id, ai.name_tiem, ai.unit, ai.AD AS factor, ei.Vol AS qty,
+               ei.Vol * ai.AD / 1000 AS emission,
+               ag.scope AS scope, \'emit\' AS itype,
+               e.id AS event_id, e.name AS event_name, e.event_date, e.event_end_date,
+               e.organizer_name, e.affiliation_id AS affil_id,
+               COALESCE(NULLIF(e.organizer_name, \'\'), a.affiliation_item) AS affil_name
+        FROM event_item ei
+        JOIN event e ON e.id = ei.event_id
+        JOIN admin_item ai ON ai.id = ei.admin_item_id
+        JOIN admin_g ag ON ag.id = ai.scope
+        LEFT JOIN affiliation_id a ON a.id = e.affiliation_id
+        WHERE e.year_id = :y';
+    $params = [':y' => $year];
+    if ($affil !== null) { $sql .= ' AND e.affiliation_id = :aff'; $params[':aff'] = $affil; }
+    $sql .= ' ORDER BY e.affiliation_id ASC, e.id ASC, ei.id ASC';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 /** รายการดูดกลับของปี + qty ที่กรอก + tCO₂e (แสดงทุกรายการแม้ยังไม่กรอก) */
 function removal_items_list(PDO $pdo, int $year): array
 {

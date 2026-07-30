@@ -11,7 +11,10 @@ require_role(['admin', 'dean']);
 $pdo = getDB();
 $affil_id = (int)($_SESSION['affiliation_id'] ?? 0);
 $affil_name = $_SESSION['affiliation_name'] ?? '-';
-$view = ($_GET['view'] ?? 'system') === 'faculty' ? 'faculty' : 'system';
+// dean พิมพ์ได้เฉพาะคณะตัวเอง → บังคับ faculty (กันเลี่ยงผ่าน ?view=system)
+$view = (($_SESSION['role'] ?? '') === 'dean')
+    ? 'faculty'
+    : (($_GET['view'] ?? 'system') === 'faculty' ? 'faculty' : 'system');
 $year = isset($_GET['year']) ? (int)$_GET['year'] : 0;
 
 $year_label = '';

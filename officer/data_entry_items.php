@@ -963,7 +963,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         เพิ่มกิจกรรม
                     </button>
                     <button type="button"
-                        onclick="if(confirm('คุณต้องการยืนยันการบันทึกข้อมูลใช่หรือไม่?')) document.getElementById('main-save-form').submit();"
+                        onclick="confirmDelete({title:'ยืนยันการบันทึก?', message:'คุณต้องการบันทึกข้อมูลใช่หรือไม่?', confirmText:'บันทึก', variant:'success'}).then(function(ok){ if(ok) document.getElementById('main-save-form').submit(); });"
                         class="btn-action btn-calculate"
                         style="background-color: #10B981; box-shadow: 0 4px 10px rgba(16,185,129,0.2);">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1084,7 +1084,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                                 <div class="cell-pill" style="padding: 0; border-color: #E5E7EB;">
                                                     <input type="number" step="any" name="vol[<?= $item['id'] ?>]"
                                                         class="vol-input" style="font-family: 'Kanit', sans-serif;"
-                                                        value="<?= (float) number_format($vol, 4, '.', '') ?>" max="1000000"
+                                                        value="<?= (float) $vol != 0 ? htmlspecialchars(rtrim(rtrim(number_format($vol, 4, '.', ''), '0'), '.')) : '' ?>" placeholder="0" max="1000000"
                                                         oninput="calculateRow(this)">
                                                 </div>
                                             </td>

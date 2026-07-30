@@ -25,6 +25,11 @@
     #cfmModal .cfm-cancel:hover{transform:translateY(-2px);background:#F9FAFB;border-color:#D1D5DB;}
     #cfmModal .cfm-confirm{background:#EF4444;color:#fff;}
     #cfmModal .cfm-confirm:hover{transform:translateY(-2px);background:#DC2626;}
+    /* variant: success (เช่น ยืนยันการบันทึก) — เขียว */
+    #cfmModal .cfm-ic.success{background:#DCFCE7;}
+    #cfmModal .cfm-ic.success svg{color:#16A34A;}
+    #cfmModal .cfm-confirm.success{background:#10B981;}
+    #cfmModal .cfm-confirm.success:hover{background:#059669;}
 </style>
 <div id="cfmModal">
     <div class="cfm-box">
@@ -43,6 +48,11 @@
 (function(){
     if (window.confirmDelete) return;   // กันนิยาม/bind ซ้ำ (เผื่อ include อยู่ในส่วนที่ถูก re-exec)
     var resolver = null;
+    // ไอคอนตาม variant
+    var ICONS = {
+        danger:  '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+        success: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'
+    };
     function close(v){
         var m = document.getElementById('cfmModal');
         if (m) m.style.display = 'none';
@@ -56,6 +66,11 @@
         document.getElementById('cfmTitle').textContent   = opts.title || 'ยืนยันการลบ?';
         document.getElementById('cfmMsg').textContent      = opts.message || 'การลบนี้ไม่สามารถกู้คืนได้';
         document.getElementById('cfmConfirm').textContent  = opts.confirmText || 'ยืนยันการลบ';
+        // variant: 'success' (เขียว/ไอคอนบันทึก) หรือ default 'danger' (แดง/ไอคอนลบ)
+        var variant = (opts.variant === 'success') ? 'success' : 'danger';
+        m.querySelector('.cfm-ic').className     = 'cfm-ic' + (variant === 'success' ? ' success' : '');
+        document.getElementById('cfmConfirm').className = 'cfm-btn cfm-confirm' + (variant === 'success' ? ' success' : '');
+        m.querySelector('.cfm-ic svg').innerHTML = opts.icon || ICONS[variant];
         m.style.display = 'flex';
         document.body.style.overflow = 'hidden';
         var box = m.querySelector('.cfm-box');            // restart pop animation ทุกครั้ง

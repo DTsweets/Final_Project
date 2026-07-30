@@ -252,7 +252,7 @@ CREATE TABLE `questionnaire` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `year_id` int(11) NOT NULL,
   `affiliation_id` int(11) NOT NULL DEFAULT 1,
-  `audience` varchar(50) NOT NULL DEFAULT '',
+  `audience` varchar(100) NOT NULL DEFAULT '',
   `created_by` int(11) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
