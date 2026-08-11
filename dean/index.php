@@ -72,7 +72,7 @@ $sys_removal      = removal_total($pdo, $selected_year);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard (คณบดี) — UP Net Zero</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
@@ -89,6 +89,8 @@ $sys_removal      = removal_total($pdo, $selected_year);
         .rmx-act.open .rmx-body { display:block; }
         /* ตารางในโมดัล: ตัดคำเฉพาะคอลัมน์แรก (ชื่อรายการยาว/ไทยไม่มีเว้นวรรค) — คอลัมน์อื่น (หน่วย/จำนวน/ตัวเลข) ปล่อย default ไม่แตกกลางคำ */
         .detail-modal-body .data-table th:first-child, .detail-modal-body .data-table td:first-child { overflow-wrap:anywhere; }
+        /* หัวตารางในโมดัลกระชับขึ้น (padding/letter-spacing น้อยลง) กันหน่วยในวงเล็บตกบรรทัดกลางคำ */
+        .detail-modal-body .data-table th { padding:0.9rem 0.7rem; letter-spacing:0.02em; text-transform:none; }
         .rmx-body .data-table { table-layout:fixed; width:100%; }
         .rmx-body .data-table th:first-child, .rmx-body .data-table td:first-child { width:34%; overflow-wrap:anywhere; word-break:break-word; }
     </style>
@@ -277,13 +279,15 @@ $sys_removal      = removal_total($pdo, $selected_year);
         <!-- Removal Modal (การดูดกลับจากกิจกรรมของคณะ — read-only accordion) -->
         <div class="modal-overlay" id="removalModal" onclick="if(event.target===this)closeRemovalModal()">
             <div class="modal-box" style="max-width:820px; padding:0 0 18px; overflow:hidden;">
-                <div style="padding:2rem 2.5rem; color:#fff; background:linear-gradient(135deg,#2E7D32,#66BB6A);">
+                <div class="modal-breadcrumb" id="rmBreadcrumb" style="display:none;">
+                    <span class="back-btn-pill" onclick="rmRenderList()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> ย้อนกลับหน้ารายการกิจกรรม</span>
+                </div>
+                <div style="padding:3.2rem 2.5rem 2rem; color:#fff; background:linear-gradient(135deg,#2E7D32,#66BB6A);">
                     <button class="modal-close-btn" onclick="closeRemovalModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
-                    <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">การดูดกลับจากกิจกรรมของคณะ</div>
-                    <h3 style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;"><?= ic('leaf',20) ?> รวม <?= number_format($removal_activity, 4) ?> tCO₂e</h3>
+                    <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">รายละเอียดการดูดกลับจากกิจกรรม</div>
+                    <h3 id="rmModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;overflow-wrap:anywhere;word-break:break-word;">การดูดกลับจากกิจกรรมที่คณะจัด</h3>
                 </div>
                 <div class="detail-modal-body">
-                    <p class="muted" style="margin:0 0 12px;color:#8A8194;">คลิกที่กิจกรรมเพื่อดูรายละเอียด</p>
                     <div id="removalModalBody"></div>
                 </div>
             </div>
@@ -298,7 +302,7 @@ $sys_removal      = removal_total($pdo, $selected_year);
                 <div style="padding:3.2rem 2.5rem 2rem; color:#fff; background:linear-gradient(135deg,#F59E0B,#F97316);">
                     <button class="modal-close-btn" onclick="closeEmissionModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
                     <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">รายละเอียดการปล่อยจากกิจกรรม</div>
-                    <h3 style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">การปล่อยจากกิจกรรมที่คณะจัด</h3>
+                    <h3 id="emModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;overflow-wrap:anywhere;word-break:break-word;">การปล่อยจากกิจกรรมที่คณะจัด</h3>
                 </div>
                 <div class="detail-modal-body">
                     <div id="emissionModalBody"></div>
@@ -330,24 +334,7 @@ $sys_removal      = removal_total($pdo, $selected_year);
             };
             window.closeDetailModal = function () { document.getElementById('detailModal').style.display = 'none'; document.body.style.overflow = ''; };
 
-            // ── Removal modal (accordion กลุ่มตามกิจกรรม) ──
-            window.rmxToggle = function (head) { head.closest('.rmx-act').classList.toggle('open'); };
-            window.openRemovalModal = function () {
-                const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-                const f4 = n => (parseFloat(n)||0).toLocaleString('th-TH', {minimumFractionDigits:4, maximumFractionDigits:4});
-                const groups = {};
-                (window.REMOVAL_ROWS||[]).forEach(a => { const k=a.event_id; if(!groups[k]) groups[k]={name:a.event_name||'-',items:[],sub:0}; groups[k].items.push(a); groups[k].sub+=parseFloat(a.emission)||0; });
-                const chev = '<svg class="rmx-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
-                let acc = '';
-                Object.values(groups).forEach(g => {
-                    let rows = '';
-                    g.items.forEach(a => { rows += `<tr><td style="font-weight:600;">${esc(a.name_tiem)}</td><td style="text-align:center;color:#6B7280;">${esc(a.unit||'-')}</td><td style="text-align:right;">${f4(a.factor)}</td><td style="text-align:right;">${(parseFloat(a.qty)||0).toLocaleString('th-TH',{maximumFractionDigits:4})}</td><td style="text-align:right;font-weight:700;color:#166534;">${f4(a.emission)}</td></tr>`; });
-                    acc += `<div class="rmx-act"><div class="rmx-head" onclick="rmxToggle(this)"><div class="rmx-title">${chev}<span class="rmx-text">${esc(g.name)}</span></div><div style="color:#166534;font-weight:800;white-space:nowrap;flex-shrink:0;">รวม ${f4(g.sub)} tCO₂e</div></div><div class="rmx-body"><table class="data-table" style="width:100%;"><thead><tr><th style="text-align:left;">รายการดูดกลับ</th><th style="text-align:center;">หน่วย</th><th style="text-align:right;">ค่าดูดกลับ (kgCO₂e/หน่วย)</th><th style="text-align:right;">ปริมาณ</th><th style="text-align:right;">tCO₂e</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-                });
-                document.getElementById('removalModalBody').innerHTML = acc || '<p style="color:#9CA3AF;text-align:center;padding:24px;">ยังไม่มีข้อมูล</p>';
-                document.getElementById('removalModal').style.display = 'flex'; document.body.style.overflow = 'hidden';
-            };
-            window.closeRemovalModal = function () { document.getElementById('removalModal').style.display = 'none'; document.body.style.overflow = ''; };
+            // Removal modal (2-level list→detail) — logic อยู่ที่ assets/js/activity-modal.js (openRemovalModal/closeRemovalModal)
 
             // Emission modal (2-level list→detail) — logic อยู่ที่ assets/js/activity-modal.js (openEmissionModal/closeEmissionModal)
 

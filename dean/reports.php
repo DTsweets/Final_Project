@@ -7,6 +7,8 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/ghg_report.php';
 require_role(['admin', 'dean']);
+// กัน browser cache HTML เก่า (แก้ inline <style> แล้วบางทีไม่โหลดใหม่)
+header('Cache-Control: no-cache, no-store, must-revalidate');
 
 $pdo  = getDB();
 $root = '../';
@@ -28,18 +30,42 @@ $view = (($_SESSION['role'] ?? '') === 'dean')
 $scope = ghg_scope_totals($pdo, $selected_year, $view === 'faculty' ? $affil_id : null);
 $total = $scope[1] + $scope[2] + $scope[3];
 
-// ── การดูดกลับ + สุทธิ (มุมมองคณะ = กิจกรรมของคณะ / ทั้งระบบ = ระดับมหาวิทยาลัย) ──
+// ── การดูดกลับ (มุมมองคณะ = กิจกรรมของคณะ / ทั้งระบบ = ระดับมหาวิทยาลัย) — รายงานแยกตามมาตรฐาน ──
 $removal = $view === 'faculty'
     ? removal_activity_total($pdo, $selected_year, $affil_id)
     : removal_total($pdo, $selected_year);
-$net = $total - $removal;
 
 // ตารางรายละเอียด
 if ($view === 'faculty') {
-    $detail = ghg_affil_detail($pdo, $affil_id, $selected_year); // by activity
+    $detail = ghg_affil_detail($pdo, $affil_id, $selected_year); // การดำเนินงาน (officer)
 } else {
     $detail = ghg_by_affiliation($pdo, $selected_year);          // by faculty
 }
+
+// เฉพาะมุมมองคณะ: การปล่อยจากกิจกรรม + การดูดกลับจากกิจกรรม
+$event_rows = $removal_rows = []; $event_total = 0.0;
+if ($view === 'faculty') {
+    $event_rows   = event_emission_list($pdo, $selected_year, $affil_id);
+    $removal_rows = removal_activity_list($pdo, $selected_year, $affil_id);
+    foreach ($event_rows as $er) $event_total += (float) $er['emission'];
+}
+
+// ── ยอดปล่อยรวม (gross) แยก Scope — รวมการปล่อยจากกิจกรรมด้วย (Scope ครอบคลุมทุกการปล่อย) ──
+$gross_scope = $scope;
+foreach ($event_rows as $er) {
+    $sc = (int) $er['scope'];
+    if (isset($gross_scope[$sc])) $gross_scope[$sc] += (float) $er['emission'];
+}
+$gross_total = $gross_scope[1] + $gross_scope[2] + $gross_scope[3];   // officer + กิจกรรม
+// สุทธิ (Net) เพื่อติดตาม Net Zero = ปล่อยทั้งหมด − ดูดกลับทั้งหมด (removal ยังรายงานแยกด้านบน)
+$net = $gross_total - $removal;
+
+// badge Scope สีตามหลัก (S1 ส้ม / S2 ชมพู / S3 ฟ้า) เหมือน admin
+$scope_badge = function (int $s): string {
+    $c = [1 => ['#FFEDD5', '#C2410C'], 2 => ['#FCE7F3', '#BE185D'], 3 => ['#DBEAFE', '#1D4ED8']];
+    [$bg, $fg] = $c[$s] ?? ['#F3F4F6', '#6B7280'];
+    return '<span style="display:inline-block;font-weight:700;font-size:.8rem;padding:4px 14px;border-radius:999px;white-space:nowrap;background:' . $bg . ';color:' . $fg . ';">Scope ' . $s . '</span>';
+};
 
 // per-year trend
 $series = [];
@@ -55,10 +81,20 @@ $dl = 'view=' . $view . '&year=' . $selected_year;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>รายงาน GHG (คณบดี) — UP Net Zero</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
+    <style>
+        /* หัวตารางไม่ต้องแปลงเป็นตัวพิมพ์ใหญ่ → "tCO₂e" คงตัวพิมพ์เดิม (ไม่กลายเป็น TCO₂E) */
+        .admin-table-container .data-table th { text-transform: none; }
+        /* table-layout:fixed + colgroup → คุมความกว้างคอลัมน์ ชื่อยาวตัดคำ ไม่ล้นแนวนอน */
+        .admin-table-container .data-table { table-layout: fixed; width: 100%; }
+        /* ชื่อยาว: ตัดคำลงบรรทัดใหม่ ไม่ล้นคอลัมน์ (ภายใต้ table-layout:fixed) — รวมถึงสตริงยาวไม่มีเว้นวรรค */
+        .admin-table-container .data-table .ell {
+            display: block; white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+        }
+    </style>
 </head>
 <body class="light-theme">
 
@@ -108,21 +144,38 @@ $dl = 'view=' . $view . '&year=' . $selected_year;
 
             <div class="db-section-label"><?= $view==='faculty' ? 'คณะของฉัน — '.htmlspecialchars($affil_name) : 'ทั้งระบบ (ทุกคณะ)' ?> · ปี <?= htmlspecialchars($year_label) ?></div>
 
-            <!-- summary: scope donut + numbers + year bar -->
+            <!-- KPI tiles -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem;margin-bottom:1.25rem;">
+                <div class="db-card db-card-white" style="border-left:5px solid #F97316;">
+                    <div style="font-size:.85rem;color:#6B7280;font-weight:600;"><?= $view==='faculty' ? 'การปล่อยจากการดำเนินงาน' : 'การปล่อยรวมทั้งระบบ' ?></div>
+                    <div class="db-big-num" style="margin-top:.25rem;color:#EA580C;"><?= number_format($total,2,'.',',') ?> <span class="db-big-unit">tCO₂e</span></div>
+                </div>
+                <?php if ($view === 'faculty'): ?>
+                <div class="db-card db-card-white" style="border-left:5px solid #F59E0B;">
+                    <div style="font-size:.85rem;color:#6B7280;font-weight:600;">การปล่อยจากกิจกรรม</div>
+                    <div class="db-big-num" style="margin-top:.25rem;color:#B45309;"><?= number_format($event_total,2,'.',',') ?> <span class="db-big-unit">tCO₂e</span></div>
+                </div>
+                <?php endif; ?>
+                <div class="db-card db-card-white" style="border-left:5px solid #16A34A;">
+                    <div style="font-size:.85rem;color:#6B7280;font-weight:600;"><?= ic('leaf',14) ?> การดูดกลับ<?= $view==='faculty'?'จากกิจกรรม':' (มหาวิทยาลัย)' ?></div>
+                    <div class="db-big-num" style="margin-top:.25rem;color:#166534;"><?= number_format($removal,2,'.',',') ?> <span class="db-big-unit">tCO₂e</span></div>
+                </div>
+                <div class="db-card db-card-white" style="border-left:5px solid #62368B;">
+                    <div style="font-size:.85rem;color:#6B7280;font-weight:600;">สุทธิ (Net) · ติดตาม Net Zero</div>
+                    <div class="db-big-num" style="margin-top:.25rem;color:var(--clr-primary);"><?= number_format($net,2,'.',',') ?> <span class="db-big-unit">tCO₂e</span></div>
+                    <div style="font-size:.7rem;color:#9CA3AF;margin-top:2px;">= ปล่อยทั้งหมด (<?= number_format($gross_total,2) ?>) − ดูดกลับ (<?= number_format($removal,2) ?>)</div>
+                </div>
+            </div>
+
+            <!-- donut + trend -->
             <div style="display:grid;grid-template-columns:300px 1fr;gap:1.5rem;align-items:start;margin-bottom:1.5rem;">
                 <div class="db-card db-card-white" style="text-align:center;">
-                    <div style="font-size:.9rem;color:#6B7280;font-weight:600;">รวม</div>
-                    <div class="db-big-num" style="margin:.25rem 0 1rem;"><?= number_format($total, 2, '.', ',') ?> <span class="db-big-unit">tCO₂e</span></div>
+                    <div style="font-size:.95rem;color:#374151;font-weight:700;margin-bottom:.5rem;">สัดส่วนตาม Scope <span style="font-weight:400;font-size:.78rem;color:#9CA3AF;">(ปล่อยทั้งหมด)</span></div>
                     <canvas id="scopeDonut" width="200" height="200" style="max-width:100%;"></canvas>
-                    <div style="display:flex;justify-content:center;gap:12px;margin-top:10px;font-size:.85rem;">
-                        <span style="color:#F97316;font-weight:700;">■ S1 <?= number_format($scope[1],2) ?></span>
-                        <span style="color:#EC4899;font-weight:700;">■ S2 <?= number_format($scope[2],2) ?></span>
-                        <span style="color:#3B82F6;font-weight:700;">■ S3 <?= number_format($scope[3],2) ?></span>
-                    </div>
-                    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #F1EEF5;font-size:.9rem;text-align:left;">
-                        <div style="display:flex;justify-content:space-between;"><span style="color:#6B7280;">การปล่อย</span><span style="font-weight:700;"><?= number_format($total,2,'.',',') ?></span></div>
-                        <div style="display:flex;justify-content:space-between;margin-top:4px;"><span style="color:#166534;"><?= ic('leaf',15) ?> ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?></span><span style="font-weight:700;color:#166534;"><?= number_format($removal,2,'.',',') ?></span></div>
-                        <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px dashed #E7E3EC;"><span style="color:#374151;font-weight:700;">สุทธิ (Net)</span><span style="font-weight:800;color:var(--clr-primary);"><?= number_format($net,2,'.',',') ?></span></div>
+                    <div style="display:flex;justify-content:center;gap:12px;margin-top:10px;font-size:.85rem;flex-wrap:wrap;">
+                        <span style="color:#F97316;font-weight:700;">■ S1 <?= number_format($gross_scope[1],2) ?></span>
+                        <span style="color:#EC4899;font-weight:700;">■ S2 <?= number_format($gross_scope[2],2) ?></span>
+                        <span style="color:#3B82F6;font-weight:700;">■ S3 <?= number_format($gross_scope[3],2) ?></span>
                     </div>
                 </div>
                 <div class="db-card db-card-white">
@@ -131,46 +184,106 @@ $dl = 'view=' . $view . '&year=' . $selected_year;
                 </div>
             </div>
 
-            <!-- detail table -->
-            <div class="admin-table-container" style="padding:1.5rem;">
-                <h3 style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:1rem;">
-                    <?= $view==='faculty' ? 'รายละเอียดตามประเภทกิจกรรม' : 'การปล่อยรายคณะ' ?>
-                </h3>
-                <div style="overflow-x:auto;">
-                <table class="data-table" style="width:100%;">
-                    <?php if ($view === 'faculty'): ?>
-                        <thead><tr><th>Scope</th><th>รายการ</th><th>หน่วย</th><th style="text-align:right;">จำนวน</th><th style="text-align:right;">tCO₂e</th></tr></thead>
+            <?php if ($view === 'faculty'): ?>
+                <!-- ตาราง 1: การปล่อยจากการดำเนินงาน (officer) -->
+                <div class="admin-table-container" style="padding:1.5rem;margin-bottom:1.25rem;">
+                    <h3 style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:1rem;">การปล่อยจากการดำเนินงานของคณะ</h3>
+                    <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%;table-layout:fixed;">
+                        <colgroup><col style="width:14%;"><col style="width:44%;"><col style="width:10%;"><col style="width:16%;"><col style="width:16%;"></colgroup>
+                        <thead><tr><th style="text-align:center;">Scope</th><th>รายการ</th><th>หน่วย</th><th style="text-align:right;">จำนวน</th><th style="text-align:right;">tCO₂e</th></tr></thead>
                         <tbody>
                             <?php if (empty($detail)): ?><tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF;">ยังไม่มีข้อมูล</td></tr><?php endif; ?>
                             <?php foreach ($detail as $r): ?>
                                 <tr>
-                                    <td style="text-align:center;"><span class="badge">Scope <?= (int)$r['scope'] ?></span></td>
-                                    <td><?= htmlspecialchars($r['name_tiem']) ?></td>
-                                    <td><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
-                                    <td style="text-align:right;"><?= number_format((float)$r['vol'], 4, '.', ',') ?></td>
-                                    <td style="text-align:right;font-weight:700;color:var(--clr-primary);"><?= number_format((float)$r['emission'], 2, '.', ',') ?></td>
+                                    <td style="text-align:center;"><?= $scope_badge((int)$r['scope']) ?></td>
+                                    <td><div class="ell" title="<?= htmlspecialchars($r['name_tiem'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['name_tiem']) ?></div></td>
+                                    <td style="text-align:center;"><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
+                                    <td style="text-align:right;"><?= qty_fmt($r['vol']) ?></td>
+                                    <td style="text-align:right;font-weight:700;color:var(--clr-primary);"><?= number_format((float)$r['emission'], 4, '.', ',') ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    <?php else: ?>
+                    </table>
+                    </div>
+                </div>
+
+                <!-- ตาราง 2: การปล่อยจากกิจกรรม (event) -->
+                <?php if (!empty($event_rows)): ?>
+                <div class="admin-table-container" style="padding:1.5rem;margin-bottom:1.25rem;">
+                    <h3 style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:1rem;">การปล่อยจากกิจกรรมที่คณะจัด
+                        <span style="font-weight:500;font-size:.85rem;color:#8A8194;">· แยกจากยอดหลัก · รวม <?= number_format($event_total,4) ?> tCO₂e</span></h3>
+                    <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%;table-layout:fixed;">
+                        <colgroup><col style="width:20%;"><col style="width:11%;"><col style="width:27%;"><col style="width:8%;"><col style="width:16%;"><col style="width:18%;"></colgroup>
+                        <thead><tr><th>กิจกรรม</th><th style="text-align:center;">Scope</th><th>รายการ</th><th>หน่วย</th><th style="text-align:right;">จำนวน</th><th style="text-align:right;">tCO₂e</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($event_rows as $r): ?>
+                                <tr>
+                                    <td><div class="ell" title="<?= htmlspecialchars($r['event_name'] ?? '-',ENT_QUOTES) ?>"><?= htmlspecialchars($r['event_name'] ?? '-') ?></div></td>
+                                    <td style="text-align:center;"><?= $scope_badge((int)$r['scope']) ?></td>
+                                    <td><div class="ell" title="<?= htmlspecialchars($r['name_tiem'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['name_tiem']) ?></div></td>
+                                    <td style="text-align:center;"><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
+                                    <td style="text-align:right;"><?= qty_fmt($r['qty']) ?></td>
+                                    <td style="text-align:right;font-weight:700;color:var(--clr-primary);"><?= number_format((float)$r['emission'], 4, '.', ',') ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <!-- ตาราง 3: การดูดกลับจากกิจกรรม (event) -->
+                <?php if (!empty($removal_rows)): ?>
+                <div class="admin-table-container" style="padding:1.5rem;">
+                    <h3 style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:1rem;"><?= ic('leaf',16) ?> การดูดกลับจากกิจกรรมที่คณะจัด
+                        <span style="font-weight:500;font-size:.85rem;color:#8A8194;">· รวม <?= number_format($removal,4) ?> tCO₂e</span></h3>
+                    <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%;table-layout:fixed;">
+                        <colgroup><col style="width:18%;"><col style="width:26%;"><col style="width:8%;"><col style="width:18%;"><col style="width:14%;"><col style="width:16%;"></colgroup>
+                        <thead><tr><th>กิจกรรม</th><th>รายการดูดกลับ</th><th>หน่วย</th><th style="text-align:right;">ค่าดูดกลับ<br>(kgCO₂e/หน่วย)</th><th style="text-align:right;">ปริมาณ</th><th style="text-align:right;">tCO₂e</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($removal_rows as $r): ?>
+                                <tr>
+                                    <td><div class="ell" title="<?= htmlspecialchars($r['event_name'] ?? '-',ENT_QUOTES) ?>"><?= htmlspecialchars($r['event_name'] ?? '-') ?></div></td>
+                                    <td><div class="ell" title="<?= htmlspecialchars($r['name_tiem'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['name_tiem']) ?></div></td>
+                                    <td style="text-align:center;"><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
+                                    <td style="text-align:right;"><?= number_format((float)$r['factor'], 4, '.', ',') ?></td>
+                                    <td style="text-align:right;"><?= qty_fmt($r['qty']) ?></td>
+                                    <td style="text-align:right;font-weight:700;color:#166534;"><?= number_format((float)$r['emission'], 4, '.', ',') ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+                <?php endif; ?>
+            <?php else: ?>
+                <!-- system: การปล่อยรายคณะ -->
+                <div class="admin-table-container" style="padding:1.5rem;">
+                    <h3 style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:1rem;">การปล่อยรายคณะ</h3>
+                    <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%;table-layout:fixed;">
+                        <colgroup><col><col style="width:10rem;"></colgroup>
                         <thead><tr><th>คณะ/หน่วยงาน</th><th style="text-align:right;">tCO₂e</th></tr></thead>
                         <tbody>
                             <?php foreach ($detail as $r): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($r['affiliation_item']) ?></td>
+                                    <td><div class="ell" title="<?= htmlspecialchars($r['affiliation_item'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['affiliation_item']) ?></div></td>
                                     <td style="text-align:right;font-weight:700;color:var(--clr-primary);"><?= number_format((float)$r['total_emission'], 2, '.', ',') ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    <?php endif; ?>
-                </table>
+                    </table>
+                    </div>
                 </div>
-            </div>
+            <?php endif; ?>
         </div>
 
         <script src="<?= $root ?>assets/js/ghg-charts.js<?= asset_v('assets/js/ghg-charts.js') ?>"></script>
         <script>
-            window.__SCOPE = <?= json_encode([$scope[1], $scope[2], $scope[3]]) ?>;
+            window.__SCOPE = <?= json_encode([$gross_scope[1], $gross_scope[2], $gross_scope[3]]) ?>;
             window.__SERIES = <?= json_encode($series, JSON_UNESCAPED_UNICODE) ?>;
             window.toggleYearDrop = function (e){ e.stopPropagation(); document.getElementById('yearMenu').classList.toggle('open'); document.getElementById('yearDropdownWrap').classList.toggle('open'); };
             (function(){

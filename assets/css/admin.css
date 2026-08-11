@@ -53,7 +53,7 @@ input,
 button,
 select,
 textarea {
-    font-family: 'Kanit', sans-serif;
+    font-family: 'Sarabun', sans-serif;
 }
 
 body {
@@ -230,7 +230,7 @@ body {
     letter-spacing: -0.06em;
     line-height: 1;
     color: var(--clr-primary);
-    font-family: 'Kanit', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     margin-bottom: 1.75rem;
 }
 
@@ -336,7 +336,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 18px;
     padding: 0 1.5rem;
-    font-family: 'Kanit', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     font-size: 1.05rem;
     font-weight: 500;
     color: var(--text-primary);
@@ -471,4 +471,16 @@ body {
 
 .btn-icon-delete:active {
     transform: scale(0.95);
+}
+
+/* ─── รายงาน GHG (dean/admin): ชื่อรายการยาว → ตัดคำลงบรรทัดใหม่ ไม่ล้นคอลัมน์ ───
+   วางไว้ที่นี่ (ไม่ใช่ inline <style>) เพื่อให้ SPA router ของ dean ที่ inject เฉพาะ
+   <link rel=stylesheet> ยังได้กฎนี้ติดมาด้วย ตอนสลับหน้าแบบไม่ reload */
+.admin-table-container .data-table { table-layout: fixed; width: 100%; }
+.admin-table-container .data-table th { text-transform: none; }
+.admin-table-container .data-table .ell {
+    display: block;
+    white-space: normal;          /* อนุญาตให้ขึ้นบรรทัดใหม่ */
+    overflow-wrap: anywhere;      /* ตัดสตริงยาวไม่มีเว้นวรรค เช่น แก๊สโซฮอลลล... */
+    word-break: break-word;
 }

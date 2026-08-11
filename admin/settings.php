@@ -207,7 +207,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <!-- Use the premium admin CSS -->
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
@@ -402,7 +402,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                 border-radius: 12px;
                 color: #1F2937;
                 font-size: 0.95rem;
-                font-family: 'Kanit', sans-serif;
+                font-family: 'Sarabun', sans-serif;
                 transition: all 0.3s ease;
             }
 
@@ -560,7 +560,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                         <h2 style="font-size: 1.4rem; color: #4B5563; font-weight: 700; margin: 0;">ข้อมูลผู้ใช้งาน</h2>
                         <button type="button" onclick="document.getElementById('add-user-modal').style.display='flex'"
-                            style="background: #C49A6C; color: white; border: none; padding: 8px 20px; border-radius: 999px; font-family: 'Kanit', sans-serif; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(196, 154, 108, 0.3); transition: all 0.2s;"
+                            style="background: #C49A6C; color: white; border: none; padding: 8px 20px; border-radius: 999px; font-family: 'Sarabun', sans-serif; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(196, 154, 108, 0.3); transition: all 0.2s;"
                             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 24px '"
                             onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 10px'">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
@@ -732,7 +732,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                             margin-bottom: 20px;
                             color: #6B7280;
                             font-size: 0.95rem;
-                            font-family: 'Kanit', sans-serif;
+                            font-family: 'Sarabun', sans-serif;
                         }
 
                         .f-search {
@@ -751,7 +751,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                             flex: 1 1 auto;
                             width: 100%;
                             min-width: 0;
-                            font-family: 'Kanit', sans-serif;
+                            font-family: 'Sarabun', sans-serif;
                             font-size: 0.95rem;
                             color: #4B5563;
                             transition: border-color 0.2s, box-shadow 0.2s;
@@ -801,7 +801,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
 
                         .f-search input::placeholder {
                             color: #9CA3AF;
-                            font-family: 'Kanit', sans-serif;
+                            font-family: 'Sarabun', sans-serif;
                         }
 
                         .figma-table {
@@ -819,7 +819,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                             color: #6B7280;
                             font-weight: 600;
                             font-size: 0.85rem;
-                            font-family: 'Kanit', sans-serif;
+                            font-family: 'Sarabun', sans-serif;
                             white-space: nowrap;
                         }
 
@@ -835,7 +835,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                             vertical-align: middle;
                             color: #4B5563;
                             font-size: 0.95rem;
-                            font-family: 'Kanit', sans-serif;
+                            font-family: 'Sarabun', sans-serif;
                         }
 
                         .role-pill {
@@ -945,7 +945,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                                     </button>
                                     <!-- Dropdown for Column Visibility -->
                                     <div id="col-vis-menu"
-                                        style="position: absolute; top: calc(100% + 8px); right: 0; background: #FFF; border: 1px solid #E8DDCE; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12); padding: 10px; z-index: 1000; display: none; min-width: 180px; font-family: 'Kanit', sans-serif;">
+                                        style="position: absolute; top: calc(100% + 8px); right: 0; background: #FFF; border: 1px solid #E8DDCE; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12); padding: 10px; z-index: 1000; display: none; min-width: 180px; font-family: 'Sarabun', sans-serif;">
                                         <div
                                             style="font-size: 0.75rem; font-weight: 700; color: #9CA3AF; margin-bottom: 8px; padding-left: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
                                             จัดการคอลัมน์</div>
@@ -1175,7 +1175,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                                         ];
                                         foreach ($exportCols as $key => $col): ?>
                                             <label class="exp-col-lbl"
-                                                style="display:flex;align-items:center;gap:8px;padding:9px 13px;background:#fff;border:1px solid #F0EBE2;border-radius:10px;cursor:<?= $col['always'] ? 'default' : 'pointer' ?>;transition:all 0.18s;box-shadow:0 1px 3px rgba(0,0,0,0.04);font-family:'Kanit',sans-serif;">
+                                                style="display:flex;align-items:center;gap:8px;padding:9px 13px;background:#fff;border:1px solid #F0EBE2;border-radius:10px;cursor:<?= $col['always'] ? 'default' : 'pointer' ?>;transition:all 0.18s;box-shadow:0 1px 3px rgba(0,0,0,0.04);font-family:'Sarabun',sans-serif;">
                                                 <input type="checkbox" class="f-custom-chk" id="<?= $key ?>"
                                                     <?= $col['always'] ? 'checked disabled' : 'checked' ?>
                                                     onchange="updateExportPreview()">
@@ -1197,12 +1197,12 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                                         ผู้ใช้งานที่ต้องการ</p>
                                     <div style="display:flex;gap:8px;">
                                         <label id="lbl-all"
-                                            style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 18px;border:none;background:#fff;border-radius:10px;font-weight:700;color:#62368B;font-size:0.9rem;transition:all 0.18s;box-shadow:0 2px 6px rgba(98,54,139,0.12);font-family:'Kanit',sans-serif;">
+                                            style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 18px;border:none;background:#fff;border-radius:10px;font-weight:700;color:#62368B;font-size:0.9rem;transition:all 0.18s;box-shadow:0 2px 6px rgba(98,54,139,0.12);font-family:'Sarabun',sans-serif;">
                                             <input type="radio" name="user_filter" id="filter_all" value="all" checked
                                                 onchange="toggleUserFilter()" style="accent-color:#62368B;"> ทั้งหมด
                                         </label>
                                         <label id="lbl-sel"
-                                            style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 18px;border:none;background:transparent;border-radius:10px;font-weight:600;color:#9CA3AF;font-size:0.9rem;transition:all 0.18s;font-family:'Kanit',sans-serif;">
+                                            style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 18px;border:none;background:transparent;border-radius:10px;font-weight:600;color:#9CA3AF;font-size:0.9rem;transition:all 0.18s;font-family:'Sarabun',sans-serif;">
                                             <input type="radio" name="user_filter" id="filter_select" value="select"
                                                 onchange="toggleUserFilter()" style="accent-color:#62368B;"> เลือกเฉพาะ
                                         </label>
@@ -1857,7 +1857,7 @@ $affiliations = $stmt_aff->fetchAll(PDO::FETCH_ASSOC);
                         wrapper.style.minHeight = '48px';    // Fix height to match standard inputs
                         wrapper.style.background = '#FDFCFB';
                         wrapper.style.cursor = 'pointer';
-                        wrapper.style.fontFamily = "'Kanit', sans-serif";
+                        wrapper.style.fontFamily = "'Sarabun', sans-serif";
                         wrapper.style.transition = 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
                         wrapper.style.marginBottom = '6px';
                         wrapper.style.display = 'flex';

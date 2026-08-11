@@ -39,7 +39,7 @@
     }
     if (centerText) {
       ctx.fillStyle = '#374151';
-      ctx.font = "700 " + Math.round(r * 0.28) + "px Kanit, sans-serif";
+      ctx.font = "700 " + Math.round(r * 0.28) + "px Sarabun, sans-serif";
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(centerText, cx, cy);
     }
@@ -56,7 +56,7 @@
     const gap = 16;
     const bw = Math.max(10, (W - pad - gap * n) / n);
     let x = pad + gap / 2;
-    ctx.font = "500 11px Kanit, sans-serif";
+    ctx.font = "500 11px Sarabun, sans-serif";
     ctx.textAlign = 'center';
     data.forEach(d => {
       const v = Number(d.value) || 0;

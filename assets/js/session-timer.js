@@ -69,10 +69,10 @@
                 text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.5);
             ">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">⏰</div>
-                <h3 style="color: #fca5a5; font-size: 1.2rem; margin-bottom: 0.5rem; font-family: \'Kanit\', sans-serif;">
+                <h3 style="color: #fca5a5; font-size: 1.2rem; margin-bottom: 0.5rem; font-family: \'Sarabun\', sans-serif;">
                     Session ใกล้หมดอายุ
                 </h3>
-                <p style="color: rgba(241,245,249,0.7); font-size: 0.875rem; margin-bottom: 1.5rem; font-family: \'Kanit\', sans-serif;">
+                <p style="color: rgba(241,245,249,0.7); font-size: 0.875rem; margin-bottom: 1.5rem; font-family: \'Sarabun\', sans-serif;">
                     คุณจะถูกออกจากระบบอัตโนมัติใน <strong style="color:#fca5a5;"> 2 นาที</strong> <br>
                     กดปุ่มด้านล่างเพื่อต่ออายุ session
                 </p>
@@ -81,13 +81,13 @@
                         padding: 0.65rem 1.5rem; border: none; border-radius: 10px;
                         background: linear-gradient(135deg, #4f46e5, #7c3aed);
                         color: #fff; font-weight: 600; cursor: pointer;
-                        font-family: \'Kanit\', sans-serif; font-size: 0.9rem;
+                        font-family: \'Sarabun\', sans-serif; font-size: 0.9rem;
                     ">ต่ออายุ Session</button>
                     <button id="logout-now" style="
                         padding: 0.65rem 1.5rem; border: 1px solid rgba(239,68,68,0.3);
                         border-radius: 10px; background: transparent;
                         color: #fca5a5; font-weight: 600; cursor: pointer;
-                        font-family: \'Kanit\', sans-serif; font-size: 0.9rem;
+                        font-family: \'Sarabun\', sans-serif; font-size: 0.9rem;
                     ">ออกจากระบบ</button>
                 </div>
             </div>

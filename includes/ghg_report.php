@@ -7,6 +7,12 @@
  *        จึง JOIN ผ่าน admin_g เสมอ
  */
 
+/** จัดรูปจำนวน/ปริมาณ: ไม่เกิน 2 ทศนิยม + ตัดศูนย์ท้ายทิ้ง (100.00→"100", 100.50→"100.5") */
+function qty_fmt($v): string
+{
+    return rtrim(rtrim(number_format((float) $v, 2, '.', ','), '0'), '.');
+}
+
 /** รายการปีทั้งหมด (ใหม่ -> เก่า) : [['year_id'=>.., 'year'=>..], ...] */
 function ghg_years(PDO $pdo): array
 {
@@ -159,8 +165,8 @@ function removal_activity_list(PDO $pdo, int $year, ?int $affil = null): array
         SELECT rei.id, rei.name_tiem, rei.unit, rei.factor,
                rei.qty,
                rei.qty * rei.factor / 1000 AS emission,
-               e.id AS event_id, e.name AS event_name, e.organizer_name,
-               e.affiliation_id AS affil_id,
+               e.id AS event_id, e.name AS event_name, e.event_date, e.event_end_date,
+               e.organizer_name, e.affiliation_id AS affil_id,
                COALESCE(NULLIF(e.organizer_name, \'\'), a.affiliation_item) AS affil_name
         FROM removal_event_item rei
         JOIN event e ON e.id = rei.event_id

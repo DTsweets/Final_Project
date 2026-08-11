@@ -192,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
@@ -1051,9 +1051,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                             <div class="header-pill" style="border-color: <?= $data_border ?>;">
                                                 ปริมาณก๊าซเรือนกระจก<br>(tCO2e/ต่อปี)</div>
                                         </th>
-                                        <th style="width: 80px;">
+                                        <th style="width: 96px;">
                                             <div class="header-pill"
-                                                style="border-color: <?= $action_border ?>; color: <?= $action_border ?>;">
+                                                style="border-color: <?= $action_border ?>; color: <?= $action_border ?>; white-space: nowrap; padding: 5px 8px;">
                                                 แนบไฟล์</div>
                                         </th>
                                     </tr>
@@ -1083,7 +1083,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                             <td>
                                                 <div class="cell-pill" style="padding: 0; border-color: #E5E7EB;">
                                                     <input type="number" step="any" name="vol[<?= $item['id'] ?>]"
-                                                        class="vol-input" style="font-family: 'Kanit', sans-serif;"
+                                                        class="vol-input" style="font-family: 'Sarabun', sans-serif;"
                                                         value="<?= (float) $vol != 0 ? htmlspecialchars(rtrim(rtrim(number_format($vol, 4, '.', ''), '0'), '.')) : '' ?>" placeholder="0" max="1000000"
                                                         oninput="calculateRow(this)">
                                                 </div>

@@ -189,7 +189,7 @@ unset(
         .ti-label {
             display: block;
             margin-bottom: 0.5rem;
-            font-family: 'Kanit', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             font-weight: 600;
             font-size: 0.95rem;
             color: var(--text-primary, #374151);
@@ -208,7 +208,7 @@ unset(
             border: 1px solid var(--ti-border);
             border-radius: 18px;
             padding: 0 1.5rem;
-            font-family: 'Kanit', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             font-size: 1.05rem;
             font-weight: 500;
             color: var(--text-primary, #374151);
@@ -269,7 +269,7 @@ unset(
             padding: 10px 14px;
             border-radius: 8px;
             cursor: pointer;
-            font-family: 'Kanit', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             font-size: 0.95rem;
             color: #374151;
             transition: background 0.15s;

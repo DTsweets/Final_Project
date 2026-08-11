@@ -25,6 +25,17 @@ $total = $scope[1] + $scope[2] + $scope[3];
 $removal = $view === 'faculty' ? removal_activity_total($pdo, $year, $affil_id) : removal_total($pdo, $year);
 $net = $total - $removal;
 $rows  = $view === 'faculty' ? ghg_affil_detail($pdo, $affil_id, $year) : ghg_by_affiliation($pdo, $year);
+$event_rows = $removal_rows = []; $event_total = 0.0;
+if ($view === 'faculty') {
+    $event_rows   = event_emission_list($pdo, $year, $affil_id);
+    $removal_rows = removal_activity_list($pdo, $year, $affil_id);
+    foreach ($event_rows as $er) $event_total += (float)$er['emission'];
+}
+// ยอดปล่อยรวม (gross) รวมกิจกรรม + Net (ปล่อยทั้งหมด − ดูดกลับ)
+$gross_scope = $scope;
+foreach ($event_rows as $er) { $sc = (int)$er['scope']; if (isset($gross_scope[$sc])) $gross_scope[$sc] += (float)$er['emission']; }
+$gross_total = $gross_scope[1] + $gross_scope[2] + $gross_scope[3];
+$net = $gross_total - $removal;
 
 $scopeName = $view === 'faculty' ? ('คณะ ' . $affil_name) : 'ทั้งระบบ';
 $filename = 'ghg_report_' . $view . '_' . $year_label . '_' . date('Ymd_His') . '.xls';
@@ -51,6 +62,12 @@ echo '<?mso-application progid="Excel.Sheet"?>' . "\n";
     <Style ss:ID="sNum"><Font ss:FontName="Angsana New" ss:Size="13"/><Alignment ss:Horizontal="Right"/>
       <NumberFormat ss:Format="#,##0.00"/>
       <Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/></Borders></Style>
+    <Style ss:ID="sNum4"><Font ss:FontName="Angsana New" ss:Size="13"/><Alignment ss:Horizontal="Right"/>
+      <NumberFormat ss:Format="#,##0.0000"/>
+      <Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/></Borders></Style>
+    <Style ss:ID="sQty"><Font ss:FontName="Angsana New" ss:Size="13"/><Alignment ss:Horizontal="Right"/>
+      <NumberFormat ss:Format="#,##0.##"/>
+      <Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/></Borders></Style>
     <Style ss:ID="sCenter"><Font ss:FontName="Angsana New" ss:Size="13"/><Alignment ss:Horizontal="Center"/></Style>
     <Style ss:ID="sTotal"><Font ss:FontName="Angsana New" ss:Size="14" ss:Bold="1"/><Interior ss:Color="#F3EAFF" ss:Pattern="Solid"/><Alignment ss:Horizontal="Right"/><NumberFormat ss:Format="#,##0.00"/></Style>
   </Styles>
@@ -58,8 +75,8 @@ echo '<?mso-application progid="Excel.Sheet"?>' . "\n";
   <Worksheet ss:Name="รายงาน GHG">
     <Table ss:DefaultRowHeight="22">
       <Row ss:Height="30"><Cell ss:StyleID="sTitle"><Data ss:Type="String">รายงานการปล่อยก๊าซเรือนกระจก — <?= htmlspecialchars($scopeName, ENT_XML1) ?> (ปี <?= htmlspecialchars($year_label, ENT_XML1) ?>)</Data></Cell></Row>
-      <Row><Cell ss:StyleID="sData"><Data ss:Type="String">Scope 1: <?= number_format($scope[1],2) ?> | Scope 2: <?= number_format($scope[2],2) ?> | Scope 3: <?= number_format($scope[3],2) ?> | รวมการปล่อย: <?= number_format($total,2) ?> tCO₂e</Data></Cell></Row>
-      <Row><Cell ss:StyleID="sData"><Data ss:Type="String">ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?>: <?= number_format($removal,2) ?> tCO₂e | สุทธิ (Net = ปล่อย − ดูดกลับ): <?= number_format($net,2) ?> tCO₂e</Data></Cell></Row>
+      <Row><Cell ss:StyleID="sData"><Data ss:Type="String">Scope 1: <?= number_format($gross_scope[1],2) ?> | Scope 2: <?= number_format($gross_scope[2],2) ?> | Scope 3: <?= number_format($gross_scope[3],2) ?> | รวมการปล่อย<?= $view==='faculty' ? ' (ดำเนินงาน '.number_format($total,2).' + กิจกรรม '.number_format($event_total,2).')' : '' ?>: <?= number_format($gross_total,2) ?> tCO₂e</Data></Cell></Row>
+      <Row><Cell ss:StyleID="sData"><Data ss:Type="String">ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?>: <?= number_format($removal,2) ?> tCO₂e | สุทธิ (Net = ปล่อยทั้งหมด − ดูดกลับ): <?= number_format($net,2) ?> tCO₂e</Data></Cell></Row>
       <Row></Row>
 
       <?php if ($view === 'faculty'): ?>
@@ -77,10 +94,56 @@ echo '<?mso-application progid="Excel.Sheet"?>' . "\n";
         <Cell ss:StyleID="sCenter"><Data ss:Type="String">Scope <?= (int)$r['scope'] ?></Data></Cell>
         <Cell ss:StyleID="sData"><Data ss:Type="String"><?= htmlspecialchars($r['name_tiem'], ENT_XML1) ?></Data></Cell>
         <Cell ss:StyleID="sData"><Data ss:Type="String"><?= htmlspecialchars($r['unit'] ?? '-', ENT_XML1) ?></Data></Cell>
-        <Cell ss:StyleID="sNum"><Data ss:Type="Number"><?= (float)$r['vol'] ?></Data></Cell>
-        <Cell ss:StyleID="sNum"><Data ss:Type="Number"><?= (float)$r['emission'] ?></Data></Cell>
+        <Cell ss:StyleID="sQty"><Data ss:Type="Number"><?= (float)$r['vol'] ?></Data></Cell>
+        <Cell ss:StyleID="sNum4"><Data ss:Type="Number"><?= (float)$r['emission'] ?></Data></Cell>
       </Row>
       <?php $i++; endforeach; ?>
+
+      <?php if (!empty($event_rows)): ?>
+      <Row></Row>
+      <Row ss:Height="26"><Cell ss:StyleID="sTitle"><Data ss:Type="String">การปล่อยจากกิจกรรมที่คณะจัด (แยกจากยอดหลัก)</Data></Cell></Row>
+      <Row ss:Height="26">
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">กิจกรรม</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">Scope</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">รายการ</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">หน่วย</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">จำนวน</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">tCO2e</Data></Cell>
+      </Row>
+      <?php foreach ($event_rows as $r): ?>
+      <Row>
+        <Cell ss:StyleID="sData"><Data ss:Type="String"><?= htmlspecialchars($r['event_name'] ?? '-', ENT_XML1) ?></Data></Cell>
+        <Cell ss:StyleID="sCenter"><Data ss:Type="String">Scope <?= (int)$r['scope'] ?></Data></Cell>
+        <Cell ss:StyleID="sData"><Data ss:Type="String"><?= htmlspecialchars($r['name_tiem'], ENT_XML1) ?></Data></Cell>
+        <Cell ss:StyleID="sData"><Data ss:Type="String"><?= htmlspecialchars($r['unit'] ?? '-', ENT_XML1) ?></Data></Cell>
+        <Cell ss:StyleID="sQty"><Data ss:Type="Number"><?= (float)$r['qty'] ?></Data></Cell>
+        <Cell ss:StyleID="sNum4"><Data ss:Type="Number"><?= (float)$r['emission'] ?></Data></Cell>
+      </Row>
+      <?php endforeach; ?>
+      <?php endif; ?>
+
+      <?php if (!empty($removal_rows)): ?>
+      <Row></Row>
+      <Row ss:Height="26"><Cell ss:StyleID="sTitle"><Data ss:Type="String">การดูดกลับจากกิจกรรมที่คณะจัด</Data></Cell></Row>
+      <Row ss:Height="26">
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">กิจกรรม</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">รายการดูดกลับ</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">หน่วย</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">ค่าดูดกลับ (kgCO2e/หน่วย)</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">ปริมาณ</Data></Cell>
+        <Cell ss:StyleID="sHeader"><Data ss:Type="String">tCO2e</Data></Cell>
+      </Row>
+      <?php foreach ($removal_rows as $r): ?>
+      <Row>
+        <Cell ss:StyleID="sData"><Data ss:Type="String"><?= htmlspecialchars($r['event_name'] ?? '-', ENT_XML1) ?></Data></Cell>
+        <Cell ss:StyleID="sData"><Data ss:Type="String"><?= htmlspecialchars($r['name_tiem'], ENT_XML1) ?></Data></Cell>
+        <Cell ss:StyleID="sData"><Data ss:Type="String"><?= htmlspecialchars($r['unit'] ?? '-', ENT_XML1) ?></Data></Cell>
+        <Cell ss:StyleID="sNum4"><Data ss:Type="Number"><?= (float)$r['factor'] ?></Data></Cell>
+        <Cell ss:StyleID="sQty"><Data ss:Type="Number"><?= (float)$r['qty'] ?></Data></Cell>
+        <Cell ss:StyleID="sNum4"><Data ss:Type="Number"><?= (float)$r['emission'] ?></Data></Cell>
+      </Row>
+      <?php endforeach; ?>
+      <?php endif; ?>
       <?php else: ?>
       <Row ss:Height="26">
         <Cell ss:StyleID="sHeader"><Data ss:Type="String">#</Data></Cell>

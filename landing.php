@@ -21,7 +21,7 @@ $textureSuffix = $isNight ? '_night' : '_day';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UP Net Zero - 3D Landing Page</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700&family=Kanit:wght@400;500;600&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" as="script">
     <link rel="preload" href="model/models/Room_Portfolio.glb" as="fetch" crossorigin>
@@ -44,7 +44,7 @@ $textureSuffix = $isNight ? '_night' : '_day';
             width: 100%;
             height: 100%;
             overflow: hidden;
-            font-family: 'Kanit', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             background-color: #111;
             /* สีพื้นหลังระหว่างรอโหลดโมเดล */
         }
@@ -91,7 +91,7 @@ $textureSuffix = $isNight ? '_night' : '_day';
         }
 
         .header-content h1 {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             font-size: 3.5rem;
             font-weight: 700;
             margin-bottom: 0.5rem;

@@ -145,7 +145,7 @@ $page_title = "ข้อมูลผู้ใช้งาน";
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Inter:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <style>
         :root {
@@ -162,8 +162,8 @@ $page_title = "ข้อมูลผู้ใช้งาน";
             --success-hover: #2563EB;
             --input-bg: #F9FAFB;
             --input-border: #E5E7EB;
-            --font-th: 'Kanit', sans-serif;
-            --font-en: 'Kanit', sans-serif;
+            --font-th: 'Sarabun', sans-serif;
+            --font-en: 'Sarabun', sans-serif;
             --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
         }
 

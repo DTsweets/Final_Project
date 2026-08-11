@@ -211,7 +211,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
     <title>Dashboard — UP Net Zero</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <link rel="preload" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>" as="style">
     <link rel="preload" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>" as="style">
@@ -739,13 +739,13 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                     <div
                         style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;flex-shrink:0;border-bottom:1px solid #F3F4F6;">
                         <button id="lbBackBtn" onclick="showLbGallery()"
-                            style="display:none;background:rgba(98,54,139,0.08);border:none;color:var(--clr-primary);padding:8px 16px;border-radius:10px;cursor:pointer;font-family:'Kanit',sans-serif;font-size:0.95rem;font-weight:600;align-items:center;gap:6px;"
+                            style="display:none;background:rgba(98,54,139,0.08);border:none;color:var(--clr-primary);padding:8px 16px;border-radius:10px;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:0.95rem;font-weight:600;align-items:center;gap:6px;"
                             onmouseover="this.style.background='rgba(98,54,139,0.15)'"
                             onmouseout="this.style.background='rgba(98,54,139,0.08)'">
                             ← แกลเลอรี
                         </button>
                         <div id="lbCounter"
-                            style="color:var(--text-secondary);font-size:0.95rem;font-weight:600;font-family:'Kanit',sans-serif;">
+                            style="color:var(--text-secondary);font-size:0.95rem;font-weight:600;font-family:'Sarabun',sans-serif;">
                         </div>
                         <button onclick="closeLightbox()"
                             style="background:rgba(0,0,0,0.05);border:none;color:var(--text-primary);width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:1.4rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;"
@@ -954,9 +954,9 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         ctx.beginPath(); ctx.arc(cx, cy, R * 0.48, 0, 2 * Math.PI);
                         ctx.fillStyle = '#fff'; ctx.fill();
                         /* text กลาง */
-                        ctx.fillStyle = '#374151'; ctx.font = 'bold 13px Kanit, sans-serif';
+                        ctx.fillStyle = '#374151'; ctx.font = 'bold 13px Sarabun, sans-serif';
                         ctx.textAlign = 'center'; ctx.fillText('tCO₂e', cx, cy - 4);
-                        ctx.font = '11px Kanit, sans-serif'; ctx.fillStyle = '#6B7280';
+                        ctx.font = '11px Sarabun, sans-serif'; ctx.fillStyle = '#6B7280';
                         ctx.fillText('ปี ' + _yearLabel, cx, cy + 14);
                     });
                 }
@@ -1153,9 +1153,9 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         ctx.beginPath(); ctx.arc(cx, cy, R * 0.48, 0, 2 * Math.PI);
                         ctx.fillStyle = '#fff'; ctx.fill();
                         /* text กลาง */
-                        ctx.fillStyle = '#374151'; ctx.font = 'bold 13px Kanit, sans-serif';
+                        ctx.fillStyle = '#374151'; ctx.font = 'bold 13px Sarabun, sans-serif';
                         ctx.textAlign = 'center'; ctx.fillText('tCO₂e', cx, cy - 4);
-                        ctx.font = '11px Kanit, sans-serif'; ctx.fillStyle = '#6B7280';
+                        ctx.font = '11px Sarabun, sans-serif'; ctx.fillStyle = '#6B7280';
                         ctx.fillText('ปี ' + _yearLabel, cx, cy + 14);
                     });
                 }
@@ -1285,10 +1285,10 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
 
                     /* ตัวเลขกลาง */
                     ctx.fillStyle = '#374151';
-                    ctx.font = 'bold 13px Kanit, sans-serif';
+                    ctx.font = 'bold 13px Sarabun, sans-serif';
                     ctx.textAlign = 'center';
                     ctx.fillText('tCO₂e', cx, cy - 4);
-                    ctx.font = '11px Kanit, sans-serif';
+                    ctx.font = '11px Sarabun, sans-serif';
                     ctx.fillStyle = '#6B7280';
                     ctx.fillText('สะสม', cx, cy + 14);
                 }
@@ -1562,9 +1562,9 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         }
                         ctx.beginPath(); ctx.arc(cx, cy, R * 0.48, 0, 2 * Math.PI);
                         ctx.fillStyle = '#fff'; ctx.fill();
-                        ctx.fillStyle = '#374151'; ctx.font = 'bold 13px Kanit, sans-serif';
+                        ctx.fillStyle = '#374151'; ctx.font = 'bold 13px Sarabun, sans-serif';
                         ctx.textAlign = 'center'; ctx.fillText('tCO₂e', cx, cy - 4);
-                        ctx.font = '11px Kanit, sans-serif'; ctx.fillStyle = '#6B7280';
+                        ctx.font = '11px Sarabun, sans-serif'; ctx.fillStyle = '#6B7280';
                         ctx.fillText('Scope ' + scopeNum, cx, cy + 14);
                     });
                 }
@@ -2549,7 +2549,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         document.getElementById('lbGallery').innerHTML = `
                     <div style="width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem;">
                         <div style="color:#D1D5DB;"><?= ic('folder',56) ?></div>
-                        <div style="color:var(--text-muted);font-size:1.1rem;font-weight:600;font-family:'Kanit',sans-serif;">ไม่มีไฟล์แนบ</div>
+                        <div style="color:var(--text-muted);font-size:1.1rem;font-weight:600;font-family:'Sarabun',sans-serif;">ไม่มีไฟล์แนบ</div>
                     </div>`;
                         return;
                     }
@@ -2617,7 +2617,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                             <div style="margin-bottom:1rem;color:var(--clr-primary);"><?= ic('link',48) ?></div>
                             <div style="font-size:1.1rem;font-weight:700;color:#111;margin-bottom:0.4rem;">${lbl}</div>
                             <div style="font-size:0.82rem;color:#6B7280;margin-bottom:1.5rem;word-break:break-all;max-width:400px;">${url.replace(/</g, '&lt;')}</div>
-                            <a href="${safeUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;background:var(--clr-primary);color:white;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-family:'Kanit',sans-serif;">
+                            <a href="${safeUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;background:var(--clr-primary);color:white;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-family:'Sarabun',sans-serif;">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                                 เปิดลิงก์
                             </a>
@@ -2634,7 +2634,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         document.getElementById('lbContent').innerHTML =
                             `<img src="${filePath}" style="max-width:100%;max-height:55vh;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.1);border:1px solid #E5E7EB;object-fit:contain;" onerror="this.alt='โหลดไม่ได้'">`;
                         document.getElementById('lbFooter').innerHTML =
-                            `<a href="${filePath}" download="${f.original_name || ''}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;color:white;text-decoration:none;font-size:0.9rem;font-weight:700;font-family:'Kanit',sans-serif;padding:10px 24px;background:var(--clr-primary);border-radius:12px;box-shadow:0 4px 12px rgba(98,54,139,0.25);transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                            `<a href="${filePath}" download="${f.original_name || ''}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;color:white;text-decoration:none;font-size:0.9rem;font-weight:700;font-family:'Sarabun',sans-serif;padding:10px 24px;background:var(--clr-primary);border-radius:12px;box-shadow:0 4px 12px rgba(98,54,139,0.25);transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         ดาวน์โหลดภาพ
                      </a>`;
@@ -2644,7 +2644,7 @@ usort($year_breakdown, fn($a, $b) => $b['emission'] <=> $a['emission']);
                         <div style="margin-bottom:1rem;color:var(--clr-primary);"><?= ic('doc',48) ?></div>
                         <div style="font-size:1.2rem;font-weight:700;color:#111;margin-bottom:0.4rem;">${ext} ไฟล์</div>
                         <div style="font-size:0.82rem;color:#6B7280;margin-bottom:1.5rem;word-break:break-all;max-width:300px;">${f.original_name || f.file_path.split('/').pop()}</div>
-                        <a href="${filePath}" download="${f.original_name || ''}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--clr-primary);color:white;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-family:'Kanit',sans-serif;">
+                        <a href="${filePath}" download="${f.original_name || ''}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--clr-primary);color:white;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-family:'Sarabun',sans-serif;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             ดาวน์โหลด
                         </a>

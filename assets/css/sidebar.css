@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
 
 /* CSS Reset for Sidebar inside components */
 .sidebar-body {
@@ -169,7 +169,7 @@
 }
 
 .figma-name {
-    font-family: 'Kanit', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     font-size: 16px;
     font-weight: 700;
     color: #111827;
@@ -198,7 +198,7 @@
 }
 
 .nav-category {
-    font-family: 'Kanit', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     font-size: 12px;
     font-weight: 600;
     color: #F1A12A;
@@ -214,7 +214,7 @@
     align-items: center;
     padding: 12px 16px;
     border-radius: 12px;
-    font-family: 'Kanit', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     font-size: 15px;
     font-weight: 500;
     color: #4B5563;
@@ -320,7 +320,7 @@
     align-items: center;
     padding: 12px 18px;
     border-radius: 12px;
-    font-family: 'Kanit', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     font-size: 15px;
     font-weight: 400;
     /* ตัวปกติไม่หนามาก */

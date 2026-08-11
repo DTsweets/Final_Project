@@ -273,7 +273,7 @@ $dd_has_options = count($dd_normalized) > 0;
             min-width: 100px;
             gap: 8px;
             line-height: 1;
-            font-family: 'Kanit', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             font-size: 1rem;
             font-weight: 600;
             color: var(--text-primary);

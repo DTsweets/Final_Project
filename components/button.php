@@ -105,7 +105,7 @@ unset(
             gap: 8px;
             border: none;
             border-radius: 999px;
-            font-family: 'Kanit', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             font-weight: 700;
             line-height: 1;
             cursor: pointer;
