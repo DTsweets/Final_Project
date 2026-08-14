@@ -1,32 +1,17 @@
 <?php
-/**
- * GHG Report Query Helpers (ใช้ซ้ำระหว่าง admin / dean)
- * -----------------------------------------------------
- * ทุกฟังก์ชันคำนวณ emission = SUM(user_item.Vol * admin_item.AD)
- * สำคัญ: admin_item.scope เป็น FK -> admin_g.id  (เลข Scope 1/2/3 อยู่ที่ admin_g.scope)
- *        จึง JOIN ผ่าน admin_g เสมอ
- */
 
-/** จัดรูปจำนวน/ปริมาณ: ไม่เกิน 2 ทศนิยม + ตัดศูนย์ท้ายทิ้ง (100.00→"100", 100.50→"100.5") */
 function qty_fmt($v): string
 {
     return rtrim(rtrim(number_format((float) $v, 2, '.', ','), '0'), '.');
 }
 
-/** รายการปีทั้งหมด (ใหม่ -> เก่า) : [['year_id'=>.., 'year'=>..], ...] */
 function ghg_years(PDO $pdo): array
 {
     return $pdo->query('SELECT id AS year_id, year FROM admin_year ORDER BY year DESC')->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/**
- * ผลรวมแยกตาม Scope (1/2/3) ของปีที่เลือก
- * $affil = null -> ทั้งระบบ, มีค่า -> เฉพาะคณะนั้น
- * คืน [1=>float, 2=>float, 3=>float]
- */
 function ghg_scope_totals(PDO $pdo, int $year, ?int $affil = null): array
 {
-    // รายคณะ = เฉพาะข้อมูลที่คณะกรอกเอง (officer); ทั้งระบบ (affil=null) รวมทุก source
     $affilCond = $affil !== null ? " AND ui.affiliation_id = :aff AND ui.source = 'officer'" : '';
     $sql = "
         SELECT ag.scope, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS e
@@ -44,18 +29,12 @@ function ghg_scope_totals(PDO $pdo, int $year, ?int $affil = null): array
     return [1 => (float)($rows[1] ?? 0), 2 => (float)($rows[2] ?? 0), 3 => (float)($rows[3] ?? 0)];
 }
 
-/** ผลรวมทั้งหมดของปี (ทั้งระบบ หรือเฉพาะคณะ) */
 function ghg_total(PDO $pdo, int $year, ?int $affil = null): float
 {
     $s = ghg_scope_totals($pdo, $year, $affil);
     return $s[1] + $s[2] + $s[3];
 }
 
-/**
- * ผลรวมรายคณะ ของปีที่เลือก (แสดงทุกคณะแม้ยังไม่กรอก)
- * $year = null -> สะสมทุกปี
- * คืน [['affil_id'=>.., 'affiliation_item'=>.., 'total_emission'=>float], ...] เรียงมาก->น้อย
- */
 function ghg_by_affiliation(PDO $pdo, ?int $year = null): array
 {
     if ($year === null) {
@@ -81,9 +60,6 @@ function ghg_by_affiliation(PDO $pdo, ?int $year = null): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/**
- * รายการที่คณะกรอกในปีนั้น (ชื่อ/หน่วย/Vol/emission/scope) — reuse จาก api_affil_detail
- */
 function ghg_affil_detail(PDO $pdo, int $affil, int $year): array
 {
     $stmt = $pdo->prepare('
@@ -99,7 +75,6 @@ function ghg_affil_detail(PDO $pdo, int $affil, int $year): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/** ผลรวมรายปีของคณะ (ใหม่->เก่า) — reuse จาก api_affil_yearly */
 function ghg_affil_yearly(PDO $pdo, int $affil): array
 {
     $stmt = $pdo->prepare('
@@ -115,7 +90,6 @@ function ghg_affil_yearly(PDO $pdo, int $affil): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/** ชื่อคณะจาก id */
 function ghg_affil_name(PDO $pdo, int $affil): string
 {
     $stmt = $pdo->prepare('SELECT affiliation_item FROM affiliation_id WHERE id = :id');
@@ -123,9 +97,6 @@ function ghg_affil_name(PDO $pdo, int $affil): string
     return (string)($stmt->fetchColumn() ?: '-');
 }
 
-/* ============ GHG Removal (การดูดกลับ — ระดับส่วนกลาง/มหาวิทยาลัย) ============ */
-
-/** ยอดดูดกลับส่วนกลาง (manual ที่ศูนย์ฯ กรอก) ของปี (tCO₂e) */
 function removal_central_total(PDO $pdo, int $year): float
 {
     $stmt = $pdo->prepare('
@@ -136,8 +107,6 @@ function removal_central_total(PDO $pdo, int $year): float
     return (float) $stmt->fetchColumn();
 }
 
-/** ยอดดูดกลับจากกิจกรรมคณะ (removal_event_item — เก็บ factor ในตัวเอง แยกจาก master) ของปี (tCO₂e)
- *  $affil = null → ทั้งมหาวิทยาลัย; ระบุ affil → เฉพาะกิจกรรมของคณะนั้น */
 function removal_activity_total(PDO $pdo, int $year, ?int $affil = null): float
 {
     $sql = 'SELECT COALESCE(SUM(rei.qty * rei.factor)/1000, 0)
@@ -151,14 +120,11 @@ function removal_activity_total(PDO $pdo, int $year, ?int $affil = null): float
     return (float) $stmt->fetchColumn();
 }
 
-/** ยอดดูดกลับรวมของปี (tCO₂e) = ส่วนกลาง + จากกิจกรรมคณะ */
 function removal_total(PDO $pdo, int $year): float
 {
     return removal_central_total($pdo, $year) + removal_activity_total($pdo, $year);
 }
 
-/** รายการดูดกลับจากกิจกรรมคณะของปี (สำหรับ breakdown บน dashboard / read-only)
- *  $affil = null → ทุกคณะ; ระบุ affil → เฉพาะกิจกรรมของคณะนั้น */
 function removal_activity_list(PDO $pdo, int $year, ?int $affil = null): array
 {
     $sql = '
@@ -180,9 +146,6 @@ function removal_activity_list(PDO $pdo, int $year, ?int $affil = null): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/** รายการ "การปล่อย" จากกิจกรรมคณะของปี (event_item) — แยกรายกิจกรรม สำหรับ dashboard (read-only)
- *  $affil = null → ทุกคณะ; ระบุ affil → เฉพาะกิจกรรมของคณะนั้น
- *  alias AD→factor, Vol→qty ให้โครงสร้างตรงกับ removal_activity_list (reuse accordion เดียวกันได้) */
 function event_emission_list(PDO $pdo, int $year, ?int $affil = null): array
 {
     $sql = '
@@ -206,7 +169,199 @@ function event_emission_list(PDO $pdo, int $year, ?int $affil = null): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/** รายการดูดกลับของปี + qty ที่กรอก + tCO₂e (แสดงทุกรายการแม้ยังไม่กรอก) */
+/**
+ * ยอดปล่อยจากกิจกรรมของคณะในปีนั้น (tCO₂e)
+ * อ่านจาก event_item ชุดเดียวกับ event_emission_list() → ตัวเลขตรงกับตารางกิจกรรมเสมอ
+ */
+function ghg_event_total(PDO $pdo, int $year, ?int $affil = null): float
+{
+    $sql = 'SELECT COALESCE(SUM(ei.Vol * ai.AD)/1000, 0)
+            FROM event_item ei
+            JOIN event e       ON e.id  = ei.event_id
+            JOIN admin_item ai ON ai.id = ei.admin_item_id
+            WHERE e.year_id = :y';
+    $params = [':y' => $year];
+    if ($affil !== null) { $sql .= ' AND e.affiliation_id = :aff'; $params[':aff'] = $affil; }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return (float) $stmt->fetchColumn();
+}
+
+/**
+ * ยอดปล่อยรวม (gross) = การดำเนินงาน + กิจกรรม — ใช้ตัวเดียวกันทุกการ์ด/โดนัท/กราฟ
+ *
+ * สำคัญ: มุมมองทั้งระบบ ($affil = null) ghg_total() ไม่กรอง source อยู่แล้ว
+ *        จึงรวมกิจกรรม (user_item.source='event') มาให้ครบแล้ว — ห้ามบวกซ้ำ
+ *        ส่วนรายคณะกรอง source='officer' จึงต้องบวก event เพิ่ม
+ */
+function ghg_gross_total(PDO $pdo, int $year, ?int $affil = null): float
+{
+    if ($affil === null) return ghg_total($pdo, $year, null);
+    return ghg_total($pdo, $year, $affil) + ghg_event_total($pdo, $year, $affil);
+}
+
+/**
+ * ผลรวมของตารางรายคณะ (แถว "รวม" ท้ายตาราง)
+ * ต้องบวกจากแถวที่แสดงจริงเท่านั้น — ห้ามใช้ ghg_total() เพราะนั่นรวม survey/event
+ * ที่ไม่ได้อยู่ในตาราง ทำให้ยอดรวมไม่ตรงกับที่ผู้อ่านบวกเองได้
+ * @param array $rows ผลลัพธ์จาก ghg_by_affiliation()
+ */
+function ghg_affil_sum(array $rows): float
+{
+    $sum = 0.0;
+    foreach ($rows as $r) $sum += (float) ($r['total_emission'] ?? 0);
+    return $sum;
+}
+
+/**
+ * จัดข้อมูลรายการของคณะให้พร้อมวาดโดนัทแยกราย Scope
+ * -------------------------------------------------
+ * - รวมรายการชื่อซ้ำเข้าด้วยกัน (คณะอาจกรอกรายการเดียวกันหลายครั้ง)
+ * - เรียงมาก -> น้อย แล้วยุบรายการที่เกิน $topN เป็น "อื่นๆ" ก้อนเดียว
+ *   (โดนัท 30 ชิ้นอ่านไม่ออก แต่ยอดรวมต้องไม่หาย)
+ * - ตัดรายการที่ยอด <= 0 ทิ้ง เพราะวาดเป็นชิ้นโดนัทไม่ได้
+ *
+ * @param array $detail ผลลัพธ์จาก ghg_affil_detail()
+ * @param int   $topN   จำนวนชิ้นสูงสุดก่อนยุบเป็น "อื่นๆ"
+ * @return array [1 => ['items' => [['name'=>..,'value'=>float], ...], 'total' => float], 2 => ..., 3 => ...]
+ */
+function ghg_scope_item_breakdown(array $detail, int $topN = 8): array
+{
+    $out = [1 => ['items' => [], 'total' => 0.0], 2 => ['items' => [], 'total' => 0.0], 3 => ['items' => [], 'total' => 0.0]];
+
+    $byScope = [1 => [], 2 => [], 3 => []];
+    foreach ($detail as $r) {
+        $s = (int) ($r['scope'] ?? 0);
+        if (!isset($byScope[$s])) continue;                 // scope นอก 1-3 ไม่ควรมี แต่กันไว้
+        $name = (string) ($r['name_tiem'] ?? '-');
+        $byScope[$s][$name] = ($byScope[$s][$name] ?? 0.0) + (float) ($r['emission'] ?? 0);
+    }
+
+    foreach ($byScope as $s => $items) {
+        $out[$s]['total'] = array_sum($items);
+        $items = array_filter($items, fn($v) => $v > 0);
+        arsort($items);
+
+        if (count($items) > $topN) {
+            $keep  = array_slice($items, 0, $topN, true);
+            $restN = count($items) - $topN;
+            $rest  = array_sum(array_slice($items, $topN, null, true));
+            foreach ($keep as $n => $v) $out[$s]['items'][] = ['name' => $n, 'value' => $v];
+            $out[$s]['items'][] = ['name' => "อื่นๆ ($restN รายการ)", 'value' => $rest];
+        } else {
+            foreach ($items as $n => $v) $out[$s]['items'][] = ['name' => $n, 'value' => $v];
+        }
+    }
+    return $out;
+}
+
+/**
+ * รวมรายการปล่อย + ดูดกลับ ของกิจกรรม ให้เป็น "การ์ดต่อ 1 กิจกรรม"
+ * ------------------------------------------------------------------
+ * กิจกรรมหนึ่งอาจมีเฉพาะการปล่อย หรือเฉพาะการดูดกลับ อย่างใดอย่างหนึ่ง
+ * จึงต้อง union จากทั้งสองรายการ ไม่ใช่วนจากฝั่งใดฝั่งเดียว (ไม่งั้นกิจกรรมหาย)
+ *
+ * @param array $emitRows    ผลจาก event_emission_list()
+ * @param array $removalRows ผลจาก removal_activity_list()
+ * @return array [['event_id'=>int,'event_name'=>string,'event_date'=>?string,'event_end_date'=>?string,
+ *                 'emit'=>[...], 'removal'=>[...], 'emit_total'=>float,'removal_total'=>float,'net'=>float], ...]
+ *               เรียงตามวันที่จัด (ใหม่ -> เก่า)
+ */
+function ghg_event_cards(array $emitRows, array $removalRows): array
+{
+    $cards = [];
+
+    $touch = function (array $r) use (&$cards): int {
+        $id = (int) ($r['event_id'] ?? 0);
+        if (!isset($cards[$id])) {
+            $cards[$id] = [
+                'event_id'       => $id,
+                'event_name'     => (string) ($r['event_name'] ?? '-'),
+                'event_date'     => $r['event_date'] ?? null,
+                'event_end_date' => $r['event_end_date'] ?? null,
+                'emit'           => [],
+                'removal'        => [],
+                'emit_total'     => 0.0,
+                'removal_total'  => 0.0,
+                'net'            => 0.0,
+            ];
+        }
+        return $id;
+    };
+
+    foreach ($emitRows as $r) {
+        $id = $touch($r);
+        $cards[$id]['emit'][]    = $r;
+        $cards[$id]['emit_total'] += (float) ($r['emission'] ?? 0);
+    }
+    foreach ($removalRows as $r) {
+        $id = $touch($r);
+        $cards[$id]['removal'][]     = $r;
+        $cards[$id]['removal_total'] += (float) ($r['emission'] ?? 0);
+    }
+    foreach ($cards as &$c) $c['net'] = $c['emit_total'] - $c['removal_total'];
+    unset($c);
+
+    // ใหม่ -> เก่า; กิจกรรมที่ไม่ระบุวันที่ให้ไปท้ายสุด แล้วเรียงตาม id
+    uasort($cards, function ($a, $b) {
+        $da = $a['event_date'] ?: '';
+        $db = $b['event_date'] ?: '';
+        if ($da !== $db) return strcmp($db, $da);
+        return $b['event_id'] <=> $a['event_id'];
+    });
+    return array_values($cards);
+}
+
+/**
+ * ความยาวแท่ง (%) ของกราฟแท่งแนวนอนรายขอบเขต
+ * เทียบกับขอบเขตที่มากที่สุด (ไม่ใช่เทียบยอดรวม) เพื่อให้เห็นความต่างชัด
+ * ถ้าไม่มีข้อมูลเลย คืน 0 ทั้งหมด — ไม่หารด้วยศูนย์
+ *
+ * @param array $scope [1=>float, 2=>float, 3=>float]
+ * @return array [1=>float, 2=>float, 3=>float] ค่า 0-100
+ */
+function ghg_scope_bar_percents(array $scope): array
+{
+    $vals = [1 => (float) ($scope[1] ?? 0), 2 => (float) ($scope[2] ?? 0), 3 => (float) ($scope[3] ?? 0)];
+    $max  = max($vals);
+    if ($max <= 0) return [1 => 0.0, 2 => 0.0, 3 => 0.0];
+    return array_map(fn($v) => $v > 0 ? $v / $max * 100 : 0.0, $vals);
+}
+
+/**
+ * ยอดปล่อยรวม (gross) แยกรายขอบเขต = การดำเนินงาน + กิจกรรม
+ * ใช้กติกาเดียวกับ ghg_gross_total() : มุมมองทั้งระบบรวมกิจกรรมมาแล้ว ห้ามบวกซ้ำ
+ *
+ * @return array [1=>float, 2=>float, 3=>float]
+ */
+function ghg_gross_scope_totals(PDO $pdo, int $year, ?int $affil = null): array
+{
+    $s = ghg_scope_totals($pdo, $year, $affil);
+    if ($affil === null) return $s;
+    foreach (event_emission_list($pdo, $year, $affil) as $r) {
+        $k = (int) $r['scope'];
+        if (isset($s[$k])) $s[$k] += (float) $r['emission'];
+    }
+    return $s;
+}
+
+/**
+ * ประวัติย้อนหลังรายปี แยกรายขอบเขต (สำหรับกราฟแท่งแนวตั้ง)
+ * เรียงเก่า -> ใหม่ เพื่อให้กราฟไล่จากซ้ายไปขวาตามเวลา
+ *
+ * @param array $years ผลจาก ghg_years() (ใหม่ -> เก่า)
+ * @return array [['year'=>string, 's1'=>float, 's2'=>float, 's3'=>float], ...]
+ */
+function ghg_scope_history(PDO $pdo, array $years, ?int $affil = null): array
+{
+    $out = [];
+    foreach (array_reverse($years) as $y) {
+        $s = ghg_gross_scope_totals($pdo, (int) $y['year_id'], $affil);
+        $out[] = ['year' => (string) $y['year'], 's1' => $s[1], 's2' => $s[2], 's3' => $s[3]];
+    }
+    return $out;
+}
+
 function removal_items_list(PDO $pdo, int $year): array
 {
     $stmt = $pdo->prepare('

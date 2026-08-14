@@ -23,8 +23,9 @@ foreach (ghg_years($pdo) as $y) { if ($y['year_id'] == $year) { $year_label = $y
 $scope = ghg_scope_totals($pdo, $year, $view === 'faculty' ? $affil_id : null);
 $total = $scope[1] + $scope[2] + $scope[3];
 $removal = $view === 'faculty' ? removal_activity_total($pdo, $year, $affil_id) : removal_total($pdo, $year);
-$net = $total - $removal;
 $rows  = $view === 'faculty' ? ghg_affil_detail($pdo, $affil_id, $year) : ghg_by_affiliation($pdo, $year);
+// แถวรวมท้ายตารางรายคณะ = บวกจากแถวที่แสดงจริง (ไม่ใช่ $total ซึ่งรวม survey/event ที่ไม่ได้อยู่ในตาราง)
+$rows_total = $view === 'faculty' ? 0.0 : ghg_affil_sum($rows);
 $event_rows = $removal_rows = []; $event_total = 0.0;
 if ($view === 'faculty') {
     $event_rows   = event_emission_list($pdo, $year, $affil_id);
@@ -69,9 +70,9 @@ $scopeName = $view === 'faculty' ? ('คณะ ' . $affil_name) : 'ทั้ง�
     <div class="sub"><?= htmlspecialchars($scopeName) ?> · ปีงบประมาณ <?= htmlspecialchars($year_label) ?> · พิมพ์เมื่อ <?= date('d/m/Y H:i') ?></div>
 
     <div class="summary">
-        <div style="color:#F97316;">Scope 1: <?= number_format($gross_scope[1], 2, '.', ',') ?> tCO₂e</div>
-        <div style="color:#EC4899;">Scope 2: <?= number_format($gross_scope[2], 2, '.', ',') ?> tCO₂e</div>
-        <div style="color:#3B82F6;">Scope 3: <?= number_format($gross_scope[3], 2, '.', ',') ?> tCO₂e</div>
+        <div style="color:#F97316;">ขอบเขต 1: <?= number_format($gross_scope[1], 2, '.', ',') ?> tCO₂e</div>
+        <div style="color:#EC4899;">ขอบเขต 2: <?= number_format($gross_scope[2], 2, '.', ',') ?> tCO₂e</div>
+        <div style="color:#3B82F6;">ขอบเขต 3: <?= number_format($gross_scope[3], 2, '.', ',') ?> tCO₂e</div>
         <div style="color:#62368B;">รวมการปล่อย<?= $view==='faculty' ? ' (ดำเนินงาน '.number_format($total,2).' + กิจกรรม '.number_format($event_total,2).')' : '' ?>: <?= number_format($gross_total, 2, '.', ',') ?> tCO₂e</div>
         <div style="color:#166534;">ดูดกลับ<?= $view==='faculty'?' (คณะ)':' (มหาวิทยาลัย)' ?>: <?= number_format($removal, 2, '.', ',') ?> tCO₂e</div>
         <div style="color:#111827;font-weight:700;">สุทธิ (Net = ปล่อยทั้งหมด − ดูดกลับ): <?= number_format($net, 2, '.', ',') ?> tCO₂e</div>
@@ -79,12 +80,12 @@ $scopeName = $view === 'faculty' ? ('คณะ ' . $affil_name) : 'ทั้ง�
 
     <table>
         <?php if ($view === 'faculty'): ?>
-            <thead><tr><th class="c">#</th><th class="c">Scope</th><th>รายการ</th><th>หน่วย</th><th class="num">จำนวน</th><th class="num">tCO₂e</th></tr></thead>
+            <thead><tr><th class="c">#</th><th class="c">ขอบเขต</th><th>รายการ</th><th>หน่วย</th><th class="num">จำนวน</th><th class="num">tCO₂e</th></tr></thead>
             <tbody>
                 <?php $i=1; foreach ($rows as $r): ?>
                     <tr>
                         <td class="c"><?= $i++ ?></td>
-                        <td class="c">Scope <?= (int)$r['scope'] ?></td>
+                        <td class="c">ขอบเขต <?= (int)$r['scope'] ?></td>
                         <td><?= htmlspecialchars($r['name_tiem']) ?></td>
                         <td><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
                         <td class="num"><?= qty_fmt($r['vol']) ?></td>
@@ -103,7 +104,7 @@ $scopeName = $view === 'faculty' ? ('คณะ ' . $affil_name) : 'ทั้ง�
                         <td class="num"><?= number_format((float)$r['total_emission'], 2, '.', ',') ?></td>
                     </tr>
                 <?php endforeach; ?>
-                <tr class="total"><td></td><td>รวมทั้งระบบ</td><td class="num"><?= number_format((float)$total, 2, '.', ',') ?></td></tr>
+                <tr class="total"><td></td><td>รวมทุกคณะ (จากการดำเนินงาน)</td><td class="num"><?= number_format((float)$rows_total, 2, '.', ',') ?></td></tr>
             </tbody>
         <?php endif; ?>
     </table>
@@ -111,12 +112,12 @@ $scopeName = $view === 'faculty' ? ('คณะ ' . $affil_name) : 'ทั้ง�
     <?php if ($view === 'faculty' && !empty($event_rows)): ?>
     <h2 style="font-size:1rem;margin:1.5rem 0 .5rem;color:#374151;">การปล่อยจากกิจกรรมที่คณะจัด <span style="font-weight:400;color:#8A8194;font-size:.85rem;">(แยกจากยอดหลัก · รวม <?= number_format($event_total,4) ?> tCO₂e)</span></h2>
     <table>
-        <thead><tr><th>กิจกรรม</th><th class="c">Scope</th><th>รายการ</th><th>หน่วย</th><th class="num">จำนวน</th><th class="num">tCO₂e</th></tr></thead>
+        <thead><tr><th>กิจกรรม</th><th class="c">ขอบเขต</th><th>รายการ</th><th>หน่วย</th><th class="num">จำนวน</th><th class="num">tCO₂e</th></tr></thead>
         <tbody>
             <?php foreach ($event_rows as $r): ?>
                 <tr>
                     <td><?= htmlspecialchars($r['event_name'] ?? '-') ?></td>
-                    <td class="c">Scope <?= (int)$r['scope'] ?></td>
+                    <td class="c">ขอบเขต <?= (int)$r['scope'] ?></td>
                     <td><?= htmlspecialchars($r['name_tiem']) ?></td>
                     <td><?= htmlspecialchars($r['unit'] ?? '-') ?></td>
                     <td class="num"><?= qty_fmt($r['qty']) ?></td>

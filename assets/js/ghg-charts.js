@@ -73,4 +73,68 @@
     ctx.strokeStyle = '#E5E7EB'; ctx.beginPath();
     ctx.moveTo(pad, base); ctx.lineTo(W - 6, base); ctx.stroke();
   };
+
+  /**
+   * กราฟแท่งกลุ่ม: 1 กลุ่ม = 1 ปี, ในกลุ่มมีหลายแท่ง (ขอบเขต 1/2/3)
+   *   drawGhgGroupedBars(canvas, [{label:'2567', values:[1.2, 0.4, 0.9]}, ...],
+   *                      [{label:'ขอบเขต 1', color:'#F97316'}, ...], 'tCO₂e')
+   * วาดพร้อมแกน Y + เส้นกริด เพื่อให้เทียบความสูงข้ามปีได้
+   */
+  w.drawGhgGroupedBars = function (canvas, groups, series, yLabel) {
+    if (!canvas || !canvas.getContext) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const padL = 56, padR = 12, padT = 14, padB = 34;
+    const base = H - padB, plotW = W - padL - padR, plotH = base - padT;
+
+    // สเกลแกน Y: ปัดขึ้นเป็นเลขกลมๆ ให้เส้นกริดอ่านง่าย
+    let maxV = 0;
+    groups.forEach(g => g.values.forEach(v => { if (+v > maxV) maxV = +v; }));
+    if (maxV <= 0) maxV = 1;
+    const rawStep = maxV / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const step = Math.ceil(rawStep / mag) * mag;
+    const top = step * 4;
+
+    // เส้นกริด + ตัวเลขแกน Y
+    ctx.font = '500 11px Sarabun, sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const v = step * i, y = base - (v / top) * plotH;
+      ctx.strokeStyle = i === 0 ? '#D1D5DB' : '#F1EFF4';
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+      ctx.fillStyle = '#9CA3AF';
+      ctx.fillText(v.toLocaleString('th-TH', { maximumFractionDigits: 2 }), padL - 8, y);
+    }
+
+    // ชื่อแกน Y (หมุนแนวตั้ง)
+    if (yLabel) {
+      ctx.save();
+      ctx.translate(12, padT + plotH / 2); ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#6B7280'; ctx.font = '600 11px Sarabun, sans-serif';
+      ctx.fillText(yLabel, 0, 0);
+      ctx.restore();
+    }
+
+    // แท่ง
+    const n = groups.length || 1, m = series.length || 1;
+    const gw = plotW / n;                                  // ความกว้างต่อกลุ่ม
+    const bw = Math.max(4, Math.min(26, (gw * 0.62) / m));  // ความกว้างต่อแท่ง
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    groups.forEach((g, gi) => {
+      const cx = padL + gw * gi + gw / 2;
+      const startX = cx - (bw * m) / 2;
+      g.values.forEach((v, si) => {
+        const val = Number(v) || 0;
+        const h = (val / top) * plotH;
+        ctx.fillStyle = series[si].color || '#9CA3AF';
+        if (h > 0) ctx.fillRect(startX + bw * si, base - h, bw - 2, h);
+      });
+      ctx.fillStyle = '#6B7280'; ctx.font = '500 11px Sarabun, sans-serif';
+      ctx.fillText(String(g.label), cx, H - 12);
+    });
+  };
 })(window);
