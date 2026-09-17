@@ -6,6 +6,7 @@
 - ห้ามแก้ไขโค้ดโดยไม่มี Unit Test ครอบคลุม
 - อ่านไฟล์ที่เกี่ยวข้องก่อนทุกครั้งในการเสนอทางแก้ไข
 - Test เฉพาะที่จำเป็น
+- เมื่อสร้างไฟล์ Test แล้วไม่ได้ต่อ สามารถลบทิ้งได้เลย ถ้าไม่กระทบอะไร เพื่อประหยัด
 
 # Tech Stack
 - php
@@ -13,7 +14,8 @@
 - XAMPP
 
 # Workflow
-- *คำสั่งรันหน้าเว็บใน terminal Powershell* C:\xampp\php\php.exe -S localhost:8000
+- *คำสั่งรันหน้าเว็บใน terminal Powershell* C:\xampp\php\php.exe -S localhost:8000 server.php
+- ต้องมี server.php ต่อท้ายเสมอ — เป็นตัวกันไม่ให้เปิดไฟล์สำรอง (database/*.sql), .env และ tests/ ผ่าน URL (php -S ไม่อ่าน .htaccess)
 
 # Negative Constraints
 - ห้ามลบไฟล์หรืออะไรโดยไม่ได้อนุญาติ

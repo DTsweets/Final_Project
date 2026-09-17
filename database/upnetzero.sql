@@ -63,7 +63,7 @@ CREATE TABLE `admin_item` (
   `scope` int(11) DEFAULT NULL,
   `name_tiem` varchar(255) NOT NULL,
   `unit` varchar(255) DEFAULT NULL,
-  `AD` float DEFAULT NULL,
+  `AD` decimal(13,6) DEFAULT NULL,
   `data_source` varchar(20) NOT NULL DEFAULT 'officer',
   `event_id` int(11) DEFAULT NULL,
   `affiliation_id` int(11) NOT NULL DEFAULT 0,
@@ -237,7 +237,7 @@ CREATE TABLE `evidence` (
 
 LOCK TABLES `evidence` WRITE;
 /*!40000 ALTER TABLE `evidence` DISABLE KEYS */;
-INSERT INTO `evidence` VALUES (1,'user_item',1169,'file','ev_1169_1784085007_0.png','image/png','Screenshot 2026-07-14 152908.png',NULL,NULL,NULL,'2026-07-15 03:10:07'),(2,'user_item',1197,'file','ev_1197_1784085016_0.png','image/png','Screenshot 2026-07-14 144017.png',NULL,NULL,NULL,'2026-07-15 03:10:16'),(3,'user_item',1189,'file','docs/doc_1189_1784085039_0___________________________________________________________________________________________________________________________________________________.pdf','application/pdf','ระบบคำนวณปริมาณคาร์บอนฟุตพริ้นท์  มหาวิทยาลัยพะเยา.pdf',NULL,NULL,NULL,'2026-07-15 03:10:39'),(4,'user_item',579,'file','ev_579_1784085138_0.png','image/png','Screenshot 2026-07-15 093616.png',NULL,NULL,NULL,'2026-07-15 03:12:18'),(5,'user_item',579,'file','ev_579_1784085151_0.png','image/png','Screenshot 2026-07-14 134601.png',NULL,NULL,NULL,'2026-07-15 03:12:31'),(6,'user_item',1157,'file','docs/doc_1157_1784085286_0___________________________________________________________.pdf','application/pdf','นายธรรมาวุธ วุฑฒะกุล.pdf',NULL,NULL,NULL,'2026-07-15 03:14:46'),(7,'user_item',1160,'file','ev_1160_1784085349_0.png','image/png','Lenovo.png',NULL,NULL,NULL,'2026-07-15 03:15:49'),(8,'user_item',1157,'file','ev_1157_1784085370_0.png','image/png','Screenshot 2026-07-14 135850.png',NULL,NULL,NULL,'2026-07-15 03:16:10');
+INSERT INTO `evidence` VALUES (1,'user_item',1169,'file','ev_1169_1784085007_0.png','image/png','evidence_1.png',NULL,NULL,NULL,'2026-07-15 03:10:07'),(2,'user_item',1197,'file','ev_1197_1784085016_0.png','image/png','evidence_2.png',NULL,NULL,NULL,'2026-07-15 03:10:16'),(3,'user_item',1189,'file','docs/doc_1189_1784085039_0___________________________________________________________________________________________________________________________________________________.pdf','application/pdf','evidence_3.pdf',NULL,NULL,NULL,'2026-07-15 03:10:39'),(4,'user_item',579,'file','ev_579_1784085138_0.png','image/png','evidence_4.png',NULL,NULL,NULL,'2026-07-15 03:12:18'),(5,'user_item',579,'file','ev_579_1784085151_0.png','image/png','evidence_5.png',NULL,NULL,NULL,'2026-07-15 03:12:31'),(6,'user_item',1157,'file','docs/doc_1157_1784085286_0___________________________________________________________.pdf','application/pdf','evidence_6.pdf',NULL,NULL,NULL,'2026-07-15 03:14:46'),(7,'user_item',1160,'file','ev_1160_1784085349_0.png','image/png','evidence_7.png',NULL,NULL,NULL,'2026-07-15 03:15:49'),(8,'user_item',1157,'file','ev_1157_1784085370_0.png','image/png','evidence_8.png',NULL,NULL,NULL,'2026-07-15 03:16:10');
 /*!40000 ALTER TABLE `evidence` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -318,7 +318,7 @@ CREATE TABLE `removal_event_item` (
   `event_id` int(11) NOT NULL,
   `name_tiem` varchar(255) NOT NULL DEFAULT '',
   `unit` varchar(255) DEFAULT NULL,
-  `factor` float DEFAULT NULL,
+  `factor` decimal(13,6) DEFAULT NULL,
   `qty` decimal(13,4) NOT NULL DEFAULT 0.0000,
   PRIMARY KEY (`id`),
   KEY `fk_rei_event` (`event_id`),
@@ -348,7 +348,7 @@ CREATE TABLE `removal_item` (
   `year_id` int(11) NOT NULL,
   `name_tiem` varchar(255) NOT NULL,
   `unit` varchar(255) DEFAULT NULL,
-  `factor` float DEFAULT NULL,
+  `factor` decimal(13,6) DEFAULT NULL,
   `qty` decimal(13,4) NOT NULL DEFAULT 0.0000,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
@@ -455,7 +455,7 @@ DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `username` varchar(50) NOT NULL,
-  `password` varchar(50) NOT NULL,
+  `password` varchar(255) NOT NULL,
   `firstname` varchar(100) NOT NULL,
   `lastname` varchar(100) NOT NULL,
   `role` enum('admin','officer','dean') DEFAULT NULL,
@@ -478,7 +478,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'admin','1234','admin','nick','admin','user_1_1775361536.jpg',1,'2025-12-31 04:21:58','kama@gmail.com',NULL),(5,'user1','1234','Dojima','Kimon','officer',NULL,1,'2026-04-21 07:27:29','Dojima@gmail.com',NULL),(6,'user2','1234','เจ้าหน้าที่','คณะเทคโนโลยีสารสนเทศและการสื่อสาร','officer',NULL,2,'2026-06-29 19:05:55','user2@up.ac.th',NULL),(7,'user3','1234','เจ้าหน้าที่','คณะเกษตรศาสตร์และทรัพยากรธรรมชาติ','officer',NULL,3,'2026-06-29 19:05:55','user3@up.ac.th',NULL),(8,'user4','1234','เจ้าหน้าที่','คณะนิติศาสตร์','officer',NULL,4,'2026-06-29 19:05:55','user4@up.ac.th',NULL),(9,'user5','1234','เจ้าหน้าที่','คณะพลังงานและสิ่งแวดล้อม','officer',NULL,5,'2026-06-29 19:05:55','user5@up.ac.th',NULL),(10,'user6','1234','เจ้าหน้าที่','คณะพยาบาลศาสตร์','officer',NULL,6,'2026-06-29 19:05:55','user6@up.ac.th',NULL),(11,'user7','1234','เจ้าหน้าที่','คณะวิศวกรรมศาสตร์','officer',NULL,7,'2026-06-29 19:05:55','user7@up.ac.th',NULL),(12,'user8','1234','เจ้าหน้าที่','คณะสาธารณสุขศาสตร์','officer',NULL,8,'2026-06-29 19:05:55','user8@up.ac.th',NULL),(13,'user9','1234','เจ้าหน้าที่','คณะบริหารธุรกิจและนิเทศศาสตร์','officer',NULL,9,'2026-06-29 19:05:55','user9@up.ac.th',NULL),(14,'user10','1234','เจ้าหน้าที่','คณะแพทยศาสตร์','officer',NULL,10,'2026-06-29 19:05:55','user10@up.ac.th',NULL),(15,'user11','1234','เจ้าหน้าที่','คณะวิทยาศาสตร์','officer',NULL,11,'2026-06-29 19:05:55','user11@up.ac.th',NULL),(16,'user12','1234','เจ้าหน้าที่','คณะสถาปัตยกรรมศาสตร์และศิลปกรรมศาสตร์','officer',NULL,12,'2026-06-29 19:05:55','user12@up.ac.th',NULL),(17,'user13','1234','เจ้าหน้าที่','คณะศิลปศาสตร์','officer',NULL,13,'2026-06-29 19:05:55','user13@up.ac.th',NULL),(18,'user14','1234','เจ้าหน้าที่','คณะทันตแพทยศาสตร์','officer',NULL,14,'2026-06-29 19:05:55','user14@up.ac.th',NULL),(19,'user15','1234','เจ้าหน้าที่','คณะเภสัชศาสตร์','officer',NULL,15,'2026-06-29 19:05:55','user15@up.ac.th',NULL),(20,'user16','1234','เจ้าหน้าที่','คณะวิทยาศาสตร์การแพทย์','officer',NULL,16,'2026-06-29 19:05:55','user16@up.ac.th',NULL),(21,'user17','1234','เจ้าหน้าที่','คณะสหเวชศาสตร์','officer',NULL,17,'2026-06-29 19:05:55','user17@up.ac.th',NULL),(22,'user18','1234','เจ้าหน้าที่','คณะรัฐศาสตร์และสังคมศาสตร์','officer',NULL,18,'2026-07-13 00:00:00','user18@up.ac.th',NULL),(23,'dean1','1234','คณบดี','ดียย','dean',NULL,1,'2026-07-05 00:00:00','dean1@up.ac.th',NULL);
+INSERT INTO `users` VALUES (1,'admin01','demo1234','ผู้ดูแลระบบทดสอบ','01','admin',NULL,1,'2025-12-31 04:21:58','admin01@example.com','ผู้ดูแลระบบ'),(5,'officer01','demo1234','เจ้าหน้าที่ทดสอบ','01','officer',NULL,1,'2026-04-21 07:27:29','officer01@example.com','เจ้าหน้าที่'),(6,'officer02','demo1234','เจ้าหน้าที่ทดสอบ','02','officer',NULL,2,'2026-06-29 19:05:55','officer02@example.com','เจ้าหน้าที่'),(7,'officer03','demo1234','เจ้าหน้าที่ทดสอบ','03','officer',NULL,3,'2026-06-29 19:05:55','officer03@example.com','เจ้าหน้าที่'),(8,'officer04','demo1234','เจ้าหน้าที่ทดสอบ','04','officer',NULL,4,'2026-06-29 19:05:55','officer04@example.com','เจ้าหน้าที่'),(9,'officer05','demo1234','เจ้าหน้าที่ทดสอบ','05','officer',NULL,5,'2026-06-29 19:05:55','officer05@example.com','เจ้าหน้าที่'),(10,'officer06','demo1234','เจ้าหน้าที่ทดสอบ','06','officer',NULL,6,'2026-06-29 19:05:55','officer06@example.com','เจ้าหน้าที่'),(11,'officer07','demo1234','เจ้าหน้าที่ทดสอบ','07','officer',NULL,7,'2026-06-29 19:05:55','officer07@example.com','เจ้าหน้าที่'),(12,'officer08','demo1234','เจ้าหน้าที่ทดสอบ','08','officer',NULL,8,'2026-06-29 19:05:55','officer08@example.com','เจ้าหน้าที่'),(13,'officer09','demo1234','เจ้าหน้าที่ทดสอบ','09','officer',NULL,9,'2026-06-29 19:05:55','officer09@example.com','เจ้าหน้าที่'),(14,'officer10','demo1234','เจ้าหน้าที่ทดสอบ','10','officer',NULL,10,'2026-06-29 19:05:55','officer10@example.com','เจ้าหน้าที่'),(15,'officer11','demo1234','เจ้าหน้าที่ทดสอบ','11','officer',NULL,11,'2026-06-29 19:05:55','officer11@example.com','เจ้าหน้าที่'),(16,'officer12','demo1234','เจ้าหน้าที่ทดสอบ','12','officer',NULL,12,'2026-06-29 19:05:55','officer12@example.com','เจ้าหน้าที่'),(17,'officer13','demo1234','เจ้าหน้าที่ทดสอบ','13','officer',NULL,13,'2026-06-29 19:05:55','officer13@example.com','เจ้าหน้าที่'),(18,'officer14','demo1234','เจ้าหน้าที่ทดสอบ','14','officer',NULL,14,'2026-06-29 19:05:55','officer14@example.com','เจ้าหน้าที่'),(19,'officer15','demo1234','เจ้าหน้าที่ทดสอบ','15','officer',NULL,15,'2026-06-29 19:05:55','officer15@example.com','เจ้าหน้าที่'),(20,'officer16','demo1234','เจ้าหน้าที่ทดสอบ','16','officer',NULL,16,'2026-06-29 19:05:55','officer16@example.com','เจ้าหน้าที่'),(21,'officer17','demo1234','เจ้าหน้าที่ทดสอบ','17','officer',NULL,17,'2026-06-29 19:05:55','officer17@example.com','เจ้าหน้าที่'),(22,'officer18','demo1234','เจ้าหน้าที่ทดสอบ','18','officer',NULL,18,'2026-07-13 00:00:00','officer18@example.com','เจ้าหน้าที่'),(23,'dean01','demo1234','คณบดีทดสอบ','01','dean',NULL,1,'2026-07-05 00:00:00','dean01@example.com','คณบดี');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

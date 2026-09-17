@@ -1,359 +1,139 @@
 <?php
 /**
- * DEAN DASHBOARD — dean/index.php (บุคลากร/คณบดี — ดูอย่างเดียว)
- * แสดง: ข้อมูลคณะของตนเอง + ผลรวมทั้งระบบ
+ * DEAN DASHBOARD — dean/index.php (คณบดี — เฉพาะคณะของตนเอง ดูอย่างเดียว)
+ * ---------------------------------------------------------
+ * หน้าตาชุดเดียวกับ Dashboard admin: การ์ดหลัก ปล่อย / ดูดกลับ / Net (+ % ชดเชย, เทียบปีก่อน) → ขอบเขต 1/2/3 (+ ความครบถ้วน)
+ *   → แถบกิจกรรมที่คณะจัด → อันดับของคณะ + แถบตำแหน่ง + 3 อันดับแรก (ทั้งหมดในหน้าต่าง) + ภาพรวมทุกปี (สลับ คณะ / ทั้งมหาวิทยาลัย)
+ * ยอดทั้งหมดมาจาก ghg_report_summary($year, $affil) ตัวเดียวกับหน้ารายงาน GHG มุมมองคณะ (ข้อมูลจัดใน includes/dean_dashboard.php)
+ * หน้าต่างรายละเอียดใช้ assets/js/admin-dashboard.js โหมด 'faculty' (ข้อมูลฝังในหน้า ไม่เรียก API) · สไตล์ admin-dashboard.css (ad-)
+ * admin ที่เปิดหน้านี้ถูกส่งไป Dashboard admin (ภาพรวมทั้งมหาวิทยาลัยอยู่ที่นั่น)
+ *
+ * เดิม: dashboard.css + inline style + <style> ใน <main>, หน้าต่างแยก 3 อัน, ส่วนทั้งมหาวิทยาลัยซ้ำกับ Dashboard admin
  */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/../includes/ghg_report.php';
+require_once __DIR__ . '/../includes/dean_dashboard.php';
 require_role(['admin', 'dean']);
+
+$redirect = dean_dash_redirect((string) ($_SESSION['role'] ?? ''), (int) ($_GET['year'] ?? 0));
+if ($redirect !== null) { header('Location: ' . $redirect); exit; }
 
 $pdo  = getDB();
 $root = '../';
-$affil_id   = (int)($_SESSION['affiliation_id'] ?? 0);
-$affil_name = $_SESSION['affiliation_name'] ?? '-';
-$page_title = "Dashboard";
+$page_title = 'Dashboard';
+$affil_id   = (int) ($_SESSION['affiliation_id'] ?? 0);
+$affil_name = (string) ($_SESSION['affiliation_name'] ?? '-');
 
-// ปีทั้งหมดในระบบ (dean ดูภาพรวมทั้งระบบด้วย จึงใช้ทุกปี)
 $years = ghg_years($pdo);
-$selected_year = isset($_GET['year']) ? (int)$_GET['year'] : ($years[0]['year_id'] ?? 0);
+$selected_year = isset($_GET['year']) ? (int) $_GET['year'] : (int) ($years[0]['year_id'] ?? 0);
 $year_label = '';
-foreach ($years as $y) { if ($y['year_id'] == $selected_year) { $year_label = $y['year']; break; } }
+foreach ($years as $y) if ((int) $y['year_id'] === $selected_year) $year_label = (string) $y['year'];
+if ($year_label === '' && $years) { $selected_year = (int) $years[0]['year_id']; $year_label = (string) $years[0]['year']; }
 
-// ── คณะของตนเอง: รายการ + scope ของปีที่เลือก (สำหรับการ์ด + modal) ──
-$items = [];
-$scope1 = $scope2 = $scope3 = 0;
-if ($affil_id) {
-    $stmt = $pdo->prepare("
-        SELECT ag.scope AS scope_no, ai.name_tiem, ai.unit,
-               COALESCE(ui.Vol,0) AS vol, (COALESCE(ui.Vol,0)*ai.AD)/1000 AS emission
-        FROM admin_item ai
-        JOIN admin_g ag ON ai.scope = ag.id
-        LEFT JOIN user_item ui ON ui.admin_item_id = ai.id AND ui.affiliation_id = :aff AND ui.year_id = :y AND ui.source = 'officer'
-        WHERE ai.year_id = :y2 AND ai.data_source = 'officer'
-        ORDER BY ag.scope ASC, ai.id ASC");
-    $stmt->execute([':aff' => $affil_id, ':y' => $selected_year, ':y2' => $selected_year]);
-    foreach ($stmt->fetchAll() as $r) {
-        $sc = (int)$r['scope_no'];
-        if ($sc === 1) $scope1 += $r['emission']; elseif ($sc === 2) $scope2 += $r['emission']; elseif ($sc === 3) $scope3 += $r['emission'];
-        $items[] = ['scope' => $sc, 'name' => $r['name_tiem'], 'unit' => $r['unit'], 'vol' => (float)$r['vol'], 'emission' => (float)$r['emission']];
-    }
-}
-$own_total = $scope1 + $scope2 + $scope3;
+$o   = ($years && $affil_id > 0) ? dean_dash_overview($pdo, $years, $selected_year, $affil_id) : null;
+$sum = $o['summary'] ?? null;
 
-// ── ทั้งระบบ: scope รวม + รายคณะ ของปีที่เลือก ──
-$sys_scope = ghg_scope_totals($pdo, $selected_year);
-$sys_total = $sys_scope[1] + $sys_scope[2] + $sys_scope[3];
-$sys_affil = ghg_by_affiliation($pdo, $selected_year);
+$h   = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
+$n2  = fn(float $v) => number_format($v, 2);
+$pct = fn(float $v) => number_format($v, 2, '.', '');
+$scope_meta = admin_dash_scope_meta();
+$arrow = '<span class="oe-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></span>';
 
-// ── การดูดกลับ: คณะตน (จากกิจกรรม) + ระดับมหาวิทยาลัย (สำหรับส่วนภาพรวมระบบ) ──
-$removal_activity = $affil_id ? removal_activity_total($pdo, $selected_year, $affil_id) : 0;
-$removal_rows     = $affil_id ? removal_activity_list($pdo, $selected_year, $affil_id) : [];
-
-// ── การปล่อยจากกิจกรรมของคณะ (source='event') — แยกจากยอดหลัก (officer) ──
-$event_emission = 0.0; $event_count = 0; $emission_rows = [];
-if ($affil_id) {
-    $ev_stmt = $pdo->prepare("SELECT COALESCE(SUM(ui.Vol * ai.AD)/1000, 0)
-        FROM user_item ui JOIN admin_item ai ON ai.id = ui.admin_item_id
-        WHERE ui.affiliation_id = :a AND ui.year_id = :y AND ui.source = 'event'");
-    $ev_stmt->execute([':a' => $affil_id, ':y' => $selected_year]);
-    $event_emission = (float) $ev_stmt->fetchColumn();
-    $evc_stmt = $pdo->prepare("SELECT COUNT(*) FROM event WHERE affiliation_id = :a AND year_id = :y");
-    $evc_stmt->execute([':a' => $affil_id, ':y' => $selected_year]);
-    $event_count = (int) $evc_stmt->fetchColumn();
-    $emission_rows = event_emission_list($pdo, $selected_year, $affil_id);
-}
-$sys_removal      = removal_total($pdo, $selected_year);
+// ข้อมูลของหน้าต่างรายละเอียด (อ่านใน admin-dashboard.js) — JSON_HEX_TAG กันชื่อที่มี </script>
+$ad_data = $o ? [
+    'mode' => 'faculty', 'year' => $selected_year, 'yearLabel' => $year_label, 'affilName' => $affil_name,
+    'gross' => $sum['gross'], 'scope' => $sum['scope'], 'removal' => $sum['removal'],
+    'eventTotal' => $sum['event_total'], 'eventCount' => $o['event_count'],
+    'detailRows' => $o['detail_rows'], 'eventGroups' => $o['event_groups'],
+    'history' => $o['history'], 'uniHistory' => $o['uni_history'], 'scopeMeta' => $scope_meta,
+    'ranking' => $o['ranking'], 'ownAffil' => $affil_id,
+] : null;
 ?>
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard (คณบดี) — UP Net Zero</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
-    <link rel="stylesheet" href="<?= $root ?>assets/css/dashboard.css<?= asset_v('assets/css/dashboard.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
-    <style>
-        /* accordion การดูดกลับจากกิจกรรม (removal modal) — ยุบ/กางเมื่อคลิก */
-        .rmx-act { border:1px solid #E7E3EC; border-radius:12px; overflow:hidden; margin-bottom:12px; }
-        .rmx-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:12px 16px; background:#F6F4F9; cursor:pointer; transition:background .15s; }
-        .rmx-head:hover { background:#EFEAF5; }
-        .rmx-title { font-weight:800; color:#2A2233; min-width:0; flex:1; display:flex; align-items:flex-start; gap:8px; }
-        .rmx-text { min-width:0; line-height:1.5; overflow-wrap:anywhere; word-break:break-word; }
-        .rmx-chev { color:#8A8194; transition:transform .2s; flex-shrink:0; margin-top:4px; }
-        .rmx-act.open .rmx-chev { transform:rotate(90deg); }
-        .rmx-body { display:none; padding:6px 16px 10px; }
-        .rmx-act.open .rmx-body { display:block; }
-        /* ตารางในโมดัล: ตัดคำเฉพาะคอลัมน์แรก (ชื่อรายการยาว/ไทยไม่มีเว้นวรรค) — คอลัมน์อื่น (หน่วย/จำนวน/ตัวเลข) ปล่อย default ไม่แตกกลางคำ */
-        .detail-modal-body .data-table th:first-child, .detail-modal-body .data-table td:first-child { overflow-wrap:anywhere; }
-        /* หัวตารางในโมดัลกระชับขึ้น (padding/letter-spacing น้อยลง) กันหน่วยในวงเล็บตกบรรทัดกลางคำ */
-        .detail-modal-body .data-table th { padding:0.9rem 0.7rem; letter-spacing:0.02em; text-transform:none; }
-        .rmx-body .data-table { table-layout:fixed; width:100%; }
-        .rmx-body .data-table th:first-child, .rmx-body .data-table td:first-child { width:34%; overflow-wrap:anywhere; word-break:break-word; }
-    </style>
+    <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/admin-dashboard.css<?= asset_v('assets/css/admin-dashboard.css') ?>">
 </head>
-<body class="light-theme">
 
+<body>
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
         <?php include __DIR__ . '/../officer/includes/header.php'; ?>
 
-        <div class="page-content">
-
-            <!-- Header + year dropdown -->
-            <div class="db-topbar">
-                <h2 class="db-title">ภาพรวมคณบดี — <?= htmlspecialchars($affil_name) ?></h2>
-                <div class="db-year-select-wrap">
-                    <span class="db-year-label">ผลรวมของปี</span>
+        <div class="oe-page ad-page">
+            <div class="oe-head oe-rise">
+                <div>
+                    <h1 class="oe-title">Dashboard</h1>
+                    <div class="oe-sub">ภาพรวมการปล่อยและดูดกลับก๊าซเรือนกระจกของ <?= $h($affil_name) ?></div>
+                </div>
+                <?php if ($years): ?>
+                <div class="oe-actions">
+                    <span class="co-year-label">ปีงบประมาณ</span>
                     <?php
-                        // ใช้ component dropdown กลาง (components/dropdown.php) แทน dropdown เฉพาะกิจ
-                        $dd_id       = 'yearSelect';
-                        $dd_name     = 'year';
-                        $dd_options  = array_map(fn($yd) => ['value' => $yd['year_id'], 'label' => $yd['year']], $years);
-                        $dd_selected = $selected_year;
-                        $dd_required = false;
-                        $dd_class    = 'dd-pill';
-                        include __DIR__ . '/../components/dropdown.php';
+                    $dd_id = 'adYear'; $dd_name = 'year_nav'; $dd_selected = $selected_year; $dd_required = false; $dd_class = 'dd-field'; $dd_style = 'width:120px;';
+                    $dd_options = array_map(fn($y) => ['value' => $y['year_id'], 'label' => (string) $y['year']], $years); $dd_placeholder = 'เลือกปี';
+                    include __DIR__ . '/../components/dropdown.php';
                     ?>
+                    <a class="oe-btn oe-btn-soft ad-report-link" href="reports.php?view=faculty&amp;year=<?= $selected_year ?>">รายงาน GHG ฉบับเต็ม <?= $arrow ?></a>
                 </div>
+                <?php endif; ?>
             </div>
 
-            <!-- ===== ส่วนที่ 1: คณะของฉัน ===== -->
-            <div class="db-section-label">คณะของฉัน — <?= htmlspecialchars($affil_name) ?> (ปี <?= htmlspecialchars($year_label) ?>)</div>
-            <div class="db-row2">
-                <div class="db-card db-card-white">
-                    <div class="db-card-inner">
-                        <div class="db-card-text">
-                            <div class="db-big-num"><?= number_format($own_total, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
-                            <div class="db-card-desc">การปล่อยจากการดำเนินงานของคณะ</div>
-                            <div class="db-card-subdesc">FACULTY OPERATIONS</div>
-                        </div>
-                        <div class="db-card-illus">
-                            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
-                                <ellipse cx="36" cy="44" rx="24" ry="14" fill="#B3E5FC" /><ellipse cx="28" cy="34" rx="14" ry="10" fill="#81D4FA" />
-                                <ellipse cx="44" cy="30" rx="16" ry="12" fill="#90CAF9" /><ellipse cx="36" cy="26" rx="18" ry="13" fill="#E1F5FE" />
-                            </svg>
-                        </div>
-                    </div>
-                    <button onclick="openDetailModal(0)" class="db-card-btn db-btn-green" style="border:none;cursor:pointer;">
-                        ดูรายละเอียด
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6" /></svg>
-                    </button>
-                </div>
-                <div class="db-card db-card-white">
-                    <div class="db-card-inner">
-                        <div class="db-card-text">
-                            <div class="db-big-num"><?= number_format($removal_activity, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
-                            <div class="db-card-desc">GHG Removal</div>
-                            <div class="db-card-subdesc">การดูดกลับจากกิจกรรมของคณะ</div>
-                        </div>
-                        <div class="db-card-illus">
-                            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
-                                <path d="M36 60 C36 60 14 46 14 30 C14 20 24 12 36 16 C48 12 58 20 58 30 C58 46 36 60 36 60Z" fill="#C8E6C9" />
-                                <circle cx="36" cy="30" r="8" fill="#4CAF50" /><path d="M32 30 L36 24 L40 30" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" />
-                            </svg>
-                        </div>
-                    </div>
-                    <?php if (!empty($removal_rows)): ?>
-                    <button onclick="openRemovalModal()" class="db-card-btn db-btn-green" style="border:none;cursor:pointer;">
-                        ดูรายละเอียด
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6" /></svg>
-                    </button>
-                    <?php else: ?>
-                    <span class="db-card-btn db-btn-green" style="opacity:.7;">ยังไม่มีกิจกรรมดูดกลับ</span>
-                    <?php endif; ?>
-                </div>
+            <?php if (!$o): ?>
+            <div class="oe-empty oe-rise">
+                <?php if (!$years): ?>
+                <h3>ยังไม่มีปีงบประมาณในระบบ</h3>
+                <p>เมื่อผู้ดูแลระบบเพิ่มปีงบประมาณและหน่วยงานกรอกข้อมูลแล้ว ภาพรวมจะแสดงที่นี่</p>
+                <?php else: ?>
+                <h3>บัญชีนี้ยังไม่ได้ผูกกับคณะ/หน่วยงาน</h3>
+                <p>กรุณาติดต่อผู้ดูแลระบบเพื่อกำหนดสังกัด</p>
+                <?php endif; ?>
             </div>
+            <?php else: ?>
 
-            <?php if ($event_count > 0): ?>
-            <!-- การปล่อยจากกิจกรรมของคณะ (แยกจากยอดหลัก) -->
-            <div class="db-section-label">กิจกรรมของคณะ ปี <?= htmlspecialchars($year_label) ?></div>
-            <div style="margin-bottom:1.5rem;">
-                <div class="db-card db-card-white">
-                    <div class="db-card-inner">
-                        <div class="db-card-text">
-                            <div class="db-big-num"><?= number_format($event_emission, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
-                            <div class="db-card-desc">การปล่อยจากกิจกรรมที่คณะจัด</div>
-                            <div class="db-card-subdesc">ACTIVITIES — แยกจากยอดหลักด้านบน</div>
-                        </div>
-                        <div class="db-card-illus">
-                            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
-                                <rect x="14" y="18" width="44" height="40" rx="6" fill="#FDE68A" />
-                                <rect x="14" y="18" width="44" height="12" rx="6" fill="#F59E0B" opacity=".55" />
-                                <rect x="22" y="12" width="4" height="12" rx="2" fill="#B45309" />
-                                <rect x="46" y="12" width="4" height="12" rx="2" fill="#B45309" />
-                                <circle cx="27" cy="42" r="3" fill="#F59E0B" />
-                                <circle cx="36" cy="42" r="3" fill="#F59E0B" />
-                                <circle cx="45" cy="42" r="3" fill="#F59E0B" />
-                            </svg>
-                        </div>
-                    </div>
-                    <button onclick="openEmissionModal()" class="db-card-btn db-btn-green" style="border:none;cursor:pointer;">
-                        ดูรายละเอียด
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6" /></svg>
-                    </button>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <div class="db-scope-row">
-                <div class="db-card db-card-scope1">
-                    <div class="db-card-inner"><div class="db-card-text">
-                        <div class="db-big-num db-num-s1"><?= number_format($scope1, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
-                        <div class="db-scope-label db-scope-s1">Scope 1</div></div></div>
-                    <button onclick="openDetailModal(1)" class="db-card-btn db-btn-scope1" style="border:none;cursor:pointer;">ดูรายละเอียด Scope 1</button>
-                </div>
-                <div class="db-card db-card-scope2">
-                    <div class="db-card-inner"><div class="db-card-text">
-                        <div class="db-big-num db-num-s2"><?= number_format($scope2, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
-                        <div class="db-scope-label db-scope-s2">Scope 2</div></div></div>
-                    <button onclick="openDetailModal(2)" class="db-card-btn db-btn-scope2" style="border:none;cursor:pointer;">ดูรายละเอียด Scope 2</button>
-                </div>
-                <div class="db-card db-card-scope3">
-                    <div class="db-card-inner"><div class="db-card-text">
-                        <div class="db-big-num db-num-s3"><?= number_format($scope3, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
-                        <div class="db-scope-label db-scope-s3">Scope 3</div></div></div>
-                    <button onclick="openDetailModal(3)" class="db-card-btn db-btn-scope3" style="border:none;cursor:pointer;">ดูรายละเอียด Scope 3</button>
-                </div>
-            </div>
-
-            <?php if (($_SESSION['role'] ?? '') !== 'dean'): /* dean เห็นเฉพาะคณะตัวเอง — ซ่อนภาพรวมทั้งระบบ */ ?>
-            <!-- ===== ส่วนที่ 2: ภาพรวมทั้งระบบ (เฉพาะ admin) ===== -->
-            <div class="db-section-label" style="margin-top:2rem;">ผลรวมทั้งระบบ — ทุกคณะ (ปี <?= htmlspecialchars($year_label) ?>)</div>
-            <div style="display:grid;grid-template-columns:320px 1fr;gap:1.5rem;align-items:start;">
-                <div class="db-card db-card-white" style="text-align:center;">
-                    <div style="font-size:.9rem;color:#6B7280;font-weight:600;margin-bottom:.5rem;">รวมทั้งระบบ</div>
-                    <div class="db-big-num" style="margin-bottom:1rem;"><?= number_format($sys_total, 2) ?> <span class="db-big-unit">tCO₂e</span></div>
-                    <canvas id="sysDonut" width="220" height="220" style="max-width:100%;"></canvas>
-                    <div style="display:flex;justify-content:center;gap:14px;margin-top:12px;font-size:.85rem;">
-                        <span style="color:#F97316;font-weight:700;">■ S1 <?= number_format($sys_scope[1], 2) ?></span>
-                        <span style="color:#EC4899;font-weight:700;">■ S2 <?= number_format($sys_scope[2], 2) ?></span>
-                        <span style="color:#3B82F6;font-weight:700;">■ S3 <?= number_format($sys_scope[3], 2) ?></span>
-                    </div>
-                    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #F1EEF5;font-size:.9rem;">
-                        <div style="color:#166534;font-weight:700;"><?= ic('leaf',16) ?> ดูดกลับ (มหาวิทยาลัย): <?= number_format($sys_removal, 2) ?> tCO₂e</div>
-                        <div style="color:#6B7280;font-weight:600;margin-top:3px;">สุทธิ (Net = ปล่อย − ดูดกลับ): <?= number_format($sys_total - $sys_removal, 2) ?> tCO₂e</div>
-                    </div>
-                </div>
-                <div class="admin-table-container" style="padding:1.5rem;">
-                    <h3 style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:1rem;">การปล่อยรายคณะ</h3>
-                    <div style="max-height:420px;overflow-y:auto;">
-                        <table class="data-table" style="width:100%;">
-                            <thead><tr><th>คณะ/หน่วยงาน</th><th style="text-align:right;">tCO₂e</th></tr></thead>
-                            <tbody>
-                                <?php foreach ($sys_affil as $r): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($r['affiliation_item']) ?></td>
-                                        <td style="text-align:right;font-weight:700;color:var(--clr-primary);"><?= number_format($r['total_emission'], 2, '.', ',') ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+            <?php include __DIR__ . '/../includes/faculty_dashboard_body.php'; ?>
             <?php endif; ?>
         </div>
 
-        <!-- Detail Modal (คณะของฉัน) -->
-        <div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeDetailModal()">
-            <div class="modal-box" style="max-width:780px; padding:0 0 18px; overflow:hidden;">
-                <div id="detailModalHeader" style="padding:2rem 2.5rem; color:#fff;">
-                    <button class="modal-close-btn" onclick="closeDetailModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
-                    <div style="font-size:.8rem; opacity:.8; text-transform:uppercase; letter-spacing:.05em;">รายละเอียดการปล่อยก๊าซเรือนกระจก (คณะ)</div>
-                    <h3 id="detailModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;">—</h3>
+        <!-- หน้าต่างรายละเอียด (หน้าต่างเดียว ย้อนกลับได้หลายชั้น) -->
+        <div class="modal-overlay" id="adModal" role="dialog" aria-modal="true" aria-labelledby="adModalTitle">
+            <div class="modal-box ad-modal">
+                <div class="ad-mh" id="adModalHead">
+                    <button type="button" class="ad-mh-back" id="adBack" hidden aria-label="ย้อนกลับ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg><span id="adBackLabel">ย้อนกลับ</span></button>
+                    <button type="button" class="ad-mh-close" id="adClose" aria-label="ปิด">&times;</button>
+                    <div class="ad-mh-label" id="adModalLabel"></div>
+                    <h3 class="ad-mh-title" id="adModalTitle"></h3>
                 </div>
-                <div class="detail-modal-body">
-                    <table class="data-table" style="width:100%;">
-                        <thead><tr><th>รายการ</th><th style="text-align:center;">หน่วย</th><th style="text-align:center;">จำนวน</th><th style="text-align:center;">tCO₂e</th></tr></thead>
-                        <tbody id="detailModalBody"></tbody>
-                    </table>
-                </div>
+                <div class="ad-mb" id="adModalBody"></div>
             </div>
         </div>
 
-        <!-- Removal Modal (การดูดกลับจากกิจกรรมของคณะ — read-only accordion) -->
-        <div class="modal-overlay" id="removalModal" onclick="if(event.target===this)closeRemovalModal()">
-            <div class="modal-box" style="max-width:820px; padding:0 0 18px; overflow:hidden;">
-                <div class="modal-breadcrumb" id="rmBreadcrumb" style="display:none;">
-                    <span class="back-btn-pill" onclick="rmRenderList()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> ย้อนกลับหน้ารายการกิจกรรม</span>
-                </div>
-                <div style="padding:3.2rem 2.5rem 2rem; color:#fff; background:linear-gradient(135deg,#2E7D32,#66BB6A);">
-                    <button class="modal-close-btn" onclick="closeRemovalModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
-                    <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">รายละเอียดการดูดกลับจากกิจกรรม</div>
-                    <h3 id="rmModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;overflow-wrap:anywhere;word-break:break-word;">การดูดกลับจากกิจกรรมที่คณะจัด</h3>
-                </div>
-                <div class="detail-modal-body">
-                    <div id="removalModalBody"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Emission Modal (การปล่อยจากกิจกรรมของคณะ — read-only accordion) -->
-        <div class="modal-overlay" id="emissionModal" onclick="if(event.target===this)closeEmissionModal()">
-            <div class="modal-box" style="max-width:820px; padding:0 0 18px; overflow:hidden;">
-                <div class="modal-breadcrumb" id="emBreadcrumb" style="display:none;">
-                    <span class="back-btn-pill" onclick="emRenderList()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> ย้อนกลับหน้ารายการกิจกรรม</span>
-                </div>
-                <div style="padding:3.2rem 2.5rem 2rem; color:#fff; background:linear-gradient(135deg,#F59E0B,#F97316);">
-                    <button class="modal-close-btn" onclick="closeEmissionModal()" style="position:absolute; top:1.1rem; right:1.1rem; background:rgba(255,255,255,0.2); border:none; color:#fff; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1.4rem; line-height:1;">&times;</button>
-                    <div style="font-size:.8rem; opacity:.85; letter-spacing:.05em;">รายละเอียดการปล่อยจากกิจกรรม</div>
-                    <h3 id="emModalTitle" style="font-size:1.5rem; font-weight:800; margin:.25rem 0 0;overflow-wrap:anywhere;word-break:break-word;">การปล่อยจากกิจกรรมที่คณะจัด</h3>
-                </div>
-                <div class="detail-modal-body">
-                    <div id="emissionModalBody"></div>
-                </div>
-            </div>
-        </div>
-
+        <?php if ($ad_data): ?>
+        <script type="application/json" id="adData"><?= json_encode($ad_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
+        <?php endif; ?>
         <script src="<?= $root ?>assets/js/ghg-charts.js<?= asset_v('assets/js/ghg-charts.js') ?>"></script>
-        <script src="<?= $root ?>assets/js/activity-modal.js<?= asset_v('assets/js/activity-modal.js') ?>"></script>
+        <script src="<?= $root ?>assets/js/admin-dashboard.js<?= asset_v('assets/js/admin-dashboard.js') ?>"></script>
         <script>
-            window.REMOVAL_ROWS = <?= json_encode($removal_rows, JSON_UNESCAPED_UNICODE) ?>;
-            window.EMISSION_ROWS = <?= json_encode($emission_rows, JSON_UNESCAPED_UNICODE) ?>;
-            window.DETAIL_ITEMS = <?= json_encode($items, JSON_UNESCAPED_UNICODE) ?>;
-            window.SYS_SCOPE = <?= json_encode([$sys_scope[1], $sys_scope[2], $sys_scope[3]]) ?>;
-            window.SCOPE_BG = {0:'linear-gradient(135deg, var(--clr-primary), #8B5CF6)',1:'linear-gradient(135deg, #F97316, #EA580C)',2:'linear-gradient(135deg, #EC4899, #BE185D)',3:'linear-gradient(135deg, #3B82F6, #1D4ED8)'};
-
-            // component dropdown ยิง event 'dd:change' เมื่อเลือกปี → โหลดหน้าใหม่ตาม ?year=
-            document.getElementById('yearSelect')?.addEventListener('dd:change', function (e) {
-                window.location = '?year=' + e.detail.value;
-            });
-            window.openDetailModal = function (scope) {
-                const title = scope === 0 ? 'การปล่อยจากการดำเนินงานของคณะ' : ('Scope ' + scope);
-                document.getElementById('detailModalTitle').textContent = title;
-                document.getElementById('detailModalHeader').style.background = window.SCOPE_BG[scope];
-                const rows = window.DETAIL_ITEMS.filter(it => scope === 0 || it.scope === scope);
-                const body = document.getElementById('detailModalBody');
-                body.innerHTML = rows.length ? rows.map(it => `<tr><td>${it.name}</td><td style="text-align:center;">${it.unit ?? '-'}</td><td style="text-align:center;">${Number(it.vol).toLocaleString('th-TH',{maximumFractionDigits:4})}</td><td style="text-align:center;font-weight:700;color:var(--clr-primary);">${Number(it.emission).toLocaleString('th-TH',{minimumFractionDigits:4,maximumFractionDigits:4})}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;padding:24px;color:#9CA3AF;">ไม่มีข้อมูล</td></tr>';
-                document.getElementById('detailModal').style.display = 'flex'; document.body.style.overflow = 'hidden';
-            };
-            window.closeDetailModal = function () { document.getElementById('detailModal').style.display = 'none'; document.body.style.overflow = ''; };
-
-            // Removal modal (2-level list→detail) — logic อยู่ที่ assets/js/activity-modal.js (openRemovalModal/closeRemovalModal)
-
-            // Emission modal (2-level list→detail) — logic อยู่ที่ assets/js/activity-modal.js (openEmissionModal/closeEmissionModal)
-
-            (function initDeanDash() {
-                var __sysDonut = document.getElementById('sysDonut');
-                if (window.drawGhgDonut && __sysDonut) {
-                    drawGhgDonut(__sysDonut, [
-                        {label:'Scope 1', value: window.SYS_SCOPE[0], color:'#F97316'},
-                        {label:'Scope 2', value: window.SYS_SCOPE[1], color:'#EC4899'},
-                        {label:'Scope 3', value: window.SYS_SCOPE[2], color:'#3B82F6'}
-                    ], 'tCO₂e');
-                }
-            })();
-
-            if (!window.__deanDashBound) {
-                window.__deanDashBound = true;
-                document.addEventListener('keydown', e => { if (e.key === 'Escape') { window.closeDetailModal(); window.closeRemovalModal(); window.closeEmissionModal(); } });
-            }
+        // สคริปต์ src โหลดแบบไม่รอกันเมื่อ SPA สลับหน้า → รอจน adInit / drawGhgGroupedBars พร้อม
+        (function run(n) {
+            if (!window.adInit || !window.drawGhgGroupedBars) { if (n < 200) setTimeout(function () { run(n + 1); }, 25); return; }
+            var el = document.getElementById('adData');
+            window.adInit(el ? JSON.parse(el.textContent) : null);
+        })(0);
         </script>
     </main>
 </body>
+
 </html>

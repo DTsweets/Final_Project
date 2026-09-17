@@ -12,12 +12,13 @@ $pdo = getDB();
 
 // ===== รับ parameters จาก Modal =====
 $allowedCols = ['col_no', 'col_firstname', 'col_lastname', 'col_username', 'col_email', 'col_affiliation', 'col_role'];
-$selectedCols = isset($_POST['cols']) ? array_intersect($_POST['cols'], $allowedCols) : $allowedCols;
+// cols / user_ids ที่ไม่ใช่ array (POST ปลอม) เดิมทำให้ array_intersect / count พัง → ถือเป็นค่าเริ่มต้น
+$selectedCols = isset($_POST['cols']) && is_array($_POST['cols']) ? array_intersect(array_map('strval', $_POST['cols']), $allowedCols) : $allowedCols;
 // col_no is always included
 if (!in_array('col_no', $selectedCols)) array_unshift($selectedCols, 'col_no');
 $selectedCols = array_values($selectedCols);
 
-$userIds = isset($_POST['user_ids']) ? $_POST['user_ids'] : ['all'];
+$userIds = isset($_POST['user_ids']) && is_array($_POST['user_ids']) ? array_map('strval', $_POST['user_ids']) : ['all'];
 $filterAll = (count($userIds) === 0 || $userIds === ['all'] || in_array('all', $userIds));
 
 // ===== Query =====

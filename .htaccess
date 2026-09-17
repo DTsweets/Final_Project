@@ -64,3 +64,12 @@ ErrorDocument 404 /404.php
     Require all denied
 </FilesMatch>
 
+# Block dumps/backups, docs and local config by extension
+# (ไฟล์ .sql มีข้อมูลผู้ใช้ทั้งฐาน — เดิมเปิดจาก URL ได้)
+<FilesMatch "\.(sql|md|env|log|bak|ini|tmp)$">
+    Require all denied
+</FilesMatch>
+
+# Block the .git directory (ชื่อไฟล์ข้างในไม่ได้ขึ้นต้นด้วยจุด เช่น .git/config)
+RedirectMatch 404 (^|/)\.git(/|$)
+

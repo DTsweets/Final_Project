@@ -7,6 +7,10 @@
  * แท็บ กิจกรรม (event): จัดการกิจกรรมรายอีเวนต์ (ปริมาณจริง) → user_item(source=event) รายคณะ
  * ทุกอย่างคำนวณ Emission = Vol × EF ÷ 1000 แล้วรวมเข้ายอดคณะ
  *
+ * หน้าตา: การ์ดสรุป 3 ใบ → แท็บ → การ์ดรายการ (กดเพื่อเปิดรายละเอียดด้านล่าง) → ตารางกรอก (คำนวณสด + แถบบันทึกติดขอบล่าง)
+ * ฟอร์ม "เพิ่ม/แก้ไข" ทั้งหมดอยู่ในหน้าต่าง · สไตล์: assets/css/officer-entry.css + assets/css/collect.css
+ * ตารางกรอก: assets/js/data-entry.js (ตัวเดียวกับหน้ากรอกข้อมูลการดำเนินงาน)
+ *
  * ผู้เรียกกำหนดก่อน include: $pdo, $root, $is_admin, $lock_affil, $SIDEBAR, $HEADER
  */
 
@@ -42,13 +46,17 @@ function ensure_questionnaire(PDO $pdo, int $year, string $group, int $affil, ?i
     return (int)$pdo->lastInsertId();
 }
 
+require_once __DIR__ . '/admin_g.php';
+require_once __DIR__ . '/collect_entry.php';
+
 // แท็บ: แบบสอบถาม + กิจกรรม — เปิดให้ทั้ง admin และ officer (officer เห็น/แก้เฉพาะคณะตัวเอง)
 $TABS = ['survey' => 'แบบสอบถาม', 'event' => 'กิจกรรม'];
-$DEFAULT_GROUPS = ['นักศึกษา', 'บุคลากร'];   // กลุ่มมาตรฐาน (เพิ่ม "อื่นๆ" พิมพ์เองได้)
 $page_title = 'กรอกข้อมูล';
 $page_title2 = 'แบบสอบถาม & กิจกรรม';
 $CENTRAL_AFFIL = 1; // ศูนย์สิ่งแวดล้อม = ค่าเริ่มต้นของ "ผู้จัดทำ" สำหรับ admin
 $years  = $pdo->query("SELECT id AS year_id, year FROM admin_year ORDER BY year DESC")->fetchAll();
+// หมวดย่อยทั้งหมด (admin_g) — ใช้เป็นตัวเลือกในฟอร์มเพิ่ม/แก้ไขรายการ แทนการเดาจากเลขขอบเขต
+$all_groups = $pdo->query("SELECT id, scope, name_tiem FROM admin_g ORDER BY scope ASC, order_num ASC, id ASC")->fetchAll();
 $affils = $is_admin ? $pdo->query("SELECT id, affiliation_item FROM affiliation_id ORDER BY id")->fetchAll() : [];
 $selected_year = isset($_GET['year']) ? (int) $_GET['year'] : ($years[0]['year_id'] ?? 0);
 $tab = (isset($_GET['tab']) && isset($TABS[$_GET['tab']])) ? $_GET['tab'] : array_key_first($TABS);
@@ -73,6 +81,7 @@ $qs = function($extra = []) use ($selected_year, $tab, $is_admin, $survey_affil)
     if ($is_admin && $tab === 'survey') $p['maker'] = $survey_affil;   // admin: คงผู้จัดทำที่เลือก
     return 'collect.php?' . http_build_query(array_merge($p, $extra));
 };
+$DETAIL = '#co-detail';   // หลังบันทึก/แก้ไขในรายละเอียด กลับมาที่ส่วนรายละเอียด (ไม่เด้งขึ้นบนสุด)
 
 // ── POST ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -98,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $qname = mb_substr(trim($_POST['q_name'] ?? ''), 0, 100);
             if ($qname === '') throw new Exception('กรุณาระบุชื่อแบบสอบถาม');
             ensure_questionnaire($pdo, $pyear, $qname, $smaker, $_SESSION['user_id'] ?? null);
-            header("Location: collect.php?year=$pyear&tab=survey".($is_admin?"&maker=$smaker":'')."&group=" . urlencode($qname) . "&msg=" . urlencode('เพิ่มแบบสอบถามแล้ว')); exit;
+            header("Location: collect.php?year=$pyear&tab=survey".($is_admin?"&maker=$smaker":'')."&group=" . urlencode($qname) . "&msg=" . urlencode('เพิ่มแบบสอบถามแล้ว') . $DETAIL); exit;
         }
         // ---- survey: ลบแบบสอบถาม (ลบทั้ง questionnaire + รายการ + ค่าเฉลี่ย) ของคณะเจ้าของ ----
         if ($action === 'delete_questionnaire') {
@@ -131,15 +140,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($dup->fetchColumn()) throw new Exception('มีแบบสอบถามชื่อนี้อยู่แล้วในปีนี้');
                 $pdo->prepare("UPDATE questionnaire SET audience=? WHERE year_id=? AND audience=? AND affiliation_id=?")->execute([$new, $pyear, $old, $smaker]);
             }
-            header("Location: collect.php?year=$pyear&tab=survey".($is_admin?"&maker=$smaker":'')."&group=" . urlencode($new) . "&msg=" . urlencode('แก้ไขชื่อแบบสอบถามแล้ว')); exit;
+            header("Location: collect.php?year=$pyear&tab=survey".($is_admin?"&maker=$smaker":'')."&group=" . urlencode($new) . "&msg=" . urlencode('แก้ไขชื่อแบบสอบถามแล้ว') . $DETAIL); exit;
         }
         // ---- survey: เพิ่มหัวข้อ (หัวข้อผูกคณะเจ้าของ $smaker) ----
         if ($action === 'add_topic') {
             $label=mb_substr(trim($_POST['label']),0,100); $unit=mb_substr(trim($_POST['unit']),0,100);
-            $scope=(int)$_POST['scope']; $ad=(float)$_POST['ad'];
+            $scope=(int)($_POST['scope'] ?? 0); officer_require_valid_vols([$_POST['ad'] ?? ''], 'ค่า EF', true); $ad=officer_clean_vol($_POST['ad'] ?? '');
             if ($pgroup==='') throw new Exception('กรุณาระบุกลุ่ม');
-            $agid=(int)$pdo->query("SELECT id FROM admin_g WHERE scope=$scope ORDER BY id LIMIT 1")->fetchColumn();
-            if (!$agid) throw new Exception("ไม่พบกลุ่มขอบเขต Scope $scope");
+            if ($label==='') throw new Exception('กรุณาระบุคำถาม');
+            [$agid, $scope] = resolve_admin_g($pdo, (int)($_POST['group_id'] ?? 0), $scope, INDIRECT_SCOPE);
             $qid = ensure_questionnaire($pdo,$pyear,$pgroup,$smaker,$_SESSION['user_id']??null);
             $pdo->beginTransaction();
             $pdo->prepare("INSERT INTO admin_item (year_id,scope,name_tiem,unit,AD,data_source,affiliation_id) VALUES (?,?,?,?,?,'survey',?)")
@@ -150,24 +159,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("INSERT INTO questionnaire_item (questionnaire_id,admin_item_id,order_num) VALUES (?,?,?)")
                 ->execute([$qid,$aiid,$ord]);
             $pdo->commit();
-            header("Location: $redir&msg=".urlencode('เพิ่มหัวข้อแล้ว')); exit;
+            header("Location: $redir&msg=".urlencode('เพิ่มหัวข้อแล้ว').$DETAIL); exit;
         }
         if ($action === 'edit_topic') {
             $qiid=(int)$_POST['qitem_id'];
             $label=mb_substr(trim($_POST['label']),0,100); $unit=mb_substr(trim($_POST['unit']),0,100);
-            $scope=(int)$_POST['scope']; $ad=(float)$_POST['ad'];
+            $scope=(int)($_POST['scope'] ?? 0); officer_require_valid_vols([$_POST['ad'] ?? ''], 'ค่า EF', true); $ad=officer_clean_vol($_POST['ad'] ?? '');
+            if ($label==='') throw new Exception('กรุณาระบุคำถาม');
             // สิทธิ์: แก้ได้เฉพาะหัวข้อของแบบสอบถามคณะเจ้าของ (ตรวจผ่าน qi → q.affiliation_id)
             $chk=$pdo->prepare("SELECT qi.admin_item_id FROM questionnaire_item qi JOIN questionnaire q ON q.id=qi.questionnaire_id WHERE qi.id=? AND q.affiliation_id=?");
             $chk->execute([$qiid,$smaker]); $aiid=(int)$chk->fetchColumn();
-            $agid=(int)$pdo->query("SELECT id FROM admin_g WHERE scope=$scope ORDER BY id LIMIT 1")->fetchColumn();
-            if (!$aiid || !$agid) throw new Exception('ไม่พบหัวข้อ/ขอบเขต หรือไม่มีสิทธิ์');
+            [$agid, $scope] = resolve_admin_g($pdo, (int)($_POST['group_id'] ?? 0), $scope, INDIRECT_SCOPE);
+            if (!$aiid) throw new Exception('ไม่พบหัวข้อ หรือไม่มีสิทธิ์');
             $pdo->beginTransaction();
             $pdo->prepare("UPDATE admin_item SET scope=?, name_tiem=?, unit=?, AD=? WHERE id=? AND data_source='survey'")
                 ->execute([$agid,$label,$unit,$ad,$aiid]);
             $pdo->commit();
             // EF เปลี่ยน → คำนวณยอดของกลุ่มนี้ใหม่ (ของคณะเจ้าของ)
             reaggregate_survey($pdo,$smaker,$pyear,$pgroup);
-            header("Location: $redir&msg=".urlencode('แก้ไขหัวข้อแล้ว')); exit;
+            header("Location: $redir&msg=".urlencode('แก้ไขหัวข้อแล้ว').$DETAIL); exit;
         }
         if ($action === 'delete_topic') {
             $qiid=(int)$_POST['qitem_id'];
@@ -178,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("DELETE FROM questionnaire_item WHERE id=?")->execute([$qiid]);
             $pdo->prepare("DELETE FROM admin_item WHERE id=? AND data_source='survey'")->execute([$aiid]);
             reaggregate_survey($pdo,$smaker,$pyear,$pgroup);
-            header("Location: $redir&msg=".urlencode('ลบหัวข้อแล้ว')); exit;
+            header("Location: $redir&msg=".urlencode('ลบหัวข้อแล้ว').$DETAIL); exit;
         }
         // ---- survey: บันทึกค่าเฉลี่ย (ของคณะเจ้าของ $smaker) ----
         if ($action === 'save_survey') {
@@ -186,18 +196,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $map=$pdo->prepare("SELECT qi.id, qi.admin_item_id FROM questionnaire_item qi JOIN questionnaire q ON q.id=qi.questionnaire_id WHERE q.year_id=? AND q.audience=? AND q.affiliation_id=?");
             $map->execute([$pyear,$pgroup,$smaker]); $map=$map->fetchAll(PDO::FETCH_KEY_PAIR);
             $resp=$_POST['resp']??[]; $avg=$_POST['avg']??[];
+            // ค่าผิด (ไม่ใช่ตัวเลข / ติดลบ / เกิน 1,000,000) ในหัวข้อของแบบสอบถามนี้ → ไม่บันทึกทั้งฟอร์ม
+            officer_require_valid_vols(array_merge(array_map(fn($q)=>$resp[$q]??'', array_keys($map)), array_map(fn($q)=>$avg[$q]??'', array_keys($map))), 'ผู้ตอบ/ค่าเฉลี่ย');
+            // ผู้ตอบ × ค่าเฉลี่ย เกินความจุ → ไม่บันทึกทั้งฟอร์ม (ตรวจก่อนเริ่ม transaction · ตัวตรวจค่าชุดเดียวกับตอนบันทึก)
+            $over=[];
+            foreach ($map as $qiid=>$aiid) {
+                if (collect_survey_over_max(collect_clean_count($resp[$qiid]??''), officer_clean_vol($avg[$qiid]??''))) $over[]=(int)$aiid;
+            }
+            if ($over) {
+                $names=$pdo->query("SELECT name_tiem FROM admin_item WHERE id IN (".implode(',',$over).") ORDER BY id")->fetchAll(PDO::FETCH_COLUMN);
+                throw new Exception('ผู้ตอบ × ค่าเฉลี่ย ของหัวข้อ "'.implode('", "',array_slice($names,0,3)).'"'.(count($names)>3?' ฯลฯ':'')
+                    .' เกิน 999,999,999 จึงยังไม่บันทึก กรุณาตรวจค่าที่กรอก');
+            }
             $pdo->beginTransaction();
             $up=$pdo->prepare("INSERT INTO survey_summary (affiliation_id,year_id,questionnaire_item_id,admin_item_id,respondents,avg_value,created_by)
                 VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE respondents=VALUES(respondents),avg_value=VALUES(avg_value)");
             $del=$pdo->prepare("DELETE FROM survey_summary WHERE affiliation_id=? AND year_id=? AND questionnaire_item_id=?");
             foreach ($map as $qiid=>$aiid) {
-                $r=(int)($resp[$qiid]??0); $a=(float)($avg[$qiid]??0);
+                // ค่าเดียวกับที่หน้าเว็บตรวจ: ผู้ตอบเป็นจำนวนเต็ม, ไม่ติดลบ, ไม่เกิน 1,000,000, คั่นหลักพันได้
+                $r=collect_clean_count($resp[$qiid]??''); $a=officer_clean_vol($avg[$qiid]??'');
                 if ($r>0 && $a>0) $up->execute([$paffil,$pyear,$qiid,$aiid,$r,$a,$_SESSION['user_id']??null]);
                 else $del->execute([$paffil,$pyear,$qiid]);
             }
             reaggregate_survey($pdo,$paffil,$pyear,$pgroup);
             $pdo->commit();
-            header("Location: $redir&msg=".urlencode('บันทึกแบบสอบถามแล้ว')); exit;
+            header("Location: $redir&msg=".urlencode('บันทึกแบบสอบถามแล้ว').$DETAIL); exit;
         }
         // ---- event ----
         if ($action === 'add_event') {
@@ -211,7 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("INSERT INTO event (name,kind,affiliation_id,organizer_name,year_id,event_date,event_end_date,created_by) VALUES (?,?,?,?,?,?,?,?)")
                 ->execute([$name,$kind,$affil,$oname,$pyear,$date,$end,$_SESSION['user_id']??null]);
             $eid=(int)$pdo->lastInsertId();
-            header("Location: $redir&event=$eid&msg=".urlencode('เพิ่มกิจกรรมแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('เพิ่มกิจกรรมแล้ว').$DETAIL); exit;
         }
         if ($action === 'edit_event') {
             $eid=(int)$_POST['event_id'];
@@ -224,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($end!==null && $date===null) throw new Exception('กรุณากรอกวันที่เริ่มก่อนวันสิ้นสุด');
             $pdo->prepare("UPDATE event SET name=?, event_date=?, event_end_date=? WHERE id=?")
                 ->execute([$name,$date,$end,$eid]);
-            header("Location: $redir&event=$eid&msg=".urlencode('แก้ไขกิจกรรมแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('แก้ไขกิจกรรมแล้ว').$DETAIL); exit;
         }
         if ($action === 'delete_event') {
             $eid=(int)$_POST['event_id'];
@@ -240,39 +263,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             header("Location: $redir&msg=".urlencode('ลบกิจกรรมแล้ว')); exit;
         }
-        if ($action === 'add_item') {
-            $eid=(int)$_POST['event_id']; $aiid=(int)$_POST['admin_item_id']; $vol=(float)$_POST['vol'];
-            $row=$pdo->prepare("SELECT affiliation_id,year_id FROM event WHERE id=?"); $row->execute([$eid]); $row=$row->fetch();
-            if (!$row) throw new Exception('ไม่พบกิจกรรม');
-            if (!$is_admin && (int)$row['affiliation_id']!==(int)$lock_affil) throw new Exception('ไม่มีสิทธิ์');
-            $pdo->prepare("INSERT INTO event_item (event_id,admin_item_id,Vol) VALUES (?,?,?)")->execute([$eid,$aiid,$vol]);
-            reaggregate_events($pdo,(int)$row['affiliation_id'],(int)$row['year_id']);
-            header("Location: $redir&event=$eid&msg=".urlencode('เพิ่มรายการแล้ว')); exit;
-        }
-        // ---- event: นิยามรายการ EF เอง (ชื่อ/หน่วย/scope/EF) ราย "ปี" ใช้ร่วมทุกกิจกรรม ----
+        // (เดิมมี add_item / delete_item — ไม่มีปุ่มเรียกใช้แล้ว และไม่ตรวจว่ารายการเป็นของกิจกรรมนั้น → ลบออก
+        //  การกรอก/ล้างปริมาณทำผ่าน save_event_items ที่ตรวจรายการของกิจกรรมครบ)
+        // ---- event: นิยามรายการ EF เอง (ชื่อ/หน่วย/scope/EF) ของกิจกรรมนี้ ----
         if ($action === 'add_event_topic') {
             $eid=(int)$_POST['event_id'];
             $label=trim($_POST['label']); $unit=trim($_POST['unit']);
-            $scope=(int)$_POST['scope']; $ad=(float)$_POST['ad'];
+            $scope=(int)($_POST['scope'] ?? 0); officer_require_valid_vols([$_POST['ad'] ?? ''], 'ค่า EF', true); $ad=officer_clean_vol($_POST['ad'] ?? '');
             if ($label==='') throw new Exception('กรอกชื่อรายการ');
-            $agid=(int)$pdo->query("SELECT id FROM admin_g WHERE scope=$scope ORDER BY id LIMIT 1")->fetchColumn();
-            if (!$agid) throw new Exception("ไม่พบขอบเขต Scope $scope");
+            [$agid, $scope] = resolve_admin_g($pdo, (int)($_POST['group_id'] ?? 0), $scope, INDIRECT_SCOPE);
             if (!$eid) throw new Exception('ไม่พบกิจกรรม');
             // สิทธิ์: officer เพิ่มรายการได้เฉพาะกิจกรรมของคณะตัวเอง
-            $evown=$pdo->prepare("SELECT affiliation_id FROM event WHERE id=?"); $evown->execute([$eid]); $evown=$evown->fetch();
+            $evown=$pdo->prepare("SELECT affiliation_id, year_id FROM event WHERE id=?"); $evown->execute([$eid]); $evown=$evown->fetch();
             if (!$evown) throw new Exception('ไม่พบกิจกรรม');
             if (!$is_admin && (int)$evown['affiliation_id']!==(int)$lock_affil) throw new Exception('ไม่มีสิทธิ์');
+            // ปีของรายการ = ปีของกิจกรรม (ไม่ใช้ year_id จากฟอร์ม — ปีไม่ตรงแล้วรายงานคณะนับ แต่รายงานทั้ง มพ. ไม่นับ)
             $pdo->prepare("INSERT INTO admin_item (year_id,scope,name_tiem,unit,AD,data_source,event_id) VALUES (?,?,?,?,?,'event',?)")
-                ->execute([$pyear,$agid,$label,$unit,$ad,$eid]);
-            header("Location: $redir&event=$eid&msg=".urlencode('เพิ่มรายการแล้ว')); exit;
+                ->execute([(int)$evown['year_id'],$agid,$label,$unit,$ad,$eid]);
+            header("Location: $redir&event=$eid&msg=".urlencode('เพิ่มรายการแล้ว').$DETAIL); exit;
         }
         if ($action === 'edit_event_topic') {
             $aiid=(int)$_POST['admin_item_id']; $eid=(int)$_POST['event_id'];
             $label=trim($_POST['label']); $unit=trim($_POST['unit']);
-            $scope=(int)$_POST['scope']; $ad=(float)$_POST['ad'];
+            $scope=(int)($_POST['scope'] ?? 0); officer_require_valid_vols([$_POST['ad'] ?? ''], 'ค่า EF', true); $ad=officer_clean_vol($_POST['ad'] ?? '');
             if ($label==='') throw new Exception('กรอกชื่อรายการ');
-            $agid=(int)$pdo->query("SELECT id FROM admin_g WHERE scope=$scope ORDER BY id LIMIT 1")->fetchColumn();
-            if (!$agid) throw new Exception("ไม่พบขอบเขต Scope $scope");
+            [$agid, $scope] = resolve_admin_g($pdo, (int)($_POST['group_id'] ?? 0), $scope, INDIRECT_SCOPE);
             // สิทธิ์: officer แก้ไขได้เฉพาะรายการของกิจกรรมคณะตัวเอง (ตรวจจาก admin_item → event จริง)
             $own=$pdo->prepare("SELECT e.affiliation_id FROM admin_item ai JOIN event e ON e.id=ai.event_id WHERE ai.id=? AND ai.data_source='event'");
             $own->execute([$aiid]); $own=$own->fetch();
@@ -281,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Vol ใน user_item ไม่เปลี่ยน (AD/scope อ่านสดตอนแสดงผล) จึงไม่ต้อง reaggregate
             $pdo->prepare("UPDATE admin_item SET scope=?, name_tiem=?, unit=?, AD=? WHERE id=? AND data_source='event'")
                 ->execute([$agid,$label,$unit,$ad,$aiid]);
-            header("Location: $redir&event=$eid&msg=".urlencode('แก้ไขรายการแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('แก้ไขรายการแล้ว').$DETAIL); exit;
         }
         if ($action === 'delete_event_topic') {
             $aiid=(int)$_POST['admin_item_id']; $eid=(int)$_POST['event_id'];
@@ -298,7 +313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("DELETE FROM admin_item WHERE id=? AND data_source='event'")->execute([$aiid]);
             foreach ($affs as $a) reaggregate_events($pdo,(int)$a['affiliation_id'],(int)$a['year_id']);
             $pdo->commit();
-            header("Location: $redir&event=$eid&msg=".urlencode('ลบรายการแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('ลบรายการแล้ว').$DETAIL); exit;
         }
         // ---- event: บันทึกทั้งตาราง (กรอก Vol ราย EF แล้วบันทึกทีเดียว เหมือนแบบสอบถาม) ----
         if ($action === 'save_event_items') {
@@ -310,22 +325,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $valid=$pdo->prepare("SELECT id FROM admin_item WHERE data_source='event' AND event_id=?");
             $valid->execute([$eid]); $valid=array_map('intval',$valid->fetchAll(PDO::FETCH_COLUMN));
             $vols=$_POST['vol'] ?? [];
+            officer_require_valid_vols(array_intersect_key((array)$vols, array_flip($valid)));   // ค่าผิดในรายการของกิจกรรมนี้ → ไม่บันทึกทั้งตาราง
             $pdo->beginTransaction();
             $pdo->prepare("DELETE FROM event_item WHERE event_id=?")->execute([$eid]);
             $ins=$pdo->prepare("INSERT INTO event_item (event_id,admin_item_id,Vol) VALUES (?,?,?)");
-            foreach ($vols as $aiid=>$v){ $aiid=(int)$aiid; $v=(float)$v;
+            foreach ($vols as $aiid=>$v){ $aiid=(int)$aiid; $v=officer_clean_vol($v);
                 if ($v>0 && in_array($aiid,$valid,true)) $ins->execute([$eid,$aiid,$v]); }
             reaggregate_events($pdo,(int)$row['affiliation_id'],(int)$row['year_id']);
             $pdo->commit();
-            header("Location: $redir&event=$eid&msg=".urlencode('บันทึกรายการแล้ว')); exit;
-        }
-        if ($action === 'delete_item') {
-            $iid=(int)$_POST['item_id']; $eid=(int)$_POST['event_id'];
-            $row=$pdo->prepare("SELECT affiliation_id,year_id FROM event WHERE id=?"); $row->execute([$eid]); $row=$row->fetch();
-            if ($row && !$is_admin && (int)$row['affiliation_id']!==(int)$lock_affil) throw new Exception('ไม่มีสิทธิ์');
-            $pdo->prepare("DELETE FROM event_item WHERE id=?")->execute([$iid]);
-            if ($row) reaggregate_events($pdo,(int)$row['affiliation_id'],(int)$row['year_id']);
-            header("Location: $redir&event=$eid&msg=".urlencode('ลบรายการแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('บันทึกรายการแล้ว').$DETAIL); exit;
         }
         // ---- event: บันทึกปริมาณดูดกลับทั้งตาราง (เหมือนหน้า GHG Removal) → ไหลเข้ายอด Removal ----
         // factor มาจาก removal_item (กำหนดโดยศูนย์ฯ) คณะกรอกปริมาณต่อรายการแล้วบันทึกทีเดียว
@@ -336,12 +344,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$is_admin && (int)$row['affiliation_id']!==(int)$lock_affil) throw new Exception('ไม่มีสิทธิ์');
             $qty=$_POST['qty'] ?? [];
             // อัปเดตปริมาณเฉพาะรายการดูดกลับ "ของกิจกรรมนี้" (คีย์ด้วย removal_event_item.id)
+            $ids=$pdo->prepare("SELECT id FROM removal_event_item WHERE event_id=?"); $ids->execute([$eid]); $ids=$ids->fetchAll(PDO::FETCH_COLUMN);
+            officer_require_valid_vols(array_map(fn($reid)=>$qty[$reid]??'', $ids));   // ค่าผิด → ไม่บันทึกทั้งตาราง
             $upd=$pdo->prepare("UPDATE removal_event_item SET qty=? WHERE id=? AND event_id=?");
-            $ids=$pdo->prepare("SELECT id FROM removal_event_item WHERE event_id=?"); $ids->execute([$eid]);
-            foreach ($ids->fetchAll(PDO::FETCH_COLUMN) as $reid) {
-                $upd->execute([max(0,(float)($qty[$reid] ?? 0)), $reid, $eid]);
+            foreach ($ids as $reid) {
+                $upd->execute([officer_clean_vol($qty[$reid] ?? ''), $reid, $eid]);
             }
-            header("Location: $redir&event=$eid&msg=".urlencode('บันทึกปริมาณดูดกลับแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('บันทึกปริมาณดูดกลับแล้ว').$DETAIL); exit;
         }
         // ---- event: เพิ่มรายการดูดกลับ "ของกิจกรรมนี้" (เก็บ factor ในตัวเอง แยกจากหน้ากลาง) ----
         if ($action === 'add_removal_item') {
@@ -349,11 +358,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $row=$pdo->prepare("SELECT affiliation_id FROM event WHERE id=?"); $row->execute([$eid]); $row=$row->fetch();
             if (!$row) throw new Exception('ไม่พบกิจกรรม');
             if (!$is_admin && (int)$row['affiliation_id']!==(int)$lock_affil) throw new Exception('ไม่มีสิทธิ์');
-            $name=trim($_POST['name'] ?? ''); $unit=trim($_POST['unit'] ?? ''); $factor=max(0,(float)($_POST['factor'] ?? 0));
+            $name=trim($_POST['name'] ?? ''); $unit=trim($_POST['unit'] ?? ''); officer_require_valid_vols([$_POST['factor'] ?? ''], 'ค่าดูดกลับ', true); $factor=officer_clean_vol($_POST['factor'] ?? '');
             if ($name==='') throw new Exception('กรุณาระบุชื่อรายการ');
             $pdo->prepare("INSERT INTO removal_event_item (event_id,name_tiem,unit,factor,qty) VALUES (?,?,?,?,0)")
                 ->execute([$eid,$name,$unit,$factor]);
-            header("Location: $redir&event=$eid&msg=".urlencode('เพิ่มรายการดูดกลับแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('เพิ่มรายการดูดกลับแล้ว').$DETAIL); exit;
         }
         // ---- event: แก้ไขรายการดูดกลับ (ชื่อ/หน่วย/factor) ของกิจกรรมนี้ ----
         if ($action === 'edit_event_removal') {
@@ -361,11 +370,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $row=$pdo->prepare("SELECT affiliation_id FROM event WHERE id=?"); $row->execute([$eid]); $row=$row->fetch();
             if (!$row) throw new Exception('ไม่พบกิจกรรม');
             if (!$is_admin && (int)$row['affiliation_id']!==(int)$lock_affil) throw new Exception('ไม่มีสิทธิ์');
-            $name=trim($_POST['name'] ?? ''); $unit=trim($_POST['unit'] ?? ''); $factor=max(0,(float)($_POST['factor'] ?? 0));
+            $name=trim($_POST['name'] ?? ''); $unit=trim($_POST['unit'] ?? ''); officer_require_valid_vols([$_POST['factor'] ?? ''], 'ค่าดูดกลับ', true); $factor=officer_clean_vol($_POST['factor'] ?? '');
             if ($name==='') throw new Exception('กรุณาระบุชื่อรายการ');
             $pdo->prepare("UPDATE removal_event_item SET name_tiem=?, unit=?, factor=? WHERE id=? AND event_id=?")
                 ->execute([$name,$unit,$factor,$reid,$eid]);
-            header("Location: $redir&event=$eid&msg=".urlencode('แก้ไขรายการแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('แก้ไขรายการแล้ว').$DETAIL); exit;
         }
         // ---- event: ลบรายการดูดกลับของกิจกรรมนี้ ----
         if ($action === 'delete_event_removal') {
@@ -373,50 +382,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $row=$pdo->prepare("SELECT affiliation_id FROM event WHERE id=?"); $row->execute([$eid]); $row=$row->fetch();
             if ($row && !$is_admin && (int)$row['affiliation_id']!==(int)$lock_affil) throw new Exception('ไม่มีสิทธิ์');
             $pdo->prepare("DELETE FROM removal_event_item WHERE id=? AND event_id=?")->execute([$reid,$eid]);
-            header("Location: $redir&event=$eid&msg=".urlencode('ลบรายการแล้ว')); exit;
+            header("Location: $redir&event=$eid&msg=".urlencode('ลบรายการแล้ว').$DETAIL); exit;
         }
-    } catch (Exception $e) { $flash='ผิดพลาด: '.$e->getMessage(); $flash_t='danger'; }
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $flash='ผิดพลาด: '.safe_error_message($e); $flash_t='danger';
+    }
 }
 if (isset($_GET['msg'])) $flash = $_GET['msg'];
 
-// ── โหลดข้อมูลตามแท็บ ──
-$rows = []; $events = []; $curEvent = null; $curItems = []; $curVol = []; $ef_items = []; $year_total = 0; $group_options = [];
-if ($is_survey) {
-    // รายชื่อกลุ่มสำหรับ dropdown = กลุ่มมาตรฐาน ∪ กลุ่มที่มีอยู่แล้วในปีนี้ "ของคณะเจ้าของ" ∪ กลุ่มที่เลือกอยู่
-    $existing = $pdo->prepare("SELECT DISTINCT audience FROM questionnaire WHERE year_id=? AND affiliation_id=?");
-    $existing->execute([$selected_year, $survey_affil]);
-    $group_options = array_values(array_unique(array_merge($DEFAULT_GROUPS, $existing->fetchAll(PDO::FETCH_COLUMN), [$group])));
+// ── โหลดข้อมูล ──
+// รายการของทั้งสองแท็บโหลดเสมอ → การ์ดสรุป 3 ใบ + ตัวเลขบนแท็บ ตรงกันทุกแท็บ
+//   admin: ทุกคณะ · officer: เฉพาะคณะตัวเอง
+$questionnaires = collect_survey_list($pdo, $selected_year, $is_admin ? null : (int)$survey_affil);
+$events         = collect_event_list($pdo, $selected_year, $is_admin ? null : (int)$lock_affil);
+$totals         = collect_totals($questionnaires, $events);
 
-    // รายการ "แบบสอบถามทั้งหมด" ของปีนี้ + จำนวนรายการ + ยอดรวม (tCO₂e ตามคณะเจ้าของแต่ละแถว)
-    //   admin: เห็นทุกคณะ (มีคอลัมน์ผู้จัดทำ) · officer: เฉพาะคณะตัวเอง
-    $qlist = $pdo->prepare("
-        SELECT q.id AS qid, q.audience AS name, q.affiliation_id AS affid, a.affiliation_item AS maker_name,
-               COUNT(DISTINCT qi.id) AS item_count,
-               (SELECT COUNT(*) FROM evidence ev WHERE ev.entity_type='questionnaire' AND ev.entity_id=q.id) AS ev_count,
-               COALESCE(SUM(COALESCE(ss.respondents,0)*COALESCE(ss.avg_value,0)*ai.AD)/1000, 0) AS tco2e
-        FROM questionnaire q
-        JOIN affiliation_id a ON a.id = q.affiliation_id
-        LEFT JOIN questionnaire_item qi ON qi.questionnaire_id = q.id
-        LEFT JOIN admin_item ai ON ai.id = qi.admin_item_id
-        LEFT JOIN survey_summary ss ON ss.questionnaire_item_id = qi.id AND ss.affiliation_id = q.affiliation_id AND ss.year_id = :y
-        WHERE q.year_id = :y2" . ($is_admin ? '' : " AND q.affiliation_id = :aff2") . "
-        GROUP BY q.id, q.audience, q.affiliation_id, a.affiliation_item
-        ORDER BY " . ($is_admin ? "a.affiliation_item, " : "") . "q.audience");
-    $qp = [':y'=>$selected_year, ':y2'=>$selected_year];
-    if (!$is_admin) $qp[':aff2'] = $survey_affil;
-    $qlist->execute($qp);
-    $questionnaires = $qlist->fetchAll();
+$rows = []; $curEvent = null; $curVol = []; $ef_items = []; $rm_rows = [];
+$sel_survey_exists = false; $survey_affil_name = ''; $org_options = [];
+if ($is_survey) {
     // แบบสอบถามที่เลือกอยู่มีจริงไหม (ตรงทั้งชื่อ + คณะเจ้าของ เพราะชื่อซ้ำข้ามคณะได้)
-    $sel_survey_exists = false;
     foreach ($questionnaires as $qq) { if ($qq['name'] === $group && (int)$qq['affid'] === (int)$survey_affil) { $sel_survey_exists = true; break; } }
 
-    // ชื่อคณะของ "ผู้จัดทำ" ปัจจุบัน — ใช้แสดงต่อท้ายหัวข้อ (ให้เข้าชุดกับฝั่งกิจกรรม)
+    // ชื่อคณะของ "ผู้จัดทำ" ปัจจุบัน — แสดงใต้ชื่อแบบสอบถามในส่วนรายละเอียด
     $snm = $pdo->prepare("SELECT affiliation_item FROM affiliation_id WHERE id=?");
     $snm->execute([$survey_affil]);
     $survey_affil_name = (string)($snm->fetchColumn() ?: '');
 
     $it = $pdo->prepare("
         SELECT qi.id AS qiid, ai.name_tiem AS label, qi.admin_item_id, ai.unit, ai.AD, ag.scope,
+               ai.scope AS group_id, ag.name_tiem AS group_name,
                COALESCE(ss.respondents,0) AS respondents, COALESCE(ss.avg_value,0) AS avg_value,
                (COALESCE(ss.respondents,0)*COALESCE(ss.avg_value,0)*ai.AD)/1000 AS emission
         FROM questionnaire q
@@ -427,51 +422,23 @@ if ($is_survey) {
         WHERE q.year_id=:y2 AND q.audience=:grp AND q.affiliation_id=:aff2 ORDER BY qi.order_num, qi.id");
     $it->execute([':aff'=>$sel_affil, ':y'=>$selected_year, ':y2'=>$selected_year, ':grp'=>$group, ':aff2'=>$survey_affil]);
     $rows = $it->fetchAll();
-    // ยอดรวมมุมบน = รวมทุกแบบสอบถามของปีนี้เสมอ (ไม่เปลี่ยนตามแบบสอบถามที่เลือก)
-    $year_total = array_sum(array_map(fn($q)=>(float)$q['tco2e'], $questionnaires));
 } else { // event
-    // รายชื่อผู้จัดสำหรับ dropdown (admin) = คณะในระบบ + ผู้จัดอิสระที่เคยกรอกในปีนี้
     // ตัวเลือกผู้จัดสำหรับฟอร์มเพิ่มกิจกรรม (admin) = คณะในระบบ + ผู้จัดอิสระที่เคยกรอกในปีนี้
-    $org_options = [];
     if ($is_admin) {
         foreach ($affils as $a) $org_options[] = ['value'=>'aff:'.$a['id'], 'label'=>$a['affiliation_item']];
         $cst = $pdo->prepare("SELECT DISTINCT organizer_name FROM event WHERE year_id=? AND organizer_name IS NOT NULL AND organizer_name<>''");
         $cst->execute([$selected_year]);
         foreach ($cst->fetchAll(PDO::FETCH_COLUMN) as $cn) $org_options[] = ['value'=>'custom:'.$cn, 'label'=>$cn];
     }
-    // admin เห็นทุกกิจกรรมของปีนั้น; officer เห็นเฉพาะกิจกรรมของคณะตัวเอง
-    $evStmt = $pdo->prepare("SELECT e.id, e.name, e.kind, e.event_date, e.event_end_date, e.affiliation_id, e.organizer_name,
-            COALESCE(e.organizer_name, a.affiliation_item) AS org_label,
-            COALESCE(SUM(ei.Vol*ai.AD)/1000,0) AS tco2e, COUNT(ei.id) AS item_count,
-            (SELECT COALESCE(SUM(rei.qty*rei.factor)/1000,0) FROM removal_event_item rei WHERE rei.event_id=e.id) AS removal_tco2e,
-            (SELECT COUNT(*) FROM removal_event_item rei WHERE rei.event_id=e.id) AS removal_count,
-            (SELECT COUNT(*) FROM evidence ev WHERE ev.entity_type='event' AND ev.entity_id=e.id) AS ev_count
-        FROM event e JOIN affiliation_id a ON a.id=e.affiliation_id
-        LEFT JOIN event_item ei ON ei.event_id=e.id LEFT JOIN admin_item ai ON ai.id=ei.admin_item_id
-        WHERE e.year_id=:y" . ($is_admin ? '' : " AND e.affiliation_id=:lock") . " GROUP BY e.id ORDER BY e.event_date DESC, e.id DESC");
-    $p=[':y'=>$selected_year];
-    if (!$is_admin) $p[':lock']=(int)$lock_affil;
-    $evStmt->execute($p);
-    $events = $evStmt->fetchAll();
-    // แยกยอดตามประเภท: ปล่อย (emission) กับ ดูดกลับ (removal) — ไม่รวมกัน (คนละหมวดตามหลัก)
-    // กิจกรรมมีได้ทั้งปล่อย+ดูดกลับ → รวมแยกตามชนิดรายการ ไม่ผูกกับ kind ของกิจกรรม
-    $ev_emit_total = array_sum(array_map(fn($e)=>(float)$e['tco2e'], $events));
-    $ev_rmv_total  = array_sum(array_map(fn($e)=>(float)$e['removal_tco2e'], $events));
-    $year_total = $ev_emit_total;
     if ($sel_event) {
         foreach ($events as $e) if ((int)$e['id']===$sel_event) { $curEvent=$e; break; }
-        if ($curEvent) {
-            $it=$pdo->prepare("SELECT ei.id, ei.admin_item_id, ei.Vol, ai.name_tiem, ai.unit, ai.AD, ag.scope, (ei.Vol*ai.AD)/1000 AS emission
-                FROM event_item ei JOIN admin_item ai ON ai.id=ei.admin_item_id JOIN admin_g ag ON ag.id=ai.scope
-                WHERE ei.event_id=? ORDER BY ag.scope, ai.name_tiem");
-            $it->execute([$sel_event]); $curItems=$it->fetchAll();
-            foreach ($curItems as $ci) $curVol[(int)$ci['admin_item_id']] = (float)$ci['Vol']; // map ค่า Vol เดิมไว้ prefill
-        }
     }
-    // รายการ EF เฉพาะของกิจกรรมที่เลือก (ผูกด้วย event_id) — ไม่แชร์ข้ามกิจกรรม
-    $rm_rows = [];
-    if ($sel_event) {
-        $ef=$pdo->prepare("SELECT ai.id, ai.name_tiem, ai.unit, ai.AD, ag.scope FROM admin_item ai JOIN admin_g ag ON ag.id=ai.scope
+    if ($curEvent) {
+        $it=$pdo->prepare("SELECT ei.admin_item_id, ei.Vol FROM event_item ei WHERE ei.event_id=?");
+        $it->execute([$sel_event]);
+        foreach ($it->fetchAll() as $ci) $curVol[(int)$ci['admin_item_id']] = (float)$ci['Vol']; // map ค่า Vol เดิมไว้ prefill
+        // รายการ EF เฉพาะของกิจกรรมที่เลือก (ผูกด้วย event_id) — ไม่แชร์ข้ามกิจกรรม
+        $ef=$pdo->prepare("SELECT ai.id, ai.name_tiem, ai.unit, ai.AD, ag.scope, ai.scope AS group_id, ag.name_tiem AS group_name FROM admin_item ai JOIN admin_g ag ON ag.id=ai.scope
             WHERE ai.data_source='event' AND ai.event_id=? ORDER BY ag.scope, ai.name_tiem");
         $ef->execute([$sel_event]); $ef_items=$ef->fetchAll();
         // รายการดูดกลับ "เฉพาะของกิจกรรมนี้" (แยกขาดจากหน้ากลาง — เก็บ factor ในตัวเอง)
@@ -480,6 +447,14 @@ if ($is_survey) {
         $rme->execute([$sel_event]); $rm_rows=$rme->fetchAll();
     }
 }
+
+$h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+$arrow = '<span class="oe-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>';
+$svg_edit = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+$svg_del  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+$svg_clip = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+$svg_save = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
+$i = 0;   // ลำดับแอนิเมชันลอยขึ้น
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -489,803 +464,667 @@ if ($is_survey) {
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
 </head>
 <body style="background:#F6F4F9;">
     <?php include $SIDEBAR; ?>
     <main class="main-content">
         <?php include $HEADER; ?>
-        <style>
-            .co { padding:26px 30px 70px; max-width:none; }
-            .co h1 { font-size:1.4rem; font-weight:800; color:#2A2233; margin:0 0 12px; }
-            .flash { display:flex; align-items:center; gap:10px; border-radius:12px; padding:12px 16px; font-weight:600; margin-bottom:16px; }
-            .flash svg { flex-shrink:0; } .flash.success{background:#DCFCE7;color:#166534;} .flash.danger{background:#FEE2E2;color:#B91C1C;}
-            .card { background:#fff; border:1px solid #E7E3EC; border-radius:16px; padding:20px 22px; margin-bottom:16px; }
-            .card h2 { font-size:1.05rem; font-weight:800; margin:0 0 14px; color:#2A2233; overflow-wrap:anywhere; word-break:break-word; }
-            .tabs{display:inline-flex;gap:6px;background:#F1EEF5;border-radius:999px;padding:4px;margin-bottom:16px;}
-            .tabs a{padding:8px 20px;border-radius:999px;text-decoration:none;font-weight:700;font-size:.92rem;color:#5B5168;}
-            .tabs a.on{background:#62368B;color:#fff;box-shadow:0 6px 14px rgba(98,54,139,.25);}
-            .row-top{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
-            .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
-            .full{grid-column:1/-1;}
-            .fld label{display:block;font-size:.8rem;font-weight:600;color:#4B4155;margin:0 0 5px;}
-            .fld input{width:100%;}
-            table.t{width:100%;border-collapse:collapse;}
-            table.t th{text-align:center;font-size:.75rem;color:#6B7280;padding:8px 10px;border-bottom:1px solid #E7E3EC;}
-            table.t td{padding:9px 10px;border-bottom:1px solid #F1EEF5;font-size:.92rem;text-align:center;vertical-align:middle;overflow-wrap:anywhere;}
-            /* ชื่อกิจกรรม/แบบสอบถามในลิสต์: ยาวเกินให้ตัดด้วย ... (hover เห็นชื่อเต็ม) */
-            .evt-name{ flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-            /* คอลัมน์แรก (คำถาม/กิจกรรม) ชิดซ้าย ที่เหลือกึ่งกลาง — เหมือนตารางขอบเขต 1 */
-            table.t th:first-child, table.t td:first-child{text-align:left;}
-            /* แถวกิจกรรม: hover จาง → active (เลือกอยู่) เข้ม + แถบม่วงซ้าย, กดชื่อซ้ำ = ปิด */
-            table.t tr.evt td{transition:background .15s ease;}
-            table.t tr.evt:hover td{background:#F5F1FA;}
-            table.t tr.sel td{background:#EDE9FE;}
-            table.t tr.sel td:first-child{box-shadow:inset 3px 0 0 #62368B;}
-            /* มุมโค้งปลายแถบไฮไลต์ทั้งตอน hover และ active */
-            table.t tr.evt:hover td:first-child, table.t tr.sel td:first-child{border-top-left-radius:12px;border-bottom-left-radius:12px;}
-            table.t tr.evt:hover td:last-child, table.t tr.sel td:last-child{border-top-right-radius:12px;border-bottom-right-radius:12px;}
-            /* เว้นที่หายใจปลายแถว → ปุ่ม/ข้อความไม่ชิดขอบแถบไฮไลต์ */
-            table.t td:first-child{padding-left:16px;}
-            table.t td:last-child{padding-right:16px;}
-            .linkish:hover{text-decoration:underline;}
-            .num{text-align:center;font-variant-numeric:tabular-nums;}
-            .sdot{font-size:.7rem;font-weight:800;padding:2px 8px;border-radius:6px;}
-            .s1{background:#FFF7ED;color:#F97316;}.s2{background:#FDF2F8;color:#EC4899;}.s3{background:#EFF6FF;color:#3B82F6;}
-            .inp{width:120px;border:1px solid #E7E3EC;border-radius:8px;padding:7px 10px;font:inherit;text-align:center;background:#fff;}
-            .del{background:none;border:1px solid #E7E3EC;border-radius:8px;color:#EF4444;cursor:pointer;padding:5px 10px;font:inherit;transition:transform .2s ease,background .2s ease,border-color .2s ease;}
-            .del:hover{transform:translateY(-2px);background:#FEF2F2;border-color:#EF4444;}
-            .icobtn{border:none;width:36px;height:36px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#fff;transition:all .2s;vertical-align:middle;margin:0 3px;}
-            .icobtn.edit{background:#3B82F6;box-shadow:0 4px 10px rgba(59,130,246,.2);}
-            .icobtn.edit:hover{background:#2563EB;transform:translateY(-2px);}
-            .icobtn.del{background:#EF4444;box-shadow:0 4px 10px rgba(239,68,68,.2);}
-            .icobtn.del:hover{background:#DC2626;transform:translateY(-2px);}
-            /* ปุ่มเพิ่มแบบสอบถาม/เพิ่มกิจกรรม: ตัดเงาออก */
-            .co .btn-c.btn-noshadow,.co .btn-c.btn-noshadow:hover{box-shadow:none;}
-            /* effect การ์ดเด้งขึ้น (เหมือน .modal-box) สำหรับ modal custom ในหน้านี้ */
-            @keyframes coPop{from{opacity:0;transform:translateY(50px) scale(.9);}to{opacity:1;transform:translateY(0) scale(1);}}
-            .co-pop{animation:coPop .5s cubic-bezier(0.34,1.56,0.64,1);}
-            .tot{font-weight:800;color:#62368B;} .muted{color:#6B7280;font-size:.9rem;} .foot{display:flex;justify-content:flex-end;margin-top:14px;}
-            .frow{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;} .frow .fld{flex:1;min-width:150px;}
-            .linkish{color:#62368B;text-decoration:none;font-weight:600;}
-            .co .dd-trigger,.co .ti-input{height:auto;padding:9px 12px;border-radius:10px;font-family:inherit;font-size:1rem;font-weight:400;background:#fff;border-color:#E7E3EC;transition:border-color .2s ease,box-shadow .2s ease;}
-            /* effect ตอน focus: ขอบม่วง + glow (specificity 0,3,0 ชนะ .co .ti-input) ให้เหมือน dropdown/modal */
-            .co .ti-input:focus{outline:none;border-color:#62368B;box-shadow:0 0 0 1px #62368B,0 0 0 4px rgba(98,54,139,.15);}
-            /* ล้างพื้นหลัง autofill (โทนฟ้า/ม่วง) ให้เป็นขาวในหน้านี้ */
-            .co .ti-input:-webkit-autofill,.inp:-webkit-autofill,
-            .co .ti-input:-webkit-autofill:hover,.inp:-webkit-autofill:hover,
-            .co .ti-input:-webkit-autofill:focus,.inp:-webkit-autofill:focus{
-                -webkit-box-shadow:0 0 0 1000px #fff inset;
-                -webkit-text-fill-color:#374151;
-                transition:background-color 9999s ease-in-out 0s;
-            }
-        </style>
+        <?php $toast_msg = $flash; $toast_type = $flash_t; include __DIR__ . '/../components/toast.php'; ?>
 
-        <div class="co">
-            <h1 style="display:flex;align-items:center;gap:8px;"><?= ic('note',22) ?> แบบสอบถาม & กิจกรรม</h1>
-            <?php if (count($TABS) > 1): ?>
-            <div class="tabs">
+        <div class="oe-page co-page">
+            <!-- หัวหน้า + ปี -->
+            <div class="oe-head oe-rise">
+                <div>
+                    <h1 class="oe-title">แบบสอบถาม &amp; กิจกรรม</h1>
+                    <div class="oe-sub"><?= $is_admin ? 'จัดการแบบสอบถามและกิจกรรมของทุกหน่วยงาน' : 'แบบสอบถามและกิจกรรมของหน่วยงานคุณ' ?> · ยอดปล่อยรวมเข้าขอบเขต 3</div>
+                </div>
+                <div class="oe-actions">
+                    <span class="co-year-label">ปีงบประมาณ</span>
+                    <?php $dd_id='coYear';$dd_name='year_nav';$dd_options=array_map(fn($y)=>['value'=>$y['year_id'],'label'=>(string)$y['year']],$years);
+                        $dd_selected=$selected_year;$dd_required=false;$dd_class='dd-field';$dd_placeholder='เลือกปี';$dd_style='width:120px;';
+                        include __DIR__.'/../components/dropdown.php'; ?>
+                </div>
+            </div>
+
+            <!-- การ์ดสรุป -->
+            <div class="co-kpis">
+                <div class="co-kpi oe-rise" style="--i:1;">
+                    <span class="co-kpi-ic"><?= ic('survey', 22) ?></span>
+                    <div><span class="co-kpi-label">แบบสอบถาม</span>
+                        <b class="co-kpi-val" data-co-kpi="survey"><?= collect_fmt($totals['survey']) ?> <small>tCO₂e</small></b>
+                        <span class="co-kpi-sub"><?= count($questionnaires) ?> แบบสอบถาม</span></div>
+                </div>
+                <div class="co-kpi oe-rise" style="--i:2;">
+                    <span class="co-kpi-ic"><?= ic('factory', 22) ?></span>
+                    <div><span class="co-kpi-label">กิจกรรม · ปล่อย</span>
+                        <b class="co-kpi-val" data-co-kpi="emit"><?= collect_fmt($totals['emit']) ?> <small>tCO₂e</small></b>
+                        <span class="co-kpi-sub"><?= count($events) ?> กิจกรรม</span></div>
+                </div>
+                <div class="co-kpi co-kpi-green oe-rise" style="--i:3;">
+                    <span class="co-kpi-ic"><?= ic('leaf', 22) ?></span>
+                    <div><span class="co-kpi-label">กิจกรรม · ดูดกลับ</span>
+                        <b class="co-kpi-val" data-co-kpi="removal"><?= collect_fmt($totals['removal']) ?> <small>tCO₂e</small></b>
+                        <span class="co-kpi-sub">รวมเข้า GHG Removal ของมหาวิทยาลัย</span></div>
+                </div>
+            </div>
+
+            <!-- แท็บ (แถบม่วงเลื่อนตามแท็บที่เลือก) -->
+            <nav class="co-tabs oe-rise" style="--i:4;" data-tab="<?= $tab ?>" aria-label="เลือกประเภทข้อมูล">
+                <span class="co-tab-ind" aria-hidden="true"></span>
                 <?php foreach ($TABS as $k=>$lbl):
-                    $href="collect.php?year=$selected_year&tab=$k";
-                    if ($k==='survey') $href.='&group='.urlencode($group); ?>
-                    <a class="<?= $tab===$k?'on':'' ?>" href="<?= $href ?>"
-                        onclick="return !this.classList.contains('on');"><?= $lbl ?></a>
+                    $href="collect.php?year=$selected_year&tab=$k" . ($k==='survey' ? '&group='.urlencode($group) : ''); ?>
+                    <a class="co-tab<?= $tab===$k ? ' is-on' : '' ?>" href="<?= $h($href) ?>" data-tab="<?= $k ?>" data-de-guard<?= $tab===$k ? ' aria-current="page"' : '' ?>>
+                        <?= $lbl ?> <span class="co-tab-n"><?= $k==='survey' ? count($questionnaires) : count($events) ?></span>
+                    </a>
                 <?php endforeach; ?>
-            </div>
-            <?php endif; ?>
-
-            <?php $toast_msg = $flash; $toast_type = $flash_t; include __DIR__ . '/../components/toast.php'; ?>
-
-            <div class="row-top">
-                <label style="font-weight:600;color:#4B4155;">ปี:</label>
-                <?php $dd_id='coYear';$dd_name='year_nav';$dd_options=array_map(fn($y)=>['value'=>$y['year_id'],'label'=>(string)$y['year']],$years);
-                    $dd_selected=$selected_year;$dd_required=false;$dd_class='dd-field';$dd_placeholder='เลือกปี';$dd_style='width:110px;';
-                    include __DIR__.'/../components/dropdown.php'; ?>
-                <?php if (!$is_survey): /* แท็บกิจกรรม: แยกยอดปล่อย/ดูดกลับ (คนละหมวด) */ ?>
-                <span class="muted" style="margin-left:auto;text-align:right;line-height:1.5;">
-                    กิจกรรมปล่อย: <span class="tot"><?= number_format($ev_emit_total,3) ?></span> tCO₂e<br>
-                    กิจกรรมดูดกลับ: <span style="color:#166534;font-weight:800;"><?= number_format($ev_rmv_total,3) ?></span> tCO₂e
-                </span>
-                <?php else: ?>
-                <span class="muted" style="margin-left:auto;">รวมทั้งหมด (แบบสอบถาม): <span class="tot"><?= number_format($year_total,3) ?></span> tCO₂e</span>
-                <?php endif; ?>
-            </div>
+            </nav>
 
             <?php if ($is_survey): /* ===== แท็บ แบบสอบถาม ===== */ ?>
-                <!-- เพิ่มแบบสอบถาม (+ ผู้จัดทำ สำหรับ admin) -->
-                <div class="card">
-                    <h2>＋ เพิ่มแบบสอบถาม</h2>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="add_questionnaire"><input type="hidden" name="tab" value="survey"><input type="hidden" name="year_id" value="<?= $selected_year ?>">
-                        <?php if (!$is_admin): ?><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>"><?php endif; ?>
-                        <?php if ($is_admin): ?>
-                        <!-- ผู้จัดทำ = field ในฟอร์ม (สร้างให้คณะไหน) — บรรทัดแยก, dropdown กว้างพอชื่อยาว -->
-                        <div class="fld" style="max-width:360px;margin-bottom:14px;"><label>ผู้จัดทำ (คณะเจ้าของ)</label>
-                            <?php $dd_id='surveyMaker';$dd_name='maker';
-                                $dd_options=array_map(fn($a)=>['value'=>$a['id'],'label'=>$a['affiliation_item']],$affils);
-                                $dd_selected=$survey_affil;$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือกผู้จัดทำ';$dd_style='width:100%;';
-                                include __DIR__.'/../components/dropdown.php'; ?>
-                        </div>
-                        <?php endif; ?>
-                        <div class="frow">
-                            <div class="fld" style="flex:1;min-width:240px;"><label>ชื่อแบบสอบถาม</label>
-                                <?php $ti_id='qName';$ti_name='q_name';$ti_required=true;$ti_maxlength=100;$ti_placeholder='เช่น นักศึกษา / บุคลากร / แบบสอบถามการเดินทาง';$ti_wrap_style='width:100%;';include __DIR__.'/../components/text_input.php'; ?></div>
-                            <div style="align-self:flex-end;"><?php $btn_label='เพิ่มแบบสอบถาม';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?></div>
-                        </div>
-                    </form>
-                    <?php if ($is_admin): ?><p class="muted" style="margin-top:10px;">เลือกคณะที่จะสร้างแบบสอบถามให้ · ส่วนหัวข้อ/ค่าเฉลี่ยด้านล่างจะตามแบบสอบถามที่คลิกเลือกในตาราง</p><?php endif; ?>
+            <section class="oe-panel co-list oe-rise" style="--i:5;">
+                <div class="co-panel-head">
+                    <h2 class="co-h2">แบบสอบถามทั้งหมด <span class="co-count"><?= count($questionnaires) ?></span></h2>
+                    <button type="button" class="oe-btn" onclick="coSurveyOpen(null)"><?= ic('add', 16) ?> เพิ่มแบบสอบถาม</button>
                 </div>
-
-                <!-- แบบสอบถามทั้งหมด -->
-                <div class="card">
-                    <h2>แบบสอบถามทั้งหมด (<?= count($questionnaires) ?>)</h2>
-                    <?php if (empty($questionnaires)): ?>
-                        <p class="muted">ยังไม่มีแบบสอบถามในปีนี้ — เพิ่มด้านบน</p>
-                    <?php else: ?>
-                    <table class="t" style="table-layout:fixed;">
-                        <colgroup>
-                            <col>
-                            <?php if($is_admin):?><col style="width:210px;"><?php endif;?>
-                            <col style="width:80px;">
-                            <col style="width:96px;">
-                            <col style="width:86px;">
-                            <col style="width:100px;">
-                        </colgroup>
-                        <thead><tr><th style="text-align:left;">แบบสอบถาม</th><?php if($is_admin):?><th style="text-align:left;">ผู้จัดทำ</th><?php endif;?><th class="num">รายการ</th><th class="num">tCO₂e</th><th style="text-align:center;">แนบไฟล์</th><th>จัดการ</th></tr></thead>
-                        <tbody>
-                        <?php foreach ($questionnaires as $qq): $isSelQ = ($qq['name']===$group && (int)$qq['affid']===(int)$survey_affil); ?>
-                            <tr class="evt <?= $isSelQ?'sel':'' ?>">
-                                <td style="text-align:left;"><div style="display:flex;align-items:center;"><a class="linkish evt-name" title="<?= htmlspecialchars($qq['name'],ENT_QUOTES) ?>" href="<?= $isSelQ ? $qs() : $qs(['group'=>$qq['name'],'maker'=>(int)$qq['affid']]) ?>"><?= htmlspecialchars($qq['name']) ?></a></div></td>
-                                <?php if($is_admin):?><td style="text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?= htmlspecialchars($qq['maker_name'],ENT_QUOTES) ?>"><?= htmlspecialchars($qq['maker_name']) ?></td><?php endif;?>
-                                <td class="num"><?= (int)$qq['item_count'] ?></td>
-                                <td class="num"><?= number_format((float)$qq['tco2e'],3) ?></td>
-                                <td style="text-align:center;">
-                                    <button type="button" class="ev-open-btn" data-ev="questionnaire:<?= (int)$qq['qid'] ?>" title="แนบ (ไฟล์/ลิงก์)"
-                                        onclick="openEvidence({type:'questionnaire', id:<?= (int)$qq['qid'] ?>, title:<?= htmlspecialchars(json_encode($qq['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>})">
-                                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                                        <?php if ((int)$qq['ev_count'] > 0): ?><span class="ev-badge"><?= (int)$qq['ev_count'] ?></span><?php endif; ?>
-                                    </button>
-                                </td>
-                                <td class="num" style="white-space:nowrap;">
-                                    <button type="button" class="icobtn edit" title="แก้ไขชื่อ" data-name="<?= htmlspecialchars($qq['name'],ENT_QUOTES) ?>" data-affid="<?= (int)$qq['affid'] ?>" onclick="qEdit(this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-                                    <form method="POST" onsubmit="return cfmForm(event, this, 'ลบแบบสอบถามนี้ทั้งหมด รวมรายการและค่าเฉลี่ย — ไม่สามารถกู้คืนได้')" style="display:inline;">
-                                        <input type="hidden" name="action" value="delete_questionnaire"><input type="hidden" name="tab" value="survey"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$qq['affid'] ?>"><input type="hidden" name="q_name" value="<?= htmlspecialchars($qq['name'],ENT_QUOTES) ?>">
-                                        <button class="icobtn del" title="ลบแบบสอบถาม" type="submit"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                    <!-- Modal แก้ไขชื่อแบบสอบถาม -->
-                    <div id="qEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                        <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:480px;width:92%;">
-                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขชื่อแบบสอบถาม</h2>
-                            <form method="POST">
-                                <input type="hidden" name="action" value="edit_questionnaire"><input type="hidden" name="tab" value="survey"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" id="qe_maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="q_old" id="qe_old">
-                                <div class="fld" style="margin-bottom:12px;"><label>ชื่อแบบสอบถาม</label><input class="ti-input" style="width:100%;" name="q_name" id="qe_name" required maxlength="100"></div>
-                                <div style="display:flex;justify-content:flex-end;gap:10px;">
-                                    <button type="button" class="del" onclick="document.getElementById('qEditModal').style.display='none'">ยกเลิก</button>
-                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
-                                </div>
-                            </form>
-                        </div>
+                <?php if (empty($questionnaires)): ?>
+                    <div class="oe-empty co-empty">
+                        <h3>ยังไม่มีแบบสอบถามในปีนี้</h3>
+                        <p>สร้างแบบสอบถาม เช่น นักศึกษา / บุคลากร แล้วเพิ่มหัวข้อคำถามและกรอกผลสรุป</p>
+                        <button type="button" class="oe-btn oe-btn-success" onclick="coSurveyOpen(null)"><?= ic('add', 16) ?> เพิ่มแบบสอบถามแรก</button>
                     </div>
-                    <script>
-                        function qEdit(b){
-                            document.getElementById('qe_old').value=b.dataset.name;
-                            document.getElementById('qe_name').value=b.dataset.name;
-                            if(b.dataset.affid) document.getElementById('qe_maker').value=b.dataset.affid;
-                            document.getElementById('qEditModal').style.display='flex';
-                            coPopRestart('qEditModal');
-                        }
-                        document.getElementById('qEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
-                    </script>
-                    <?php endif; ?>
-                </div>
-
-                <?php if ($sel_survey_exists): ?>
-                <div class="card">
-                    <h2 style="overflow-wrap:anywhere;word-break:break-word;">＋ เพิ่มรายการสอบถาม (<span title="<?= htmlspecialchars($group,ENT_QUOTES) ?>"><?= htmlspecialchars($group) ?></span>)<?php if($survey_affil_name!==''):?> <span class="muted" style="font-weight:500;font-size:.9rem;">· ผู้จัดทำ: <?= htmlspecialchars($survey_affil_name) ?></span><?php endif;?></h2>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="add_topic"><input type="hidden" name="tab" value="<?= $tab ?>">
-                        <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>">
-                        <input type="hidden" name="group" value="<?= htmlspecialchars($group,ENT_QUOTES) ?>">
-                        <div class="grid">
-                            <div class="fld full"><label>คำถาม (ที่ผู้ตอบเห็นในฟอร์ม)</label>
-                                <?php $ti_id='coLabel';$ti_name='label';$ti_required=true;$ti_maxlength=100;$ti_placeholder='เช่น ระยะทางเดินทางมามหาลัย (มอเตอร์ไซค์) กม./ปี';include __DIR__.'/../components/text_input.php'; ?></div>
-                            <div class="fld"><label>หน่วย</label>
-                                <?php $ti_id='coUnit';$ti_name='unit';$ti_required=true;$ti_maxlength=100;$ti_placeholder='กม. / มื้อ / kg';include __DIR__.'/../components/text_input.php'; ?></div>
-                            <div class="fld"><label>ขอบเขต (Scope)</label>
-                                <?php $dd_id='coScope';$dd_name='scope';$dd_options=[['value'=>3,'label'=>'Scope 3'],['value'=>1,'label'=>'Scope 1'],['value'=>2,'label'=>'Scope 2']];
-                                    $dd_selected=3;$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือก Scope';$dd_style='';include __DIR__.'/../components/dropdown.php'; ?></div>
-                            <div class="fld"><label>ค่า EF (kgCO₂e/หน่วย)</label>
-                                <?php $ti_id='coAd';$ti_name='ad';$ti_type='number';$ti_required=true;$ti_step='0.0001';$ti_min=0;$ti_placeholder='0.0000';include __DIR__.'/../components/text_input.php'; ?></div>
-                        </div>
-                        <div style="text-align:right;margin-top:12px;"><?php $btn_label='เพิ่มรายการสอบถาม';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?></div>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <h2 style="overflow-wrap:anywhere;word-break:break-word;">กรอกค่าเฉลี่ย (<span title="<?= htmlspecialchars($group,ENT_QUOTES) ?>"><?= htmlspecialchars($group) ?></span>)<?php if($survey_affil_name!==''):?> <span class="muted" style="font-weight:500;font-size:.9rem;">· ผู้จัดทำ: <?= htmlspecialchars($survey_affil_name) ?></span><?php endif;?></h2>
-                    <?php if (empty($rows)): ?>
-                        <p class="muted">ยังไม่มีหัวข้อในกลุ่มนี้ — เพิ่มด้านบน</p>
-                    <?php else: ?>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="save_survey"><input type="hidden" name="tab" value="<?= $tab ?>">
-                        <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="group" value="<?= htmlspecialchars($group,ENT_QUOTES) ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>">
-                        <table class="t">
-                            <thead><tr><th>คำถาม</th><th>Scope</th><th class="num">จำนวนผู้ตอบ</th><th class="num">เฉลี่ย/คน</th><th>หน่วย</th><th class="num">tCO₂e</th><th>จัดการ</th></tr></thead>
-                            <tbody>
-                            <?php foreach ($rows as $r): ?>
-                                <tr>
-                                    <td><div style="max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($r['label'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['label']) ?></div></td>
-                                    <td><span class="sdot s<?= (int)$r['scope'] ?>">S<?= (int)$r['scope'] ?></span></td>
-                                    <td class="num"><input class="ti-input" style="width:120px;text-align:center;" type="number" min="0" step="1" name="resp[<?= (int)$r['qiid'] ?>]" value="<?= (int)$r['respondents']?:'' ?>" placeholder="0"></td>
-                                    <td class="num"><input class="ti-input" style="width:120px;text-align:center;" type="number" min="0" step="0.0001" name="avg[<?= (int)$r['qiid'] ?>]" value="<?= (float)$r['avg_value']!=0?htmlspecialchars(rtrim(rtrim(number_format((float)$r['avg_value'],4,'.',''),'0'),'.')):'' ?>" placeholder="0"></td>
-                                    <td><div style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($r['unit'],ENT_QUOTES) ?>"><?= htmlspecialchars($r['unit']) ?></div></td>
-                                    <td class="num" style="color:var(--clr-primary);font-weight:700;"><?= number_format((float)$r['emission'],4) ?></td>
-                                    <td class="num" style="white-space:nowrap;">
-                                        <button type="button" class="icobtn edit" title="แก้ไขหัวข้อ"
-                                            data-qiid="<?= (int)$r['qiid'] ?>"
-                                            data-label="<?= htmlspecialchars($r['label'],ENT_QUOTES) ?>"
-                                            data-unit="<?= htmlspecialchars($r['unit'],ENT_QUOTES) ?>"
-                                            data-scope="<?= (int)$r['scope'] ?>"
-                                            data-ad="<?= htmlspecialchars((string)$r['AD'],ENT_QUOTES) ?>"
-                                            onclick="topicEdit(this)">
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                                        </button>
-                                        <button type="button" class="icobtn del" title="ลบหัวข้อ" onclick="topicDelete(<?= (int)$r['qiid'] ?>)">
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                        <div class="foot"><?php $btn_label='บันทึก';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?></div>
-                    </form>
-                        <?php foreach ($rows as $r): ?>
-                        <form method="POST" id="delTopic<?= (int)$r['qiid'] ?>" style="display:none;">
-                            <input type="hidden" name="action" value="delete_topic"><input type="hidden" name="tab" value="<?= $tab ?>">
-                            <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="group" value="<?= htmlspecialchars($group,ENT_QUOTES) ?>">
-                            <input type="hidden" name="qitem_id" value="<?= (int)$r['qiid'] ?>">
-                        </form>
-                        <?php endforeach; ?>
-                        <!-- Modal แก้ไขหัวข้อ -->
-                        <div id="topicEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                            <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                                <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขหัวข้อ</h2>
-                                <form method="POST">
-                                    <input type="hidden" name="action" value="edit_topic"><input type="hidden" name="tab" value="<?= $tab ?>">
-                                    <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="group" value="<?= htmlspecialchars($group,ENT_QUOTES) ?>">
-                                    <input type="hidden" name="qitem_id" id="te_qiid">
-                                    <div class="fld" style="margin-bottom:10px;"><label>คำถาม</label><input class="ti-input" style="width:100%;" name="label" id="te_label" required maxlength="100"></div>
-                                    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-                                        <div class="fld" style="flex:1;min-width:120px;"><label>หน่วย</label><input class="ti-input" style="width:100%;" name="unit" id="te_unit" required maxlength="100"></div>
-                                        <div class="fld" style="width:130px;"><label>Scope</label>
-                                            <?php $dd_id='teScopeEdit';$dd_name='scope';$dd_options=[['value'=>1,'label'=>'Scope 1'],['value'=>2,'label'=>'Scope 2'],['value'=>3,'label'=>'Scope 3']];
-                                                $dd_selected=1;$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือก Scope';$dd_style='';include __DIR__.'/../components/dropdown.php'; ?></div>
-                                        <div class="fld" style="width:150px;"><label>ค่า EF</label><input class="ti-input" style="width:100%;" type="number" step="0.0001" min="0" name="ad" id="te_ad" required></div>
-                                    </div>
-                                    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
-                                        <button type="button" class="del" onclick="document.getElementById('topicEditModal').style.display='none'">ยกเลิก</button>
-                                        <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
-                                    </div>
+                <?php else: ?>
+                <div class="co-cards">
+                    <?php foreach ($questionnaires as $k => $qq):
+                        $isSelQ = ($qq['name']===$group && (int)$qq['affid']===(int)$survey_affil);
+                        $href = $isSelQ ? $qs() : $qs(['group'=>$qq['name'],'maker'=>(int)$qq['affid']]) . $DETAIL; ?>
+                    <article class="co-card oe-rise<?= $isSelQ ? ' is-selected' : '' ?>" style="--i:<?= min($k, 10) + 5 ?>;">
+                        <a class="co-card-main" href="<?= $h($href) ?>" data-de-guard>
+                            <?php if ($is_admin): ?><span class="co-card-kicker" title="<?= $h($qq['maker_name']) ?>">ผู้จัดทำ: <?= $h($qq['maker_name']) ?></span><?php endif; ?>
+                            <span class="co-card-name" title="<?= $h($qq['name']) ?>"><?= $h($qq['name']) ?></span>
+                            <span class="co-card-stats">
+                                <span><small>กรอกแล้ว</small><b><?= (int)$qq['filled_count'] ?> / <?= (int)$qq['item_count'] ?> หัวข้อ</b></span>
+                                <span><small>tCO₂e</small><b class="is-purple"><?= collect_fmt((float)$qq['tco2e']) ?></b></span>
+                            </span>
+                        </a>
+                        <div class="co-card-foot">
+                            <a class="co-card-go" href="<?= $h($href) ?>" data-de-guard tabindex="-1"><?= $isSelQ ? 'ปิดรายละเอียด' : 'กรอกข้อมูล ' . $arrow ?></a>
+                            <div class="co-card-tools">
+                                <button type="button" class="ev-open-btn" data-ev="questionnaire:<?= (int)$qq['qid'] ?>" title="แนบหลักฐาน (ไฟล์/ลิงก์)"
+                                    onclick="openEvidence({type:'questionnaire', id:<?= (int)$qq['qid'] ?>, title:<?= $h(json_encode($qq['name'], JSON_UNESCAPED_UNICODE)) ?>})">
+                                    <?= $svg_clip ?><?php if ((int)$qq['ev_count'] > 0): ?><span class="ev-badge"><?= (int)$qq['ev_count'] ?></span><?php endif; ?>
+                                </button>
+                                <button type="button" class="oe-icon-btn oe-icon-edit" title="แก้ไขชื่อ" aria-label="แก้ไขชื่อแบบสอบถาม <?= $h($qq['name']) ?>"
+                                    data-name="<?= $h($qq['name']) ?>" data-affid="<?= (int)$qq['affid'] ?>" onclick="coSurveyOpen(this)"><?= $svg_edit ?></button>
+                                <form method="POST" data-msg="<?= $h('ลบแบบสอบถาม "' . $qq['name'] . '" ทั้งหมด รวมหัวข้อและผลที่กรอกไว้ — ไม่สามารถกู้คืนได้') ?>" onsubmit="return cfmForm(event, this, this.dataset.msg)"><?= csrf_field() ?>
+                                    <input type="hidden" name="action" value="delete_questionnaire"><input type="hidden" name="tab" value="survey"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$qq['affid'] ?>"><input type="hidden" name="q_name" value="<?= $h($qq['name']) ?>">
+                                    <button type="submit" class="oe-icon-btn oe-icon-del" title="ลบแบบสอบถาม" aria-label="ลบแบบสอบถาม <?= $h($qq['name']) ?>"><?= $svg_del ?></button>
                                 </form>
                             </div>
                         </div>
-                        <script>
-                            function topicEdit(b){
-                                document.getElementById('te_qiid').value=b.dataset.qiid;
-                                document.getElementById('te_label').value=b.dataset.label;
-                                document.getElementById('te_unit').value=b.dataset.unit;
-                                ddSetValue('teScopeEdit', b.dataset.scope, 'Scope '+b.dataset.scope);
-                                document.getElementById('te_ad').value=b.dataset.ad;
-                                var m=document.getElementById('topicEditModal'); m.style.display='flex';
-                                coPopRestart('topicEditModal');
-                            }
-                            function topicDelete(qiid){ confirmDelete({message:'ต้องการลบหัวข้อนี้?'}).then(function(ok){ if(ok) document.getElementById('delTopic'+qiid).submit(); }); }
-                            document.getElementById('topicEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
-                        </script>
-                    <?php endif; ?>
+                    </article>
+                    <?php endforeach; ?>
                 </div>
-                <?php endif; /* sel_survey_exists */ ?>
+                <?php endif; ?>
+            </section>
+
+            <?php if ($sel_survey_exists):
+                $s_total = array_sum(array_map(fn($r) => (float)$r['emission'], $rows));
+                $s_filled = count(array_filter($rows, fn($r) => (int)$r['respondents'] > 0 && (float)$r['avg_value'] > 0)); ?>
+            <section class="co-detail oe-rise" id="co-detail">
+                <div class="co-detail-head">
+                    <div class="co-detail-title">
+                        <span class="co-eyebrow"><?= ic('survey', 14) ?> แบบสอบถาม</span>
+                        <h2><?= $h($group) ?></h2>
+                        <div class="oe-sub"><?= $survey_affil_name !== '' ? 'ผู้จัดทำ: ' . $h($survey_affil_name) . ' · ' : '' ?>กรอกจำนวนผู้ตอบและค่าเฉลี่ยต่อคนของแต่ละหัวข้อ</div>
+                    </div>
+                    <div class="oe-actions">
+                        <button type="button" class="oe-btn oe-btn-soft" onclick="coTopicOpen(null)"><?= ic('add', 16) ?> เพิ่มหัวข้อ</button>
+                        <a class="oe-btn oe-btn-ghost" href="<?= $h($qs()) ?>" data-de-guard>ปิด</a>
+                    </div>
+                </div>
+                <?php if (empty($rows)): ?>
+                    <div class="oe-empty co-empty">
+                        <h3>ยังไม่มีหัวข้อในแบบสอบถามนี้</h3>
+                        <p>เพิ่มหัวข้อคำถาม เช่น ระยะทางเดินทางมามหาวิทยาลัย พร้อมหน่วยและค่า EF</p>
+                        <button type="button" class="oe-btn oe-btn-success" onclick="coTopicOpen(null)"><?= ic('add', 16) ?> เพิ่มหัวข้อแรก</button>
+                    </div>
+                <?php else: ?>
+                <div class="co-sec" data-de-scope data-de-digits="3">
+                    <form method="POST" id="coSurveyForm"><?= csrf_field() ?>
+                        <input type="hidden" name="action" value="save_survey"><input type="hidden" name="tab" value="survey">
+                        <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="group" value="<?= $h($group) ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>">
+                        <table class="oe-table">
+                            <colgroup><col><col style="width:128px;"><col style="width:140px;"><col style="width:104px;"><col style="width:108px;"><col style="width:86px;"></colgroup>
+                            <thead><tr><th>หัวข้อ</th><th>จำนวนผู้ตอบ (คน)</th><th>ค่าเฉลี่ยต่อคน</th><th>EF<br><span class="oe-muted">kgCO₂e/หน่วย</span></th><th>tCO₂e</th><th>จัดการ</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($rows as $r): $filled = (int)$r['respondents'] > 0 && (float)$r['avg_value'] > 0; ?>
+                                <tr class="item-row<?= $filled ? ' is-filled' : '' ?>">
+                                    <td><?= $h($r['label']) ?><span class="co-row-sub"><?= $h($r['group_name']) ?> · หน่วย: <?= $h($r['unit'] ?: '-') ?></span></td>
+                                    <td data-label="จำนวนผู้ตอบ (คน)"><input type="text" inputmode="numeric" autocomplete="off" class="vol-input oe-input" data-int="1" data-group="survey" data-ef="<?= (float)$r['AD'] ?>"
+                                        name="resp[<?= (int)$r['qiid'] ?>]" value="<?= (int)$r['respondents'] ?: '' ?>" placeholder="0" aria-label="จำนวนผู้ตอบ: <?= $h($r['label']) ?>"></td>
+                                    <td data-label="ค่าเฉลี่ยต่อคน (<?= $h($r['unit'] ?: 'หน่วย') ?>)"><input type="text" inputmode="decimal" autocomplete="off" class="vol-input oe-input"
+                                        name="avg[<?= (int)$r['qiid'] ?>]" value="<?= collect_input_val((float)$r['avg_value']) ?>" placeholder="0" aria-label="ค่าเฉลี่ยต่อคน: <?= $h($r['label']) ?>"><span class="de-err" role="alert"></span></td>
+                                    <td class="oe-c oe-ef" data-label="EF (kgCO₂e/หน่วย)"><?= ef_fmt($r['AD']) ?></td>
+                                    <td data-label="tCO₂e"><span class="total-pill"><?= collect_fmt((float)$r['emission'], 4) ?></span></td>
+                                    <td class="oe-c co-tools-cell">
+                                        <button type="button" class="oe-icon-btn oe-icon-edit" title="แก้ไขหัวข้อ"
+                                            data-qiid="<?= (int)$r['qiid'] ?>" data-label="<?= $h($r['label']) ?>" data-unit="<?= $h($r['unit']) ?>"
+                                            data-group="<?= (int)$r['group_id'] ?>" data-groupname="<?= $h('ขอบเขต '.$r['scope'].' · '.$r['group_name']) ?>" data-ad="<?= ef_input_val($r['AD']) ?>"
+                                            onclick="coTopicOpen(this)"><?= $svg_edit ?></button>
+                                        <button type="button" class="oe-icon-btn oe-icon-del" title="ลบหัวข้อ" onclick="coDeleteRow('delTopic<?= (int)$r['qiid'] ?>', 'ลบหัวข้อนี้? ผลที่กรอกไว้ของหัวข้อนี้จะถูกลบด้วย')"><?= $svg_del ?></button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        <div class="oe-dock">
+                            <div class="oe-dock-info">
+                                <div class="oe-dock-stat"><span>ยอดรวมแบบสอบถามนี้</span><b class="is-purple"><span data-de-total><?= collect_fmt($s_total) ?></span> tCO₂e</b></div>
+                                <div class="oe-dock-stat"><span>กรอกแล้ว</span><b><span data-de-filled><?= $s_filled ?> / <?= count($rows) ?></span> หัวข้อ</b></div>
+                                <span class="oe-dirty" data-de-dirty hidden>● ยังไม่บันทึก</span>
+                                <span class="oe-msg" data-de-msg role="alert"></span>
+                            </div>
+                            <button type="button" class="oe-btn oe-btn-success" onclick="deSave(this)"><?= $svg_save ?> บันทึกแบบสอบถาม</button>
+                        </div>
+                    </form>
+                    <?php foreach ($rows as $r): ?>
+                    <form method="POST" id="delTopic<?= (int)$r['qiid'] ?>" hidden><?= csrf_field() ?>
+                        <input type="hidden" name="action" value="delete_topic"><input type="hidden" name="tab" value="survey">
+                        <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="group" value="<?= $h($group) ?>">
+                        <input type="hidden" name="qitem_id" value="<?= (int)$r['qiid'] ?>">
+                    </form>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </section>
+            <?php endif; /* sel_survey_exists */ ?>
 
             <?php else: /* ===== แท็บ กิจกรรม ===== */ ?>
-                <div class="card">
-                    <h2>＋ เพิ่มกิจกรรม</h2>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="add_event"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>">
-                        <!-- บรรทัด 1: ชื่อกิจกรรม เต็มความกว้าง (ประเภทปล่อย/ดูดกลับ เลือกทีหลังต่อรายการ) -->
-                        <div class="fld full" style="margin-bottom:12px;"><label>ชื่อกิจกรรม</label>
-                            <?php $ti_id='evName';$ti_name='name';$ti_required=true;$ti_placeholder='เช่น งานรับน้อง 2569';$ti_wrap_style='width:100%;';include __DIR__.'/../components/text_input.php'; ?></div>
-                        <!-- บรรทัด 2: ผู้จัด / วันที่ / ปุ่ม -->
-                        <div class="frow">
-                            <?php if ($is_admin): ?>
-                            <div class="fld" id="addOrgField" style="flex:0 0 auto;"><label>ผู้จัด</label>
-                                <div style="display:flex;gap:8px;align-items:center;">
-                                    <?php $org_dd=$org_options; $org_dd[]=['value'=>'__custom__','label'=>'อื่นๆ…'];
-                                        $dd_id='addOrg';$dd_name='org';$dd_options=$org_dd;$dd_selected=($org_options[0]['value']??'');$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือกผู้จัด';$dd_style='width:360px;flex:none;';include __DIR__.'/../components/dropdown.php'; ?>
-                                    <input type="text" id="addOrgCustom" class="ti-input" style="width:320px;display:none;" placeholder="พิมพ์ชื่อผู้จัด (อื่นๆ)">
-                                </div></div>
-                            <?php endif; ?>
-                            <div class="fld" style="flex:0 0 140px;min-width:0;max-width:140px;"><label>วันที่เริ่ม</label>
-                                <input type="text" id="evDate" class="ti-input" style="width:100%;" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="off">
-                                <input type="hidden" name="event_date" id="evDateHidden"></div>
-                            <div class="fld" style="flex:0 0 140px;min-width:0;max-width:140px;"><label>วันสิ้นสุด <span class="muted">(ถ้ามี)</span></label>
-                                <input type="text" id="evEndDate" class="ti-input" style="width:100%;" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="off">
-                                <input type="hidden" name="event_end_date" id="evEndDateHidden"></div>
-                        </div>
-                        <!-- ปุ่มบันทึกไว้มุมขวาล่างของการ์ด (บรรทัดของตัวเอง) -->
-                        <div style="text-align:right;margin-top:12px;"><?php $btn_label='เพิ่มกิจกรรม';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?></div>
-                    </form>
+            <section class="oe-panel co-list oe-rise" style="--i:5;">
+                <div class="co-panel-head">
+                    <h2 class="co-h2">กิจกรรมทั้งหมด <span class="co-count"><?= count($events) ?></span></h2>
+                    <button type="button" class="oe-btn" onclick="coEventOpen(null)"><?= ic('add', 16) ?> เพิ่มกิจกรรม</button>
                 </div>
-                <div class="card">
-                    <h2>กิจกรรมทั้งหมด (<?= count($events) ?>)</h2>
-                    <?php if (empty($events)): ?><p class="muted">ยังไม่มีกิจกรรมในปีนี้</p><?php else: ?>
-                    <table class="t" style="table-layout:fixed;">
-                        <colgroup>
-                            <col>
-                            <?php if($is_admin):?><col style="width:146px;"><?php endif;?>
-                            <col style="width:210px;">
-                            <col style="width:60px;">
-                            <col style="width:88px;">
-                            <col style="width:80px;">
-                            <col style="width:100px;">
-                        </colgroup>
-                        <thead><tr><th style="text-align:left;">กิจกรรม</th><?php if($is_admin):?><th>ผู้จัด</th><?php endif;?><th>วันที่</th><th class="num">รายการ</th><th class="num">tCO₂e</th><th style="text-align:center;">ไฟล์</th><th>จัดการ</th></tr></thead>
-                        <tbody>
-                        <?php foreach ($events as $e): ?>
-                            <?php $isSel = (int)$e['id']===$sel_event; ?>
-                            <tr class="evt <?= $isSel?'sel':'' ?>">
-                                <?php $hasEmit=(int)$e['item_count']>0; $hasRmv=(int)$e['removal_count']>0; ?>
-                                <td style="text-align:left;">
-                                    <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                        <a class="linkish evt-name" title="<?= htmlspecialchars($e['name'],ENT_QUOTES) ?>" href="<?= $isSel ? $qs() : $qs(['event'=>$e['id']]) ?>"><?= htmlspecialchars($e['name']) ?></a>
-                                    </div>
-                                </td>
-                                <?php if($is_admin):?><td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?= htmlspecialchars($e['org_label'],ENT_QUOTES) ?>"><?= htmlspecialchars($e['org_label']) ?></td><?php endif;?>
-                                <td style="white-space:nowrap;"><?php
-                                    // แสดงวันที่เป็น วัน/เดือน/ปี (dd/mm/yyyy); ใน DB เก็บเป็น yyyy-mm-dd
-                                    $fmtDMY = fn($iso) => $iso ? implode('/', array_reverse(explode('-', $iso))) : '—';
-                                    echo htmlspecialchars($fmtDMY($e['event_date']));
-                                    if (!empty($e['event_end_date'])) echo ' - ' . htmlspecialchars($fmtDMY($e['event_end_date']));
-                                ?></td>
-                                <td class="num"><?= (int)$e['item_count'] + (int)$e['removal_count'] ?></td>
-                                <td class="num" style="white-space:nowrap;">
-                                    <div style="display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;">
-                                        <?php if ($hasEmit || !$hasRmv): /* โชว์ "ปล่อย" เฉพาะเมื่อมีรายการปล่อยจริง (หรือไม่มีทั้งปล่อย/ดูดกลับ = fallback) */ ?>
-                                        <span style="display:inline-flex;align-items:center;gap:5px;color:#62368B;font-weight:700;" title="การปล่อย (tCO₂e)">
-                                            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="flex-shrink:0;"><path d="M2 20V9l6 4V9l6 4V4h4v16z"/></svg>
-                                            <?= number_format((float)$e['tco2e'],3) ?>
-                                        </span>
-                                        <?php endif; ?>
-                                        <?php if ($hasRmv): ?>
-                                        <span style="display:inline-flex;align-items:center;gap:5px;color:#166534;font-weight:700;" title="การดูดกลับ (tCO₂e)">
-                                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
-                                            <?= number_format((float)$e['removal_tco2e'],3) ?>
-                                        </span>
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
-                                <td style="text-align:center;">
-                                    <button type="button" class="ev-open-btn" data-ev="event:<?= (int)$e['id'] ?>" title="แนบ (ไฟล์/ลิงก์)"
-                                        onclick="openEvidence({type:'event', id:<?= (int)$e['id'] ?>, title:<?= htmlspecialchars(json_encode($e['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>})">
-                                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                                        <?php if ((int)$e['ev_count'] > 0): ?><span class="ev-badge"><?= (int)$e['ev_count'] ?></span><?php endif; ?>
-                                    </button>
-                                </td>
-                                <td class="num" style="white-space:nowrap;">
-                                    <button type="button" class="icobtn edit" title="แก้ไขกิจกรรม"
-                                        data-eid="<?= (int)$e['id'] ?>"
-                                        data-name="<?= htmlspecialchars($e['name'],ENT_QUOTES) ?>"
-                                        data-date="<?= htmlspecialchars((string)$e['event_date'],ENT_QUOTES) ?>"
-                                        data-end="<?= htmlspecialchars((string)($e['event_end_date']??''),ENT_QUOTES) ?>"
-                                        onclick="evEdit(this)">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                                    </button>
-                                    <form method="POST" onsubmit="return cfmForm(event, this, 'ต้องการลบกิจกรรมนี้?')" style="display:inline;">
-                                    <input type="hidden" name="action" value="delete_event"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $e['id'] ?>">
-                                    <button class="icobtn del" title="ลบกิจกรรม" type="submit">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                    </button></form></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                    <div id="evEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                        <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขกิจกรรม</h2>
-                            <form method="POST">
-                                <input type="hidden" name="action" value="edit_event"><input type="hidden" name="tab" value="event">
-                                <input type="hidden" name="year_id" value="<?= $selected_year ?>">                                <input type="hidden" name="event_id" id="ev_ed_eid">
-                                <div class="fld" style="margin-bottom:10px;"><label>ชื่อกิจกรรม</label><input class="ti-input" style="width:100%;" name="name" id="ev_ed_name" required></div>
-                                <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-                                    <div class="fld" style="flex:1;min-width:140px;"><label>วันที่เริ่ม</label>
-                                        <input type="text" id="ev_ed_date" class="ti-input evMaskDate" style="width:100%;" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="off" data-hidden="ev_ed_dateH">
-                                        <input type="hidden" name="event_date" id="ev_ed_dateH"></div>
-                                    <div class="fld" style="flex:1;min-width:140px;"><label>วันสิ้นสุด <span class="muted">(ถ้ามี)</span></label>
-                                        <input type="text" id="ev_ed_end" class="ti-input evMaskDate" style="width:100%;" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="off" data-hidden="ev_ed_endH">
-                                        <input type="hidden" name="event_end_date" id="ev_ed_endH"></div>
-                                </div>
-                                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
-                                    <button type="button" class="del" onclick="document.getElementById('evEditModal').style.display='none'">ยกเลิก</button>
-                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
-                                </div>
-                            </form>
-                        </div>
+                <?php if (empty($events)): ?>
+                    <div class="oe-empty co-empty">
+                        <h3>ยังไม่มีกิจกรรมในปีนี้</h3>
+                        <p>เพิ่มกิจกรรม เช่น งานรับน้อง แล้วกรอกปริมาณการปล่อยหรือการดูดกลับคาร์บอน</p>
+                        <button type="button" class="oe-btn oe-btn-success" onclick="coEventOpen(null)"><?= ic('add', 16) ?> เพิ่มกิจกรรมแรก</button>
                     </div>
-                    <?php endif; ?>
+                <?php else: ?>
+                <div class="co-cards">
+                    <?php foreach ($events as $k => $e):
+                        $isSel = (int)$e['id'] === $sel_event;
+                        $href = $isSel ? $qs() : $qs(['event'=>$e['id']]) . $DETAIL;
+                        $topics = (int)$e['emit_topics'] + (int)$e['removal_count']; ?>
+                    <article class="co-card oe-rise<?= $isSel ? ' is-selected' : '' ?>" style="--i:<?= min($k, 10) + 5 ?>;">
+                        <a class="co-card-main" href="<?= $h($href) ?>" data-de-guard>
+                            <span class="co-card-kicker" title="<?= $h($e['org_label']) ?>"><?= $h(collect_date_range($e['event_date'], $e['event_end_date'])) ?><?= $is_admin ? ' · ' . $h($e['org_label']) : '' ?></span>
+                            <span class="co-card-name" title="<?= $h($e['name']) ?>"><?= $h($e['name']) ?></span>
+                            <span class="co-card-stats">
+                                <span><small>รายการ</small><b><?= $topics ?></b></span>
+                                <span><small>ปล่อย tCO₂e</small><b class="is-purple"><?= collect_fmt((float)$e['tco2e']) ?></b></span>
+                                <?php if ((int)$e['removal_count'] > 0): ?><span><small>ดูดกลับ tCO₂e</small><b class="is-green"><?= collect_fmt((float)$e['removal_tco2e']) ?></b></span><?php endif; ?>
+                            </span>
+                        </a>
+                        <div class="co-card-foot">
+                            <a class="co-card-go" href="<?= $h($href) ?>" data-de-guard tabindex="-1"><?= $isSel ? 'ปิดรายละเอียด' : 'กรอกข้อมูล ' . $arrow ?></a>
+                            <div class="co-card-tools">
+                                <button type="button" class="ev-open-btn" data-ev="event:<?= (int)$e['id'] ?>" title="แนบหลักฐาน (ไฟล์/ลิงก์)"
+                                    onclick="openEvidence({type:'event', id:<?= (int)$e['id'] ?>, title:<?= $h(json_encode($e['name'], JSON_UNESCAPED_UNICODE)) ?>})">
+                                    <?= $svg_clip ?><?php if ((int)$e['ev_count'] > 0): ?><span class="ev-badge"><?= (int)$e['ev_count'] ?></span><?php endif; ?>
+                                </button>
+                                <button type="button" class="oe-icon-btn oe-icon-edit" title="แก้ไขกิจกรรม" aria-label="แก้ไขกิจกรรม <?= $h($e['name']) ?>"
+                                    data-eid="<?= (int)$e['id'] ?>" data-name="<?= $h($e['name']) ?>" data-date="<?= $h($e['event_date']) ?>" data-end="<?= $h($e['event_end_date']) ?>"
+                                    onclick="coEventOpen(this)"><?= $svg_edit ?></button>
+                                <form method="POST" data-msg="<?= $h('ลบกิจกรรม "' . $e['name'] . '" พร้อมรายการและปริมาณทั้งหมด — ไม่สามารถกู้คืนได้') ?>" onsubmit="return cfmForm(event, this, this.dataset.msg)"><?= csrf_field() ?>
+                                    <input type="hidden" name="action" value="delete_event"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= (int)$e['id'] ?>">
+                                    <button type="submit" class="oe-icon-btn oe-icon-del" title="ลบกิจกรรม" aria-label="ลบกิจกรรม <?= $h($e['name']) ?>"><?= $svg_del ?></button>
+                                </form>
+                            </div>
+                        </div>
+                    </article>
+                    <?php endforeach; ?>
                 </div>
-                <?php if ($curEvent): ?>
-                <!-- ＋ เพิ่มรายการ (เลือกประเภท: ปล่อย / ดูดกลับ ต่อรายการ) -->
-                <div class="card">
-                    <h2>＋ เพิ่มรายการ</h2>
-                    <div class="fld" style="max-width:200px;margin-bottom:14px;"><label>ประเภทรายการ</label>
-                        <?php $dd_id='evItemType';$dd_name='__itype';$dd_options=[['value'=>'emit','label'=>'ปล่อยคาร์บอน','icon'=>ic('factory',16,'style="color:#62368B"')],['value'=>'rmv','label'=>'ดูดกลับคาร์บอน','icon'=>ic('leaf',16,'style="color:#166534"')]];
-                            $dd_selected='emit';$dd_required=false;$dd_class='dd-field';$dd_placeholder='เลือกประเภท';$dd_style='width:100%;';include __DIR__.'/../components/dropdown.php'; ?>
+                <?php endif; ?>
+            </section>
+
+            <?php if ($curEvent): ?>
+            <section class="co-detail oe-rise" id="co-detail">
+                <div class="co-detail-head">
+                    <div class="co-detail-title">
+                        <span class="co-eyebrow"><?= ic('note', 14) ?> กิจกรรม</span>
+                        <h2><?= $h($curEvent['name']) ?></h2>
+                        <div class="oe-sub">ผู้จัด: <?= $h($curEvent['org_label']) ?> · <?= $h(collect_date_range($curEvent['event_date'], $curEvent['event_end_date'])) ?></div>
                     </div>
-                    <!-- ── ปล่อยคาร์บอน ── -->
-                    <form method="POST" id="evAddEmit">
-                        <input type="hidden" name="action" value="add_event_topic"><input type="hidden" name="tab" value="event">
-                        <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>">
-                        <div class="grid">
-                            <div class="fld full"><label>ชื่อรายการ</label>
-                                <?php $ti_id='evLabel';$ti_name='label';$ti_required=false;$ti_placeholder='เช่น น้ำมันดีเซล (รถบัสรับส่ง)';include __DIR__.'/../components/text_input.php'; ?></div>
-                            <div class="fld"><label>หน่วย</label>
-                                <?php $ti_id='evUnit';$ti_name='unit';$ti_required=false;$ti_placeholder='L / kg / kWh';include __DIR__.'/../components/text_input.php'; ?></div>
-                            <div class="fld"><label>ขอบเขต (Scope)</label>
-                                <?php $dd_id='evScope';$dd_name='scope';$dd_options=[['value'=>3,'label'=>'Scope 3'],['value'=>1,'label'=>'Scope 1'],['value'=>2,'label'=>'Scope 2']];
-                                    $dd_selected=3;$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือก Scope';$dd_style='';include __DIR__.'/../components/dropdown.php'; ?></div>
-                            <div class="fld"><label>ค่า EF (kgCO₂e/หน่วย)</label>
-                                <?php $ti_id='evAd';$ti_name='ad';$ti_type='number';$ti_required=false;$ti_step='0.0001';$ti_min=0;$ti_placeholder='0.0000';include __DIR__.'/../components/text_input.php'; ?></div>
-                        </div>
-                        <div style="text-align:right;margin-top:12px;"><?php $btn_label='＋ เพิ่มรายการปล่อย';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?></div>
-                    </form>
-                    <!-- ── ดูดกลับคาร์บอน ── -->
-                    <form method="POST" id="evAddRmv" style="display:none;">
-                        <input type="hidden" name="action" value="add_removal_item"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>">
-                        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
-                            <div class="fld" style="flex:1;min-width:200px;"><label>ชื่อรายการ</label>
-                                <?php $ti_id='rmiName';$ti_name='name';$ti_required=false;$ti_placeholder='เช่น ต้นไม้ยืนต้น / พื้นที่ป่า';$ti_wrap_style='width:100%;';include __DIR__.'/../components/text_input.php'; ?></div>
-                            <div class="fld" style="width:140px;"><label>หน่วย</label>
-                                <?php $ti_id='rmiUnit';$ti_name='unit';$ti_required=false;$ti_placeholder='ต้น / ไร่';include __DIR__.'/../components/text_input.php'; ?></div>
-                            <div class="fld" style="width:190px;"><label>ค่าดูดกลับ (kgCO₂e/หน่วย/ปี)</label>
-                                <input class="ti-input" style="width:100%;" type="number" step="0.0001" min="0" name="factor" placeholder="0.0000"></div>
-                            <div><?php $btn_label='＋ เพิ่มรายการดูดกลับ';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?></div>
-                        </div>
-                        <p class="muted" style="margin-top:8px;">ค่าดูดกลับ (factor) ควรอ้างอิงค่ามาตรฐาน (เช่น TGO) — ยอดจะรวมเข้า GHG Removal ของมหาวิทยาลัยอัตโนมัติ</p>
-                    </form>
+                    <div class="oe-actions">
+                        <button type="button" class="oe-btn oe-btn-soft" onclick="coEvTopicOpen(null)"><?= ic('factory', 16) ?> เพิ่มรายการปล่อย</button>
+                        <button type="button" class="oe-btn oe-btn-soft co-btn-green" onclick="coRemovalOpen(null)"><?= ic('leaf', 16) ?> เพิ่มรายการดูดกลับ</button>
+                        <a class="oe-btn oe-btn-ghost" href="<?= $h($qs()) ?>" data-de-guard>ปิด</a>
+                    </div>
                 </div>
 
-                <?php if (!empty($ef_items)): ?>
-                <div class="card">
-                    <h2>กรอกปริมาณปล่อยคาร์บอน — <?= htmlspecialchars($curEvent['name']) ?> <span class="muted" style="font-weight:500;font-size:.9rem;">· ผู้จัด: <?= htmlspecialchars($curEvent['org_label']) ?></span></h2>
-                    <?php if (empty($ef_items)): ?>
-                        <p class="muted">ยังไม่มีรายการในปีนี้ — เพิ่มด้านบน</p>
-                    <?php else: ?>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="save_event_items"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>">
-                        <table class="t">
-                            <thead><tr><th>รายการ</th><th>SCOPE</th><th>หน่วย</th><th class="num">ค่าคาร์บอน (kgCO₂e/หน่วย)</th><th class="num">ปริมาณ</th><th class="num">tCO₂e</th><th>จัดการ</th></tr></thead>
+                <?php if (empty($ef_items) && empty($rm_rows)): ?>
+                    <div class="oe-empty co-empty">
+                        <h3>ยังไม่มีรายการในกิจกรรมนี้</h3>
+                        <p>เพิ่มรายการที่ปล่อยคาร์บอน (เช่น การเดินทางของผู้เข้าร่วม) หรือรายการดูดกลับ (เช่น ปลูกต้นไม้)</p>
+                        <div class="oe-actions" style="justify-content:center;">
+                            <button type="button" class="oe-btn" onclick="coEvTopicOpen(null)"><?= ic('factory', 16) ?> เพิ่มรายการปล่อย</button>
+                            <button type="button" class="oe-btn oe-btn-success" onclick="coRemovalOpen(null)"><?= ic('leaf', 16) ?> เพิ่มรายการดูดกลับ</button>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!empty($ef_items)):
+                    $e_total = 0; $e_filled = 0;
+                    foreach ($ef_items as $x) { $v = $curVol[(int)$x['id']] ?? 0; $e_total += $v * (float)$x['AD'] / 1000; if ($v > 0) $e_filled++; } ?>
+                <div class="co-sec" data-de-scope data-de-digits="3">
+                    <div class="co-sec-title">ปล่อยคาร์บอน <small>ขอบเขต 3 · กรอกเฉพาะรายการที่เกี่ยวข้อง เว้นว่าง = ไม่นับ</small></div>
+                    <form method="POST" id="coEventForm"><?= csrf_field() ?>
+                        <input type="hidden" name="action" value="save_event_items"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= (int)$curEvent['id'] ?>">
+                        <table class="oe-table">
+                            <colgroup><col><col style="width:118px;"><col style="width:150px;"><col style="width:108px;"><col style="width:86px;"></colgroup>
+                            <thead><tr><th>รายการ</th><th>EF<br><span class="oe-muted">kgCO₂e/หน่วย</span></th><th>ปริมาณ</th><th>tCO₂e</th><th>จัดการ</th></tr></thead>
                             <tbody>
-                            <?php foreach ($ef_items as $x): $v=$curVol[(int)$x['id']]??0; ?>
-                                <tr>
-                                    <td><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($x['name_tiem'],ENT_QUOTES) ?>"><?= htmlspecialchars($x['name_tiem']) ?></div></td>
-                                    <td><span class="sdot s<?= (int)$x['scope'] ?>">S<?= (int)$x['scope'] ?></span></td>
-                                    <td><?= htmlspecialchars($x['unit']) ?></td>
-                                    <td class="num"><?= number_format((float)$x['AD'],4) ?></td>
-                                    <td class="num"><input class="ti-input evVol" style="width:120px;text-align:center;" type="number" min="0" step="0.0001" data-ad="<?= (float)$x['AD'] ?>" name="vol[<?= (int)$x['id'] ?>]" value="<?= $v!=0?htmlspecialchars(rtrim(rtrim(number_format($v,4,'.',''),'0'),'.')):'' ?>" placeholder="0"></td>
-                                    <td class="num evEmit" style="color:var(--clr-primary);font-weight:700;"><?= number_format($v*(float)$x['AD']/1000,4) ?></td>
-                                    <td class="num" style="white-space:nowrap;">
-                                        <button type="button" class="icobtn edit" title="แก้ไขรายการ"
-                                            data-aiid="<?= (int)$x['id'] ?>"
-                                            data-label="<?= htmlspecialchars($x['name_tiem'],ENT_QUOTES) ?>"
-                                            data-unit="<?= htmlspecialchars($x['unit'],ENT_QUOTES) ?>"
-                                            data-scope="<?= (int)$x['scope'] ?>"
-                                            data-ad="<?= htmlspecialchars((string)$x['AD'],ENT_QUOTES) ?>"
-                                            onclick="evTopicEdit(this)">
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                                        </button>
-                                        <button type="button" class="icobtn del" title="ลบรายการ" onclick="evTopicDelete(<?= (int)$x['id'] ?>)">
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                        </button>
+                            <?php foreach ($ef_items as $x): $v = $curVol[(int)$x['id']] ?? 0; ?>
+                                <tr class="item-row<?= $v > 0 ? ' is-filled' : '' ?>">
+                                    <td><?= $h($x['name_tiem']) ?><span class="co-row-sub"><?= $h($x['group_name']) ?> · หน่วย: <?= $h($x['unit'] ?: '-') ?></span></td>
+                                    <td class="oe-c oe-ef" data-label="EF (kgCO₂e/หน่วย)"><?= ef_fmt($x['AD']) ?></td>
+                                    <td class="oe-vol" data-label="ปริมาณ (<?= $h($x['unit'] ?: 'หน่วย') ?>)"><input type="text" inputmode="decimal" autocomplete="off" class="vol-input oe-input" data-group="emit" data-ef="<?= (float)$x['AD'] ?>"
+                                        name="vol[<?= (int)$x['id'] ?>]" value="<?= collect_input_val((float)$v) ?>" placeholder="0" aria-label="ปริมาณ: <?= $h($x['name_tiem']) ?>"><span class="de-err" role="alert"></span></td>
+                                    <td data-label="tCO₂e"><span class="total-pill"><?= collect_fmt($v * (float)$x['AD'] / 1000, 4) ?></span></td>
+                                    <td class="oe-c co-tools-cell">
+                                        <button type="button" class="oe-icon-btn oe-icon-edit" title="แก้ไขรายการ"
+                                            data-aiid="<?= (int)$x['id'] ?>" data-label="<?= $h($x['name_tiem']) ?>" data-unit="<?= $h($x['unit']) ?>"
+                                            data-group="<?= (int)$x['group_id'] ?>" data-groupname="<?= $h('ขอบเขต '.$x['scope'].' · '.$x['group_name']) ?>" data-ad="<?= ef_input_val($x['AD']) ?>"
+                                            onclick="coEvTopicOpen(this)"><?= $svg_edit ?></button>
+                                        <button type="button" class="oe-icon-btn oe-icon-del" title="ลบรายการ" onclick="coDeleteRow('delEvTopic<?= (int)$x['id'] ?>', 'ลบรายการนี้ออกจากกิจกรรม พร้อมปริมาณที่กรอกไว้?')"><?= $svg_del ?></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
                         </table>
-                        <div class="foot"><?php $btn_label='บันทึก';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?></div>
+                        <div class="oe-dock">
+                            <div class="oe-dock-info">
+                                <div class="oe-dock-stat"><span>ยอดปล่อยของกิจกรรมนี้</span><b class="is-purple"><span data-de-total><?= collect_fmt($e_total) ?></span> tCO₂e</b></div>
+                                <div class="oe-dock-stat"><span>กรอกแล้ว</span><b><span data-de-filled><?= $e_filled ?> / <?= count($ef_items) ?></span> รายการ</b></div>
+                                <span class="oe-dirty" data-de-dirty hidden>● ยังไม่บันทึก</span>
+                                <span class="oe-msg" data-de-msg role="alert"></span>
+                            </div>
+                            <button type="button" class="oe-btn oe-btn-success" onclick="deSave(this)"><?= $svg_save ?> บันทึกการปล่อย</button>
+                        </div>
                     </form>
                     <?php foreach ($ef_items as $x): ?>
-                    <form method="POST" id="delEvTopic<?= (int)$x['id'] ?>" style="display:none;">
-                        <input type="hidden" name="action" value="delete_event_topic"><input type="hidden" name="tab" value="event">
-                        <input type="hidden" name="year_id" value="<?= $selected_year ?>">                        <input type="hidden" name="admin_item_id" value="<?= (int)$x['id'] ?>"><input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>">
+                    <form method="POST" id="delEvTopic<?= (int)$x['id'] ?>" hidden><?= csrf_field() ?>
+                        <input type="hidden" name="action" value="delete_event_topic"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>">
+                        <input type="hidden" name="admin_item_id" value="<?= (int)$x['id'] ?>"><input type="hidden" name="event_id" value="<?= (int)$curEvent['id'] ?>">
                     </form>
                     <?php endforeach; ?>
-                    <p class="muted" style="margin-top:6px;">กรอกปริมาณเฉพาะรายการที่เกี่ยวข้อง (เว้นว่าง/0 = ไม่นับ) แล้วกดบันทึกทีเดียว</p>
-                    <div id="evTopicEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                        <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขรายการ</h2>
-                            <form method="POST">
-                                <input type="hidden" name="action" value="edit_event_topic"><input type="hidden" name="tab" value="event">
-                                <input type="hidden" name="year_id" value="<?= $selected_year ?>">                                <input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>"><input type="hidden" name="admin_item_id" id="ev_te_aiid">
-                                <div class="fld" style="margin-bottom:10px;"><label>ชื่อรายการ</label><input class="ti-input" style="width:100%;" name="label" id="ev_te_label" required></div>
-                                <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-                                    <div class="fld" style="flex:1;min-width:120px;"><label>หน่วย</label><input class="ti-input" style="width:100%;" name="unit" id="ev_te_unit" required></div>
-                                    <div class="fld" style="width:130px;"><label>Scope</label>
-                                        <?php $dd_id='evScopeEdit';$dd_name='scope';$dd_options=[['value'=>1,'label'=>'Scope 1'],['value'=>2,'label'=>'Scope 2'],['value'=>3,'label'=>'Scope 3']];
-                                            $dd_selected=1;$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือก Scope';$dd_style='';include __DIR__.'/../components/dropdown.php'; ?></div>
-                                    <div class="fld" style="width:150px;"><label>ค่า EF</label><input class="ti-input" style="width:100%;" type="number" step="0.0001" min="0" name="ad" id="ev_te_ad" required></div>
-                                </div>
-                                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
-                                    <button type="button" class="del" onclick="document.getElementById('evTopicEditModal').style.display='none'">ยกเลิก</button>
-                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    <?php endif; ?>
                 </div>
+                <?php endif; ?>
 
-                <?php endif; /* end ตารางปล่อย (ef_items) */ ?>
-
-                <?php if (!empty($rm_rows)): ?>
-                <!-- ตารางกรอกปริมาณดูดกลับ -->
-                <div class="card">
-                    <h2>กรอกปริมาณดูดกลับ —<?= htmlspecialchars($curEvent['name']) ?> <span class="muted" style="font-weight:500;font-size:.9rem;">· ผู้จัด: <?= htmlspecialchars($curEvent['org_label']) ?></span></h2>
-                    <?php if (empty($rm_rows)): ?>
-                        <p class="muted">ยังไม่มีรายการดูดกลับในกิจกรรมนี้ — เพิ่มด้านบน (เช่น ปลูกต้นไม้ยืนต้น)</p>
-                    <?php else: ?>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="save_event_removal"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>">
-                        <table class="t">
-                            <thead><tr><th>รายการดูดกลับ</th><th>หน่วย</th><th class="num">ค่าดูดกลับ (kgCO₂e/หน่วย)</th><th class="num">ปริมาณ</th><th class="num">tCO₂e</th><th style="text-align:center;">จัดการ</th></tr></thead>
+                <?php if (!empty($rm_rows)):
+                    $r_total = array_sum(array_map(fn($m) => (float)$m['emission'], $rm_rows));
+                    $r_filled = count(array_filter($rm_rows, fn($m) => (float)$m['qty'] > 0)); ?>
+                <div class="co-sec co-sec-green" data-de-scope data-de-digits="3">
+                    <div class="co-sec-title">ดูดกลับคาร์บอน <small>ยอดรวมเข้า GHG Removal ของมหาวิทยาลัยอัตโนมัติ</small></div>
+                    <form method="POST" id="coRemovalForm"><?= csrf_field() ?>
+                        <input type="hidden" name="action" value="save_event_removal"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= (int)$curEvent['id'] ?>">
+                        <table class="oe-table">
+                            <colgroup><col><col style="width:118px;"><col style="width:150px;"><col style="width:108px;"><col style="width:86px;"></colgroup>
+                            <thead><tr><th>รายการดูดกลับ</th><th>ค่าดูดกลับ<br><span class="oe-muted">kgCO₂e/หน่วย</span></th><th>ปริมาณ</th><th>tCO₂e</th><th>จัดการ</th></tr></thead>
                             <tbody>
-                            <?php foreach ($rm_rows as $m): $q=(float)$m['qty']; ?>
-                                <tr>
-                                    <td style="font-weight:600;"><div style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($m['name_tiem'],ENT_QUOTES) ?>"><?= htmlspecialchars($m['name_tiem']) ?></div></td>
-                                    <td><?= htmlspecialchars($m['unit'] ?: '-') ?></td>
-                                    <td class="num"><?= number_format((float)$m['factor'],4) ?></td>
-                                    <td class="num"><input class="ti-input evRmQty" style="width:120px;text-align:center;" type="number" min="0" step="0.0001" data-factor="<?= (float)$m['factor'] ?>" name="qty[<?= (int)$m['rid'] ?>]" value="<?= $q!=0?htmlspecialchars(rtrim(rtrim(number_format($q,4,'.',''),'0'),'.')):'' ?>" placeholder="0"></td>
-                                    <td class="num evRmEmit" style="color:#166534;font-weight:700;"><?= number_format($q*(float)$m['factor']/1000,4) ?></td>
-                                    <td style="text-align:center;white-space:nowrap;">
-                                        <button type="button" class="icobtn edit" title="แก้ไขรายการ"
-                                            data-rid="<?= (int)$m['rid'] ?>"
-                                            data-name="<?= htmlspecialchars($m['name_tiem'],ENT_QUOTES) ?>"
-                                            data-unit="<?= htmlspecialchars((string)$m['unit'],ENT_QUOTES) ?>"
-                                            data-factor="<?= htmlspecialchars((string)$m['factor'],ENT_QUOTES) ?>"
-                                            onclick="evRmEdit(this)">
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                                        </button>
-                                        <button type="button" class="icobtn del" title="เอาออกจากกิจกรรม" onclick="evRmDel(<?= (int)$m['rid'] ?>)">
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                        </button>
+                            <?php foreach ($rm_rows as $m): $q = (float)$m['qty']; ?>
+                                <tr class="item-row<?= $q > 0 ? ' is-filled' : '' ?>">
+                                    <td><?= $h($m['name_tiem']) ?><span class="co-row-sub">หน่วย: <?= $h($m['unit'] ?: '-') ?></span></td>
+                                    <td class="oe-c oe-ef" data-label="ค่าดูดกลับ (kgCO₂e/หน่วย)"><?= ef_fmt($m['factor']) ?></td>
+                                    <td class="oe-vol" data-label="ปริมาณ (<?= $h($m['unit'] ?: 'หน่วย') ?>)"><input type="text" inputmode="decimal" autocomplete="off" class="vol-input oe-input" data-group="removal" data-ef="<?= (float)$m['factor'] ?>"
+                                        name="qty[<?= (int)$m['rid'] ?>]" value="<?= collect_input_val($q) ?>" placeholder="0" aria-label="ปริมาณ: <?= $h($m['name_tiem']) ?>"><span class="de-err" role="alert"></span></td>
+                                    <td data-label="tCO₂e"><span class="total-pill"><?= collect_fmt((float)$m['emission'], 4) ?></span></td>
+                                    <td class="oe-c co-tools-cell">
+                                        <button type="button" class="oe-icon-btn oe-icon-edit" title="แก้ไขรายการ"
+                                            data-rid="<?= (int)$m['rid'] ?>" data-name="<?= $h($m['name_tiem']) ?>" data-unit="<?= $h($m['unit']) ?>" data-factor="<?= ef_input_val($m['factor']) ?>"
+                                            onclick="coRemovalOpen(this)"><?= $svg_edit ?></button>
+                                        <button type="button" class="oe-icon-btn oe-icon-del" title="เอาออกจากกิจกรรม" onclick="coDeleteRow('delEvRm<?= (int)$m['rid'] ?>', 'เอารายการดูดกลับนี้ออกจากกิจกรรม?')"><?= $svg_del ?></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
                         </table>
-                        <div class="foot"><?php $btn_label='บันทึก';$btn_variant='primary';$btn_type='submit';include __DIR__.'/../components/button.php'; ?></div>
+                        <div class="oe-dock">
+                            <div class="oe-dock-info">
+                                <div class="oe-dock-stat"><span>ยอดดูดกลับของกิจกรรมนี้</span><b class="is-purple"><span data-de-total><?= collect_fmt($r_total) ?></span> tCO₂e</b></div>
+                                <div class="oe-dock-stat"><span>กรอกแล้ว</span><b><span data-de-filled><?= $r_filled ?> / <?= count($rm_rows) ?></span> รายการ</b></div>
+                                <span class="oe-dirty" data-de-dirty hidden>● ยังไม่บันทึก</span>
+                                <span class="oe-msg" data-de-msg role="alert"></span>
+                            </div>
+                            <button type="button" class="oe-btn oe-btn-success" onclick="deSave(this)"><?= $svg_save ?> บันทึกการดูดกลับ</button>
+                        </div>
                     </form>
-                    <?php /* ฟอร์มลบแยกไว้นอกฟอร์มบันทึก (กัน nested form) */ ?>
                     <?php foreach ($rm_rows as $m): ?>
-                    <form method="POST" id="delEvRm<?= (int)$m['rid'] ?>" style="display:none;">
-                        <input type="hidden" name="action" value="delete_event_removal"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>"><input type="hidden" name="rei_id" value="<?= (int)$m['rid'] ?>">
+                    <form method="POST" id="delEvRm<?= (int)$m['rid'] ?>" hidden><?= csrf_field() ?>
+                        <input type="hidden" name="action" value="delete_event_removal"><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= (int)$curEvent['id'] ?>"><input type="hidden" name="rei_id" value="<?= (int)$m['rid'] ?>">
                     </form>
                     <?php endforeach; ?>
-                    <!-- Modal แก้ไขรายการดูดกลับ -->
-                    <div id="rmEvEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
-                        <div class="co-pop" style="background:#fff;border-radius:16px;padding:22px;max-width:520px;width:92%;">
-                            <h2 style="margin:0 0 14px;font-size:1.1rem;font-weight:800;"><?= ic('edit',18) ?>แก้ไขรายการดูดกลับ</h2>
-                            <form method="POST">
-                                <input type="hidden" name="action" value="edit_event_removal"><input type="hidden" name="tab" value="event">
-                                <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= $curEvent['id'] ?>"><input type="hidden" name="rei_id" id="rmev_id">
-                                <div class="fld" style="margin-bottom:10px;"><label>ชื่อรายการ</label><input class="ti-input" style="width:100%;" name="name" id="rmev_name" required></div>
-                                <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-                                    <div class="fld" style="flex:1;min-width:120px;"><label>หน่วย</label><input class="ti-input" style="width:100%;" name="unit" id="rmev_unit"></div>
-                                    <div class="fld" style="width:180px;"><label>ค่าดูดกลับ (kgCO₂e/หน่วย)</label><input class="ti-input" style="width:100%;" type="number" step="0.0001" min="0" name="factor" id="rmev_factor" required></div>
-                                </div>
-                                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
-                                    <button type="button" class="del" onclick="document.getElementById('rmEvEditModal').style.display='none'">ยกเลิก</button>
-                                    <?php $btn_label='บันทึกการแก้ไข';$btn_variant='primary';$btn_type='submit';$btn_class='btn-noshadow';include __DIR__.'/../components/button.php'; ?>
-                                </div>
-                            </form>
-                        </div>
+                </div>
+                <?php endif; ?>
+            </section>
+            <?php endif; /* curEvent */ ?>
+            <?php endif; /* tab */ ?>
+        </div>
+
+        <!-- ═════ หน้าต่าง (เพิ่ม/แก้ไข) ═════ -->
+        <?php if ($is_survey): ?>
+        <!-- แบบสอบถาม: เพิ่ม / แก้ไขชื่อ -->
+        <div class="modal-overlay" id="coSurveyModal">
+            <div class="modal-box co-modal">
+                <div class="modal-title"><span data-co-icon></span><span data-co-title>เพิ่มแบบสอบถาม</span></div>
+                <form method="POST" data-co-form><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="add_questionnaire" data-co-action><input type="hidden" name="tab" value="survey"><input type="hidden" name="year_id" value="<?= $selected_year ?>">
+                    <input type="hidden" name="maker" value="<?= (int)$survey_affil ?>" id="coSurveyMakerH"><input type="hidden" name="q_old" id="coSurveyOld">
+                    <?php if ($is_admin): ?>
+                    <div class="form-group-dark" id="coSurveyMakerField"><label class="form-label-dark">ผู้จัดทำ (หน่วยงานเจ้าของ) *</label>
+                        <?php $dd_id='coSurveyMaker';$dd_name='maker';$dd_options=array_map(fn($a)=>['value'=>$a['id'],'label'=>$a['affiliation_item']],$affils);
+                            $dd_selected=$survey_affil;$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือกผู้จัดทำ';$dd_style='width:100%;';
+                            include __DIR__.'/../components/dropdown.php'; ?>
                     </div>
                     <?php endif; ?>
-                </div>
-                <?php endif; /* end removal section */ ?>
-                <?php endif; /* end curEvent */ ?>
-            <?php endif; ?>
+                    <div class="form-group-dark"><label class="form-label-dark" for="coSurveyName">ชื่อแบบสอบถาม *</label>
+                        <input class="form-control-dark" id="coSurveyName" name="q_name" required maxlength="100" placeholder="เช่น นักศึกษา / บุคลากร / แบบสอบถามการเดินทาง" autocomplete="off"></div>
+                    <p class="co-modal-msg" data-co-msg role="alert"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeModal('coSurveyModal')">ยกเลิก</button>
+                        <button type="submit" class="btn-primary" data-co-submit>เพิ่มแบบสอบถาม</button>
+                    </div>
+                </form>
+            </div>
         </div>
+        <?php if ($sel_survey_exists): ?>
+        <!-- หัวข้อแบบสอบถาม: เพิ่ม / แก้ไข -->
+        <div class="modal-overlay" id="coTopicModal">
+            <div class="modal-box co-modal co-modal-wide">
+                <div class="modal-title"><span data-co-icon></span><span data-co-title>เพิ่มหัวข้อ</span></div>
+                <form method="POST" data-co-form data-co-dd="coTopicGroup"><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="add_topic" data-co-action><input type="hidden" name="tab" value="survey">
+                    <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="maker" value="<?= (int)$survey_affil ?>"><input type="hidden" name="group" value="<?= $h($group) ?>">
+                    <input type="hidden" name="qitem_id" id="coTopicId">
+                    <div class="co-form-grid">
+                        <div class="form-group-dark co-span2"><label class="form-label-dark" for="coTopicLabel">คำถาม (ที่ผู้ตอบเห็นในฟอร์ม) *</label>
+                            <input class="form-control-dark" id="coTopicLabel" name="label" required maxlength="100" placeholder="เช่น ระยะทางเดินทางมามหาวิทยาลัย (มอเตอร์ไซค์)" autocomplete="off"></div>
+                        <div class="form-group-dark co-span2"><label class="form-label-dark">หมวดย่อย (ขอบเขต 3) *</label>
+                            <?php $dd_id='coTopicGroup';$dd_name='group_id';$dd_options=admin_g_options($all_groups, INDIRECT_SCOPE);
+                                $dd_selected='';$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือกหมวดย่อย';$dd_style='width:100%;';include __DIR__.'/../components/dropdown.php'; ?></div>
+                        <div class="form-group-dark"><label class="form-label-dark" for="coTopicUnit">หน่วย *</label>
+                            <input class="form-control-dark" id="coTopicUnit" name="unit" required maxlength="100" placeholder="กม. / มื้อ / kg" autocomplete="off"></div>
+                        <div class="form-group-dark"><label class="form-label-dark" for="coTopicAd">ค่า EF (kgCO₂e/หน่วย) *</label>
+                            <input class="form-control-dark" id="coTopicAd" name="ad" type="number" step="any" min="0" max="1000000" required placeholder="0.0000"></div>
+                    </div>
+                    <p class="co-modal-msg" data-co-msg role="alert"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeModal('coTopicModal')">ยกเลิก</button>
+                        <button type="submit" class="btn-primary" data-co-submit>เพิ่มหัวข้อ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php else: ?>
+        <!-- กิจกรรม: เพิ่ม / แก้ไข -->
+        <div class="modal-overlay" id="coEventModal">
+            <div class="modal-box co-modal co-modal-wide">
+                <div class="modal-title"><span data-co-icon></span><span data-co-title>เพิ่มกิจกรรม</span></div>
+                <form method="POST" data-co-form data-co-dates><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="add_event" data-co-action><input type="hidden" name="tab" value="event"><input type="hidden" name="year_id" value="<?= $selected_year ?>">
+                    <input type="hidden" name="event_id" id="coEventId">
+                    <div class="form-group-dark"><label class="form-label-dark" for="coEventName">ชื่อกิจกรรม *</label>
+                        <input class="form-control-dark" id="coEventName" name="name" required maxlength="255" placeholder="เช่น งานรับน้อง 2569" autocomplete="off"></div>
+                    <?php if ($is_admin): ?>
+                    <div class="form-group-dark" id="coEventOrgField"><label class="form-label-dark">ผู้จัด *</label>
+                        <?php $org_dd=$org_options; $org_dd[]=['value'=>'__custom__','label'=>'อื่นๆ…'];
+                            $dd_id='addOrg';$dd_name='org';$dd_options=$org_dd;$dd_selected=($org_options[0]['value']??'');$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือกผู้จัด';$dd_style='width:100%;';include __DIR__.'/../components/dropdown.php'; ?>
+                        <input type="text" id="addOrgCustom" class="form-control-dark" style="display:none;margin-top:10px;" placeholder="พิมพ์ชื่อผู้จัด (อื่นๆ)" maxlength="255">
+                    </div>
+                    <?php endif; ?>
+                    <div class="co-form-grid">
+                        <div class="form-group-dark"><label class="form-label-dark" for="coEventStart">วันที่เริ่ม</label>
+                            <input type="text" id="coEventStart" class="form-control-dark co-date" data-hidden="coEventStartH" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="off">
+                            <input type="hidden" name="event_date" id="coEventStartH"></div>
+                        <div class="form-group-dark"><label class="form-label-dark" for="coEventEnd">วันสิ้นสุด <span class="oe-muted">(ถ้ามี)</span></label>
+                            <input type="text" id="coEventEnd" class="form-control-dark co-date" data-hidden="coEventEndH" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="off">
+                            <input type="hidden" name="event_end_date" id="coEventEndH"></div>
+                    </div>
+                    <p class="co-modal-msg" data-co-msg role="alert"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeModal('coEventModal')">ยกเลิก</button>
+                        <button type="submit" class="btn-primary" data-co-submit>เพิ่มกิจกรรม</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <?php if ($curEvent): ?>
+        <!-- รายการปล่อยของกิจกรรม: เพิ่ม / แก้ไข -->
+        <div class="modal-overlay" id="coEvTopicModal">
+            <div class="modal-box co-modal co-modal-wide">
+                <div class="modal-title"><span data-co-icon></span><span data-co-title>เพิ่มรายการปล่อย</span></div>
+                <form method="POST" data-co-form data-co-dd="coEvTopicGroup"><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="add_event_topic" data-co-action><input type="hidden" name="tab" value="event">
+                    <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= (int)$curEvent['id'] ?>"><input type="hidden" name="admin_item_id" id="coEvTopicId">
+                    <div class="co-form-grid">
+                        <div class="form-group-dark co-span2"><label class="form-label-dark" for="coEvTopicLabel">ชื่อรายการ *</label>
+                            <input class="form-control-dark" id="coEvTopicLabel" name="label" required maxlength="100" placeholder="เช่น การเดินทางของผู้เข้าร่วม (มอเตอร์ไซค์)" autocomplete="off"></div>
+                        <div class="form-group-dark co-span2"><label class="form-label-dark">หมวดย่อย (ขอบเขต 3) *</label>
+                            <?php $dd_id='coEvTopicGroup';$dd_name='group_id';$dd_options=admin_g_options($all_groups, INDIRECT_SCOPE);
+                                $dd_selected='';$dd_required=true;$dd_class='dd-field';$dd_placeholder='เลือกหมวดย่อย';$dd_style='width:100%;';include __DIR__.'/../components/dropdown.php'; ?></div>
+                        <div class="form-group-dark"><label class="form-label-dark" for="coEvTopicUnit">หน่วย *</label>
+                            <input class="form-control-dark" id="coEvTopicUnit" name="unit" required maxlength="100" placeholder="กม. / คน / kg" autocomplete="off"></div>
+                        <div class="form-group-dark"><label class="form-label-dark" for="coEvTopicAd">ค่า EF (kgCO₂e/หน่วย) *</label>
+                            <input class="form-control-dark" id="coEvTopicAd" name="ad" type="number" step="any" min="0" max="1000000" required placeholder="0.0000"></div>
+                    </div>
+                    <p class="co-modal-msg" data-co-msg role="alert"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeModal('coEvTopicModal')">ยกเลิก</button>
+                        <button type="submit" class="btn-primary" data-co-submit>เพิ่มรายการ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- รายการดูดกลับของกิจกรรม: เพิ่ม / แก้ไข -->
+        <div class="modal-overlay" id="coRemovalModal">
+            <div class="modal-box co-modal co-modal-wide">
+                <div class="modal-title"><span data-co-icon></span><span data-co-title>เพิ่มรายการดูดกลับ</span></div>
+                <form method="POST" data-co-form><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="add_removal_item" data-co-action><input type="hidden" name="tab" value="event">
+                    <input type="hidden" name="year_id" value="<?= $selected_year ?>"><input type="hidden" name="event_id" value="<?= (int)$curEvent['id'] ?>"><input type="hidden" name="rei_id" id="coRemovalId">
+                    <div class="form-group-dark"><label class="form-label-dark" for="coRemovalName">ชื่อรายการ *</label>
+                        <input class="form-control-dark" id="coRemovalName" name="name" required maxlength="255" placeholder="เช่น ต้นไม้ยืนต้น / พื้นที่ป่า" autocomplete="off"></div>
+                    <div class="co-form-grid">
+                        <div class="form-group-dark"><label class="form-label-dark" for="coRemovalUnit">หน่วย</label>
+                            <input class="form-control-dark" id="coRemovalUnit" name="unit" maxlength="100" placeholder="ต้น / ไร่" autocomplete="off"></div>
+                        <div class="form-group-dark"><label class="form-label-dark" for="coRemovalFactor">ค่าดูดกลับ (kgCO₂e/หน่วย/ปี) *</label>
+                            <input class="form-control-dark" id="coRemovalFactor" name="factor" type="number" step="any" min="0" max="1000000" required placeholder="0.0000"></div>
+                    </div>
+                    <div class="oe-note">ค่าดูดกลับควรอ้างอิงค่ามาตรฐาน (เช่น TGO) — ยอดจะรวมเข้า GHG Removal ของมหาวิทยาลัยอัตโนมัติ</div>
+                    <p class="co-modal-msg" data-co-msg role="alert"></p>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeModal('coRemovalModal')">ยกเลิก</button>
+                        <button type="submit" class="btn-primary" data-co-submit>เพิ่มรายการดูดกลับ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
+
+        <script src="<?= $root ?>assets/js/data-entry.js<?= asset_v('assets/js/data-entry.js') ?>"></script>
         <script>
-            function evRmDel(rid){ confirmDelete({message:'เอารายการนี้ออกจากกิจกรรม?', confirmText:'ยืนยันการลบ'}).then(function(ok){ if(ok) document.getElementById('delEvRm'+rid).submit(); }); }
-            function evRmEdit(b){
-                document.getElementById('rmev_id').value=b.dataset.rid;
-                document.getElementById('rmev_name').value=b.dataset.name;
-                document.getElementById('rmev_unit').value=b.dataset.unit;
-                document.getElementById('rmev_factor').value=b.dataset.factor;
-                document.getElementById('rmEvEditModal').style.display='flex';
-                coPopRestart('rmEvEditModal');
-            }
-            document.getElementById('rmEvEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
-            // ── สลับฟอร์มเพิ่มรายการ: ปล่อย (emit) / ดูดกลับ (rmv) ──
-            document.getElementById('evItemType')?.addEventListener('dd:change', function(e){
-                var emit = e.detail.value === 'emit';
-                var fe = document.getElementById('evAddEmit'), fr = document.getElementById('evAddRmv');
-                if (fe) fe.style.display = emit ? 'block' : 'none';
-                if (fr) fr.style.display = emit ? 'none' : 'block';
+        // ประกาศผ่าน window / var / IIFE — SPA รันสคริปต์ซ้ำทุกครั้งที่เข้าหน้านี้ (let/const ระดับบนสุดจะ error ประกาศซ้ำ)
+        (function () {
+            var d = document;
+            var ICON_ADD = <?= json_encode(ic('add', 22)) ?>, ICON_EDIT = <?= json_encode(ic('edit', 22)) ?>;
+            function $(id) { return d.getElementById(id); }
+
+            window.openModal = function (id) { var m = $(id); if (m) { m.classList.add('open'); m.style.display = 'flex'; var box = m.querySelector('.modal-box'); if (box) { box.style.animation = 'none'; void box.offsetWidth; box.style.animation = ''; } } };
+            window.closeModal = function (id) { var m = $(id); if (m) { m.classList.remove('open'); m.style.display = 'none'; } };
+            d.querySelectorAll('.co-page ~ .modal-overlay').forEach(function (el) {
+                el.addEventListener('click', function (e) { if (e.target === el) closeModal(el.id); });
             });
-            // คำนวณ tCO₂e สดตอนพิมพ์ปริมาณดูดกลับ (qty × factor / 1000)
-            document.addEventListener('input', function(e){
-                var el=e.target;
-                if(el.classList && el.classList.contains('evRmQty')){
-                    var f=parseFloat(el.dataset.factor)||0, v=parseFloat(el.value)||0;
-                    var cell=el.closest('tr').querySelector('.evRmEmit');
-                    if(cell) cell.textContent=(v*f/1000).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:4});
-                }
-            });
-            // ── คงตำแหน่ง scroll เมื่อกดเลือกกิจกรรม (ลิงก์รีหน้า) → ไม่ให้เด้งขึ้นบนสุด ──
-            (function(){
-                var KEY='collectScrollY';
-                if('scrollRestoration' in history) history.scrollRestoration='manual';
-                document.querySelectorAll('a.linkish').forEach(function(a){
-                    a.addEventListener('click', function(){
-                        try{ sessionStorage.setItem(KEY, String(window.scrollY)); }catch(e){}
-                    });
+            if (!window.__coEsc) {
+                window.__coEsc = true;
+                d.addEventListener('keydown', function (e) {
+                    if (e.key !== 'Escape') return;
+                    d.querySelectorAll('.co-page ~ .modal-overlay.open').forEach(function (m) { closeModal(m.id); });
                 });
-                window.addEventListener('load', function(){
-                    var y=null;
-                    try{ y=sessionStorage.getItem(KEY); }catch(e){}
-                    if(y!==null){
-                        window.scrollTo(0, parseInt(y,10)||0);
-                        try{ sessionStorage.removeItem(KEY); }catch(e){}
+            }
+
+            // ตารางกรอก (แต่ละส่วนมีฟอร์ม + แถบบันทึกของตัวเอง)
+            d.querySelectorAll('.co-page [data-de-scope] > form:not([hidden])').forEach(function (f) { deInit(f); });
+
+            /** ตั้งหน้าต่างเป็นโหมด เพิ่ม / แก้ไข: action, หัวข้อ, ไอคอน, ปุ่ม */
+            function setMode(id, edit, cfg) {
+                var m = $(id), f = m.querySelector('[data-co-form]');
+                f.reset();
+                f.querySelector('[data-co-action]').value = edit ? cfg.editAction : cfg.addAction;
+                m.querySelector('[data-co-title]').textContent = edit ? cfg.editTitle : cfg.addTitle;
+                m.querySelector('[data-co-icon]').innerHTML = edit ? ICON_EDIT : ICON_ADD;
+                m.querySelector('[data-co-submit]').textContent = edit ? 'บันทึกการแก้ไข' : cfg.addTitle;
+                m.querySelector('[data-co-msg]').textContent = '';
+                return f;
+            }
+            /** dropdown หมวดย่อย: ว่าง (เพิ่ม) หรือค่าเดิม (แก้ไข) */
+            function setGroup(ddId, value, label) {
+                if (value) { ddSetValue(ddId, value, label); return; }
+                var wrap = $(ddId), input = $(ddId + '_input'), lab = $(ddId + '_label');
+                if (input) input.value = '';
+                if (lab) { lab.textContent = wrap.dataset.emptyLabel || 'เลือกหมวดย่อย'; lab.style.color = '#9CA3AF'; }
+                wrap.querySelectorAll('.dd-option').forEach(function (o) { o.classList.remove('active'); });
+            }
+            function focusFirst(id) { setTimeout(function () { var el = $(id).querySelector('input.form-control-dark:not([type=hidden])'); if (el) el.focus(); }, 60); }
+
+            window.coSurveyOpen = function (b) {
+                setMode('coSurveyModal', !!b, { addAction: 'add_questionnaire', editAction: 'edit_questionnaire', addTitle: 'เพิ่มแบบสอบถาม', editTitle: 'แก้ไขชื่อแบบสอบถาม' });
+                var makerField = $('coSurveyMakerField'), makerH = $('coSurveyMakerH');
+                $('coSurveyOld').value = b ? b.dataset.name : '';
+                $('coSurveyName').value = b ? b.dataset.name : '';
+                if (b) makerH.value = b.dataset.affid; else makerH.value = <?= (int)$survey_affil ?>;
+                // admin เพิ่มใหม่: เลือกผู้จัดทำจาก dropdown (ปิด hidden ไม่ให้ส่งซ้ำ) · แก้ไข: ใช้เจ้าของเดิม
+                if (makerField) { makerField.hidden = !!b; makerH.disabled = !b; $('coSurveyMaker_input').disabled = !!b; }
+                openModal('coSurveyModal'); focusFirst('coSurveyModal');
+            };
+            window.coTopicOpen = function (b) {
+                setMode('coTopicModal', !!b, { addAction: 'add_topic', editAction: 'edit_topic', addTitle: 'เพิ่มหัวข้อ', editTitle: 'แก้ไขหัวข้อ' });
+                $('coTopicId').value = b ? b.dataset.qiid : '';
+                $('coTopicLabel').value = b ? b.dataset.label : '';
+                $('coTopicUnit').value = b ? b.dataset.unit : '';
+                $('coTopicAd').value = b ? b.dataset.ad : '';
+                setGroup('coTopicGroup', b && b.dataset.group, b && b.dataset.groupname);
+                openModal('coTopicModal'); focusFirst('coTopicModal');
+            };
+            window.coEventOpen = function (b) {
+                setMode('coEventModal', !!b, { addAction: 'add_event', editAction: 'edit_event', addTitle: 'เพิ่มกิจกรรม', editTitle: 'แก้ไขกิจกรรม' });
+                $('coEventId').value = b ? b.dataset.eid : '';
+                $('coEventName').value = b ? b.dataset.name : '';
+                var toDMY = function (iso) { var m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
+                $('coEventStart').value = b ? toDMY(b.dataset.date) : ''; $('coEventStartH').value = b ? (b.dataset.date || '') : '';
+                $('coEventEnd').value = b ? toDMY(b.dataset.end) : '';    $('coEventEndH').value = b ? (b.dataset.end || '') : '';
+                var org = $('coEventOrgField'); if (org) org.hidden = !!b;   // ผู้จัดเลือกได้ตอนเพิ่มเท่านั้น
+                openModal('coEventModal'); focusFirst('coEventModal');
+            };
+            window.coEvTopicOpen = function (b) {
+                setMode('coEvTopicModal', !!b, { addAction: 'add_event_topic', editAction: 'edit_event_topic', addTitle: 'เพิ่มรายการปล่อย', editTitle: 'แก้ไขรายการปล่อย' });
+                $('coEvTopicId').value = b ? b.dataset.aiid : '';
+                $('coEvTopicLabel').value = b ? b.dataset.label : '';
+                $('coEvTopicUnit').value = b ? b.dataset.unit : '';
+                $('coEvTopicAd').value = b ? b.dataset.ad : '';
+                setGroup('coEvTopicGroup', b && b.dataset.group, b && b.dataset.groupname);
+                openModal('coEvTopicModal'); focusFirst('coEvTopicModal');
+            };
+            window.coRemovalOpen = function (b) {
+                setMode('coRemovalModal', !!b, { addAction: 'add_removal_item', editAction: 'edit_event_removal', addTitle: 'เพิ่มรายการดูดกลับ', editTitle: 'แก้ไขรายการดูดกลับ' });
+                $('coRemovalId').value = b ? b.dataset.rid : '';
+                $('coRemovalName').value = b ? b.dataset.name : '';
+                $('coRemovalUnit').value = b ? b.dataset.unit : '';
+                $('coRemovalFactor').value = b ? b.dataset.factor : '';
+                openModal('coRemovalModal'); focusFirst('coRemovalModal');
+            };
+            /** ลบแถว (ฟอร์มลบซ่อนอยู่นอกฟอร์มบันทึก) — ยืนยันก่อน */
+            window.coDeleteRow = function (formId, message) {
+                confirmDelete({ message: message }).then(function (ok) { if (ok && $(formId)) $(formId).submit(); });
+            };
+
+            // ── ช่องวันที่ dd/mm/yyyy → ส่ง yyyy-mm-dd ผ่าน hidden ──
+            function toISO(v) {
+                var m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (!m) return '';
+                if (+m[2] < 1 || +m[2] > 12 || +m[1] < 1 || +m[1] > 31 || +m[3] < 1000) return '';
+                return m[3] + '-' + m[2] + '-' + m[1];
+            }
+            function mask(v) {
+                var x = v.replace(/\D/g, '').slice(0, 8), out = x.slice(0, 2);
+                if (x.length >= 3) out += '/' + x.slice(2, 4);
+                if (x.length >= 5) out += '/' + x.slice(4, 8);
+                return out;
+            }
+            d.querySelectorAll('.co-date').forEach(function (inp) {
+                inp.addEventListener('input', function () { inp.value = mask(inp.value); var hd = $(inp.dataset.hidden); if (hd) hd.value = toISO(inp.value); });
+            });
+
+            // ── ตรวจก่อนส่งหน้าต่าง: หมวดย่อยต้องเลือก, วันที่ต้องถูกต้อง, ผู้จัด "อื่นๆ" ต้องพิมพ์ชื่อ ──
+            d.querySelectorAll('.co-page ~ .modal-overlay [data-co-form]').forEach(function (f) {
+                f.addEventListener('submit', function (e) {
+                    var msg = f.querySelector('[data-co-msg]'), err = '';
+                    if (f.dataset.coDd && !$(f.dataset.coDd + '_input').value) err = 'กรุณาเลือกหมวดย่อย';
+                    if (f.hasAttribute('data-co-dates')) {
+                        var s = $('coEventStart'), en = $('coEventEnd'), sh = $('coEventStartH').value, eh = $('coEventEndH').value;
+                        if (s.value && !sh) err = 'วันที่เริ่มไม่ถูกต้อง (dd/mm/yyyy)';
+                        else if (en.value && !eh) err = 'วันสิ้นสุดไม่ถูกต้อง (dd/mm/yyyy)';
+                        else if (eh && !sh) err = 'กรุณากรอกวันที่เริ่มก่อนวันสิ้นสุด';
+                        else if (sh && eh && eh < sh) err = 'วันสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม';
+                        var orgH = $('addOrg_input'), cust = $('addOrgCustom'), orgField = $('coEventOrgField');
+                        if (!err && orgH && orgField && !orgField.hidden && orgH.value === '__custom__') {
+                            if (!cust.value.trim()) err = 'กรุณาพิมพ์ชื่อผู้จัด';
+                            else orgH.value = 'custom:' + cust.value.trim();
+                        }
+                    }
+                    if (err) {
+                        e.preventDefault(); msg.textContent = err;
+                        var box = f.closest('.modal-box'); box.classList.remove('oe-shake'); void box.offsetWidth; box.classList.add('oe-shake');
                     }
                 });
-            })();
-            // ── ช่องวันที่แบบ masked dd/mm/yyyy → ส่ง yyyy-mm-dd ผ่าน hidden + validate end ≥ start ──
-            (function(){
-                var sd=document.getElementById('evDate'), sh=document.getElementById('evDateHidden');
-                var ed=document.getElementById('evEndDate'), eh=document.getElementById('evEndDateHidden');
-                if(!sd) return;
-                function toISO(v){
-                    var m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(!m) return '';
-                    var dd=+m[1], mm=+m[2], yy=+m[3];
-                    if(mm<1||mm>12||dd<1||dd>31||yy<1000) return '';
-                    return m[3]+'-'+m[2]+'-'+m[1];   // yyyy-mm-dd
-                }
-                function mask(v){
-                    var x=v.replace(/\D/g,'').slice(0,8);            // ตัวเลขล้วน สูงสุด 8 หลัก (ปี 4 หลัก)
-                    var out=x.slice(0,2);
-                    if(x.length>=3) out+='/'+x.slice(2,4);
-                    if(x.length>=5) out+='/'+x.slice(4,8);
-                    return out;
-                }
-                function validateRange(){
-                    if(!ed) return;
-                    // วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่ม (เทียบ ISO string เรียงตามลำดับได้)
-                    var bad = sh.value && eh.value && eh.value < sh.value;
-                    ed.setCustomValidity(bad ? 'วันสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม' : '');
-                    ed.style.borderColor = bad ? '#EF4444' : '';
-                    ed.style.boxShadow   = bad ? '0 0 0 1px #EF4444,0 0 0 4px rgba(239,68,68,.15)' : '';
-                }
-                sd.addEventListener('input', function(){ sd.value=mask(sd.value); sh.value=toISO(sd.value); validateRange(); });
-                if(ed) ed.addEventListener('input', function(){ ed.value=mask(ed.value); eh.value=toISO(ed.value); validateRange(); });
-            })();
-            // restart animation coPop ทุกครั้งที่เปิด modal (parent toggle display ไม่ re-trigger เอง) + ล็อกสกรอลล์หน้า
-            window.coPopRestart = function(modalId){
-                document.body.style.overflow = 'hidden';   // fix หน้า ไม่ให้เลื่อนหลัง modal
-                var box = document.querySelector('#'+modalId+' .co-pop');
-                if(!box) return;
-                box.style.animation='none'; void box.offsetWidth; box.style.animation='';
-            };
-            // คืนสกรอลล์อัตโนมัติเมื่อ modal custom ทุกตัวปิด (รองรับทุกทางปิด: ยกเลิก/คลิกนอก/บันทึก)
-            (function(){
-                var ids = ['qEditModal','topicEditModal','evEditModal','evTopicEditModal','rmEvEditModal'];
-                var nodes = ids.map(function(id){ return document.getElementById(id); }).filter(Boolean);
-                if(!nodes.length || typeof MutationObserver === 'undefined') return;
-                function anyOpen(){ return nodes.some(function(m){ return m.style.display === 'flex'; }); }
-                var obs = new MutationObserver(function(){ if(!anyOpen()) document.body.style.overflow = ''; });
-                nodes.forEach(function(m){ obs.observe(m, {attributes:true, attributeFilter:['style']}); });
-            })();
-            // ── แก้ไขกิจกรรม (ชื่อ/วันที่เริ่ม/วันสิ้นสุด) ──
-            (function(){
-                function toISO(v){
-                    var m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(!m) return '';
-                    if(+m[2]<1||+m[2]>12||+m[1]<1||+m[1]>31||+m[3]<1000) return '';
-                    return m[3]+'-'+m[2]+'-'+m[1];
-                }
-                function toDMY(iso){ var m=(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?m[3]+'/'+m[2]+'/'+m[1]:''; }
-                function mask(v){
-                    var x=v.replace(/\D/g,'').slice(0,8), out=x.slice(0,2);
-                    if(x.length>=3) out+='/'+x.slice(2,4);
-                    if(x.length>=5) out+='/'+x.slice(4,8);
-                    return out;
-                }
-                document.querySelectorAll('.evMaskDate').forEach(function(inp){
-                    inp.addEventListener('input', function(){
-                        inp.value=mask(inp.value);
-                        var h=document.getElementById(inp.dataset.hidden); if(h) h.value=toISO(inp.value);
-                    });
-                });
-                window.evEdit = function(b){
-                    document.getElementById('ev_ed_eid').value=b.dataset.eid;
-                    document.getElementById('ev_ed_name').value=b.dataset.name;
-                    document.getElementById('ev_ed_date').value=toDMY(b.dataset.date);
-                    document.getElementById('ev_ed_dateH').value=b.dataset.date||'';
-                    document.getElementById('ev_ed_end').value=toDMY(b.dataset.end);
-                    document.getElementById('ev_ed_endH').value=b.dataset.end||'';
-                    document.getElementById('evEditModal').style.display='flex';
-                    coPopRestart('evEditModal');
-                };
-                document.getElementById('evEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
-            })();
-            // ── ลบ/แก้ไขรายการ EF ของกิจกรรม (นอก form บันทึก) ──
-            window.evTopicDelete = function(id){
-                confirmDelete({message:'ลบรายการนี้? จะลบปริมาณของทุกกิจกรรมที่ใช้รายการนี้ด้วย'}).then(function(ok){
-                    if(ok) document.getElementById('delEvTopic'+id)?.submit();
-                });
-            };
-            window.evTopicEdit = function(b){
-                document.getElementById('ev_te_aiid').value=b.dataset.aiid;
-                document.getElementById('ev_te_label').value=b.dataset.label;
-                document.getElementById('ev_te_unit').value=b.dataset.unit;
-                ddSetValue('evScopeEdit', b.dataset.scope, 'Scope '+b.dataset.scope);
-                document.getElementById('ev_te_ad').value=b.dataset.ad;
-                document.getElementById('evTopicEditModal').style.display='flex';
-                coPopRestart('evTopicEditModal');
-            };
-            document.getElementById('evTopicEditModal')?.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
-            // ── ตารางกิจกรรม: คำนวณ tCO₂e ต่อแถวสด ๆ ตอนพิมพ์ Vol (Vol×EF÷1000) ──
-            document.querySelectorAll('.evVol').forEach(function(inp){
-                inp.addEventListener('input', function(){
-                    var ad=parseFloat(inp.dataset.ad)||0, v=parseFloat(inp.value)||0;
-                    var cell=inp.closest('tr').querySelector('.evEmit');
-                    if(cell) cell.textContent=(v*ad/1000).toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4});
-                });
             });
-            // ต่อท้าย URL: survey → (&maker admin) &group=..., event → ''
-            var navSuffix = <?= $is_survey
-                ? "'".($is_admin ? "&maker=".(int)$survey_affil : "")."&group='+encodeURIComponent(".json_encode($group).")"
-                : "''" ?>;
-            document.getElementById('coYear')?.addEventListener('dd:change', function(e){
-                if (String(e.detail.value) === '<?= $selected_year ?>') return; // อยู่ปีเดิม ไม่ต้องโหลด
-                location.href='collect.php?tab=<?= $tab ?>&year='+e.detail.value+navSuffix;
+            // ผู้จัด "อื่นๆ" → โชว์ช่องพิมพ์ชื่อ
+            var org = $('addOrg');
+            if (org) org.addEventListener('dd:change', function (e) {
+                var custom = e.detail.value === '__custom__', c = $('addOrgCustom');
+                c.style.display = custom ? 'block' : 'none'; if (custom) c.focus();
             });
-            <?php if ($is_admin && $tab==='event'): ?>
-            // ผู้จัดในฟอร์มเพิ่มกิจกรรม: เลือก "อื่นๆ" → โชว์ช่องพิมพ์ + ส่งค่าเป็น custom:<ชื่อ>
-            (function(){
-                var dd=document.getElementById('addOrg'), hidden=document.getElementById('addOrg_input');
-                var cust=document.getElementById('addOrgCustom');
-                var field=document.getElementById('addOrgField');
-                if(!dd) return;
-                // toggle การแสดงผลตามตัวเลือกผู้จัด
-                // ช่องผู้จัดหดพอดีตัวเสมอ (flex:0 0 auto) → วันที่ตามหลังเนื้อหาแบบชิด ไม่ห่าง
-                // คณะปกติ = dropdown อย่างเดียว, อื่นๆ = dropdown + ช่องพิมพ์
-                function applyOrgLayout(isCustom){
-                    cust.style.display = isCustom ? 'block' : 'none';
-                }
-                dd.addEventListener('dd:change', function(e){
-                    var isCustom = e.detail.value==='__custom__';
-                    applyOrgLayout(isCustom);
-                    if(isCustom) cust.focus();
-                });
-                // ตั้งสถานะเริ่มต้นตามค่าที่เลือกไว้ตอนโหลด
-                applyOrgLayout((hidden && hidden.value==='__custom__'));
-                // ก่อน submit: ถ้าเลือก "อื่นๆ" ให้แทนค่า org ด้วย custom:<ชื่อที่พิมพ์>
-                dd.closest('form')?.addEventListener('submit', function(){
-                    if(hidden && hidden.value==='__custom__')
-                        hidden.value='custom:'+((cust.value||'').trim());
-                });
-            })();
-            <?php endif; ?>
 
+            // ── แท็บ: เลื่อนแถบไปแท็บใหม่ก่อน แล้วค่อยเปลี่ยนหน้า ──
+            d.querySelectorAll('.co-tab').forEach(function (a) {
+                a.addEventListener('click', function (e) {
+                    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey) return;
+                    e.preventDefault();
+                    if (a.classList.contains('is-on')) return;
+                    var nav = a.closest('.co-tabs');
+                    nav.dataset.tab = a.dataset.tab;
+                    nav.querySelectorAll('.co-tab').forEach(function (t) { t.classList.toggle('is-on', t === a); });
+                    setTimeout(function () { location.href = a.href; }, 220);
+                });
+            });
+
+            // ── เปลี่ยนปี (คงแบบสอบถามที่เลือกไว้) ──
+            var navSuffix = <?= $is_survey
+                ? json_encode(($is_admin ? '&maker=' . (int)$survey_affil : '') . '&group=' . rawurlencode($group))
+                : "''" ?>;
+            var yearDd = $('coYear');
+            if (yearDd) yearDd.addEventListener('dd:change', function (e) {
+                if (String(e.detail.value) === '<?= (int)$selected_year ?>') return;   // อยู่ปีเดิม ไม่ต้องโหลด
+                location.href = 'collect.php?tab=<?= $tab ?>&year=' + encodeURIComponent(e.detail.value) + navSuffix;
+            });
+        })();
         </script>
 
         <?php include __DIR__ . '/../components/evidence_modal.php'; ?>
         <?php include __DIR__ . '/../components/confirm_modal.php'; ?>
-
     </main>
 </body>
 </html>

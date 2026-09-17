@@ -36,7 +36,8 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
     </div>
 
     <div class="figma-profile-area" style="position: relative;">
-        <div class="figma-avatar" style="overflow: hidden; position: relative; margin-bottom: 0;">
+        <a href="<?= $root ?? '../' ?>dean/profile.php" style="text-decoration: none; display: block; position: relative;" title="คลิกเพื่อเปลี่ยนโปรไฟล์">
+        <div class="figma-avatar" style="overflow: hidden; cursor: pointer; position: relative; margin-bottom: 0;">
             <?php if (!empty($_SESSION['profile_image'])): ?>
                 <img src="<?= $root ?? '../' ?>assets/images/profiles/<?= htmlspecialchars(pathinfo($_SESSION['profile_image'], PATHINFO_FILENAME) . '.webp') ?>"
                     alt="Profile" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
@@ -47,6 +48,7 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
                 </svg>
             <?php endif; ?>
         </div>
+        </a>
         <div class="figma-name" style="margin-top: 12px;"><?= htmlspecialchars(strtoupper($admin_name)) ?></div>
         <div style="font-size:12px;color:#C09A75;font-weight:600;margin-top:2px;">บุคลากร/คณบดี</div>
     </div>
@@ -77,6 +79,16 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
         </a>
 
         <div class="nav-category">LABELS</div>
+        <a href="<?= $root ?? '../' ?>dean/profile.php"
+            class="nav-item <?= ($current_page == 'profile.php') ? 'active' : '' ?>">
+            <div class="nav-icon-box">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
+            เปลี่ยนโปรไฟล์
+        </a>
         <a href="<?= $root ?? '../' ?>logout.php" class="nav-item logout-item">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="margin-right:0;">

@@ -11,7 +11,12 @@ assets/images/evidence/
 
 # ===== Database Backups =====
 # ไฟล์ backup ฐานข้อมูล (dump ตามวันที่) ไม่ควรอยู่ใน repo
+# — มีข้อมูลผู้ใช้จริง และไฟล์ใหญ่ (~90 KB ต่อไฟล์)
+# ครอบคลุมทั้ง 2 รูปแบบชื่อที่เคยใช้: upnetzero_backup_YYYY-MM-DD.sql และ backup_before_xxx_YYYYMMDD.sql
 database/*_backup_*.sql
+database/backup_*.sql
+# หมายเหตุ: สคริปต์ migration (เช่น cleanup_admin_item.sql) และ schema หลัก (upnetzero.sql)
+#           ต้องอยู่ใน repo — อย่าเพิ่มกฎกว้าง ๆ แบบ database/*.sql
 
 # ===== Dependencies =====
 vendor/

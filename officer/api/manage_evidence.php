@@ -9,6 +9,7 @@
  */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/evidence_upload.php';
 
 require_role(['admin', 'officer']);
 header('Content-Type: application/json');
@@ -18,6 +19,14 @@ $action         = $_GET['action'] ?? '';
 $is_admin       = (($_SESSION['role'] ?? '') === 'admin');
 $affiliation_id = (int) ($_SESSION['affiliation_id'] ?? 0);
 $uid            = $_SESSION['user_id'] ?? null;
+
+// คำสั่งที่เขียนข้อมูลต้องเป็น POST (require_role ตรวจ CSRF token ของ POST แล้ว)
+// เดิมรับ GET ได้ทุกคำสั่ง: กดลิงก์ ?action=delete_all&entity_type=…&entity_id=… ก็ลบหลักฐานทั้งหมดได้
+if ($action !== 'list' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'คำสั่งนี้ต้องส่งแบบ POST'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 /** คืน affiliation_id เจ้าของ entity (null = ไม่พบ) */
 function entity_owner_affil(PDO $pdo, string $type, int $id): ?int
@@ -35,7 +44,7 @@ function entity_owner_affil(PDO $pdo, string $type, int $id): ?int
 
 /**
  * แปลง request → [entity_type, entity_id]
- * รองรับ legacy (admin_item_id + year_id → user_item; สร้าง user_item ถ้ายังไม่มี เมื่อ $forUpload)
+ * รองรับ legacy (admin_item_id + year_id → user_item ของรายการ officer ปีนั้น; สร้าง user_item ถ้ายังไม่มี เมื่อ $forUpload — ผู้เรียกต้องเปิด transaction)
  * พร้อมตรวจสิทธิ์เจ้าของ (officer = คณะตัวเอง)
  */
 function resolve_entity(PDO $pdo, bool $forUpload, bool $is_admin, int $affiliation_id): array
@@ -47,12 +56,17 @@ function resolve_entity(PDO $pdo, bool $forUpload, bool $is_admin, int $affiliat
         $aid = (int) ($_REQUEST['admin_item_id'] ?? 0);
         $yid = (int) ($_REQUEST['year_id'] ?? 0);
         if (!$aid || !$yid) throw new Exception('Missing entity parameters');
-        $st = $pdo->prepare("SELECT id FROM user_item WHERE admin_item_id=? AND affiliation_id=? AND year_id=?");
+        // ต้องเป็นรายการการดำเนินงาน (officer) ของปีนั้นจริง — เดิมไม่ตรวจ: ส่ง id ปีอื่น / รายการแบบสอบถาม ก็สร้างแถว officer ได้
+        $chk = $pdo->prepare("SELECT 1 FROM admin_item WHERE id=? AND year_id=? AND data_source='officer'");
+        $chk->execute([$aid, $yid]);
+        if (!$chk->fetchColumn() || $affiliation_id <= 0) throw new Exception('ไม่พบรายการ');
+        $st = $pdo->prepare("SELECT id FROM user_item WHERE admin_item_id=? AND affiliation_id=? AND year_id=? AND source='officer'");
         $st->execute([$aid, $affiliation_id, $yid]);
         $ui = $st->fetchColumn();
         if (!$ui) {
             if (!$forUpload) return ['user_item', 0];   // ยังไม่มีรายการ → ไม่มีหลักฐาน
-            $pdo->prepare("INSERT INTO user_item (admin_item_id,affiliation_id,year_id,Vol,create_year) VALUES (?,?,?,0,CURDATE())")
+            // สร้างใน transaction ของคำสั่ง (upload / add_link) — ไฟล์/ลิงก์ไม่ผ่าน → rollback แถวนี้ด้วย ไม่มีแถว Vol 0 ค้าง
+            $pdo->prepare("INSERT INTO user_item (admin_item_id,affiliation_id,year_id,Vol,create_year,source) VALUES (?,?,?,0,CURDATE(),'officer')")
                 ->execute([$aid, $affiliation_id, $yid]);
             $ui = $pdo->lastInsertId();
         }
@@ -83,32 +97,6 @@ function assert_evidence_owned(PDO $pdo, array $ev, bool $is_admin, int $affilia
 
 function evidence_dir(): string { return __DIR__ . '/../../assets/images/evidence/'; }
 
-/** ย่อ + แปลงเป็น WebP */
-function processEvidenceImage($sourcePath, $targetPath, $inputExt)
-{
-    if (!file_exists($sourcePath)) return false;
-    list($ow, $oh) = @getimagesize($sourcePath);
-    if (!$ow || !$oh) return false;
-    $ratio = min(1200 / $ow, 1200 / $oh);
-    $nw = ($ratio >= 1) ? $ow : (int) ($ow * $ratio);
-    $nh = ($ratio >= 1) ? $oh : (int) ($oh * $ratio);
-    $dst = imagecreatetruecolor($nw, $nh);
-    imagealphablending($dst, false); imagesavealpha($dst, true);
-    imagefilledrectangle($dst, 0, 0, $nw, $nh, imagecolorallocatealpha($dst, 255, 255, 255, 127));
-    switch (strtolower($inputExt)) {
-        case 'jpeg': case 'jpg': $src = @imagecreatefromjpeg($sourcePath); break;
-        case 'png':  $src = @imagecreatefrompng($sourcePath);  break;
-        case 'gif':  $src = @imagecreatefromgif($sourcePath);  break;
-        case 'webp': $src = @imagecreatefromwebp($sourcePath); break;
-        default: return false;
-    }
-    if (!$src) return false;
-    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $ow, $oh);
-    $ok = imagewebp($dst, $targetPath, 80);
-    imagedestroy($dst); imagedestroy($src);
-    return $ok;
-}
-
 try {
     switch ($action) {
 
@@ -124,69 +112,24 @@ try {
         }
 
         // ── Upload (ไฟล์: images[] หรือ documents[]) ─────────────────────────
+        // ตรวจขนาด / ชนิดจริง / จำนวน ใน includes/evidence_upload.php — มีไฟล์ไม่ผ่านแม้ไฟล์เดียว → ไม่บันทึกทั้งชุด
         case 'upload': {
-            [$type, $id] = resolve_entity($pdo, true, $is_admin, $affiliation_id);
+            // POST ใหญ่เกิน post_max_size → PHP ทิ้งทั้ง $_POST และ $_FILES (entity หายด้วย) ต้องเช็คก่อน resolve_entity
+            if (!$_FILES && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > evidence_post_max_bytes())
+                throw new Exception('ไฟล์รวมใหญ่เกิน ' . round(evidence_post_max_bytes() / 1048576) . ' MB ต่อครั้ง กรุณาแบ่งอัปโหลด');
             $file_key = isset($_FILES['images']) ? 'images' : (isset($_FILES['documents']) ? 'documents' : null);
-            if (!$file_key) throw new Exception('No files uploaded');
-            $files = $_FILES[$file_key];
-
-            $img_dir = evidence_dir(); $doc_dir = $img_dir . 'docs/';
-            if (!is_dir($img_dir)) mkdir($img_dir, 0777, true);
-            if (!is_dir($doc_dir)) mkdir($doc_dir, 0777, true);
-
-            $image_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-            $doc_exts   = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
-            $mime_map   = [
-                'pdf' => 'application/pdf', 'doc' => 'application/msword',
-                'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'xls' => 'application/vnd.ms-excel',
-                'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'ppt' => 'application/vnd.ms-powerpoint',
-                'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            ];
-            $ins = $pdo->prepare("INSERT INTO evidence (entity_type,entity_id,kind,file_path,file_type,original_name,created_by)
-                                  VALUES (?,?,'file',?,?,?,?)");
-            $uploaded = [];
-            foreach ($files['name'] as $i => $name) {
-                if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
-                $tmp = $files['tmp_name'][$i];
-                $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-                $tag = $type . '_' . $id;
-
-                if (in_array($ext, $image_exts)) {
-                    $gd = function_exists('imagecreatetruecolor') && function_exists('imagewebp');
-                    if ($gd) {
-                        $fn = 'ev_' . $tag . '_' . time() . '_' . $i . '.webp';
-                        $up = $img_dir . $fn;
-                        if (move_uploaded_file($tmp, $up) && processEvidenceImage($up, $up, $ext)) {
-                            $ins->execute([$type, $id, $fn, 'image/webp', $name, $uid]);
-                            $uploaded[] = ['id' => $pdo->lastInsertId(), 'path' => $fn, 'type' => 'image'];
-                        }
-                    } else {
-                        $fn = 'ev_' . $tag . '_' . time() . '_' . $i . '.' . $ext;
-                        $up = $img_dir . $fn;
-                        if (move_uploaded_file($tmp, $up)) {
-                            $mime = ($ext === 'jpg') ? 'image/jpeg' : 'image/' . $ext;
-                            $ins->execute([$type, $id, $fn, $mime, $name, $uid]);
-                            $uploaded[] = ['id' => $pdo->lastInsertId(), 'path' => $fn, 'type' => 'image'];
-                        }
-                    }
-                } elseif (in_array($ext, $doc_exts)) {
-                    $safe = preg_replace('/[^a-zA-Z0-9_\-]/', '_', pathinfo($name, PATHINFO_FILENAME));
-                    $fn = 'docs/doc_' . $tag . '_' . time() . '_' . $i . '_' . $safe . '.' . $ext;
-                    $up = $img_dir . $fn;
-                    if (move_uploaded_file($tmp, $up)) {
-                        $ins->execute([$type, $id, $fn, $mime_map[$ext] ?? 'application/octet-stream', $name, $uid]);
-                        $uploaded[] = ['id' => $pdo->lastInsertId(), 'path' => $fn, 'type' => 'document'];
-                    }
-                }
-            }
+            if (!$file_key) throw new Exception('ไม่พบไฟล์ที่อัปโหลด');
+            $pdo->beginTransaction();   // แบบเก่าอาจสร้าง user_item — ไฟล์ไม่ผ่าน → rollback ใน catch
+            [$type, $id] = resolve_entity($pdo, true, $is_admin, $affiliation_id);
+            $uploaded = evidence_save_uploads($pdo, $type, $id, $_FILES[$file_key], $uid, evidence_dir(), 'move_uploaded_file');
+            $pdo->commit();
             echo json_encode(['success' => true, 'uploaded' => $uploaded, 'entity_type' => $type, 'entity_id' => $id]);
             break;
         }
 
         // ── Add link ─────────────────────────────────────────────────────────
         case 'add_link': {
+            $pdo->beginTransaction();   // แบบเก่าอาจสร้าง user_item — ลิงก์ไม่ผ่าน → rollback ใน catch
             [$type, $id] = resolve_entity($pdo, true, $is_admin, $affiliation_id);
             $url   = trim((string) ($_POST['url'] ?? ''));
             $label = trim((string) ($_POST['label'] ?? ''));
@@ -196,7 +139,9 @@ try {
             if (mb_strlen($url) > 1000) throw new Exception('ลิงก์ยาวเกินไป');
             $stmt = $pdo->prepare("INSERT INTO evidence (entity_type,entity_id,kind,url,label,created_by) VALUES (?,?,'link',?,?,?)");
             $stmt->execute([$type, $id, $url, ($label !== '' ? $label : null), $uid]);
-            echo json_encode(['success' => true, 'id' => $pdo->lastInsertId(), 'url' => $url, 'label' => $label]);
+            $newId = $pdo->lastInsertId();
+            $pdo->commit();
+            echo json_encode(['success' => true, 'id' => $newId, 'url' => $url, 'label' => $label]);
             break;
         }
 
@@ -243,6 +188,7 @@ try {
             throw new Exception('Invalid action');
     }
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => safe_error_message($e)]);
 }

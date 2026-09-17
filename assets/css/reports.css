@@ -1,0 +1,124 @@
+/* ─────────────────────────────────────────────────────────────
+   หน้า รายงาน GHG (dean/reports.php) — prefix rp- (+ ชื่อ class เดิม hbar-/rpf- ที่เทสต์และรายงานอ้างอิง)
+   ใช้ร่วมกับ officer-entry.css (oe-) / collect.css (co-tabs, oe-panel) / admin-dashboard.css (ad-kpi)
+   ค่าเฉพาะแถว (สี / ความกว้าง / ความสูง / ตำแหน่ง) ส่งมาเป็น CSS var: --sc, --w, --h, --b
+   เดิม: inline style 91 จุด + <style> ใน <main> + dashboard.css
+   ───────────────────────────────────────────────────────────── */
+
+/* ── หัวหน้า: ปุ่มดาวน์โหลด ── */
+.rp-btn-excel { background: #3B82F6; box-shadow: 0 4px 12px rgba(59,130,246,.25); }
+.rp-btn-excel:hover, .rp-btn-excel:focus-visible { background: #2563EB; box-shadow: 0 10px 22px rgba(37,99,235,.3); }
+.rp-btn-pdf { background: #EF4444; box-shadow: 0 4px 12px rgba(239,68,68,.25); }
+.rp-btn-pdf:hover, .rp-btn-pdf:focus-visible { background: #DC2626; box-shadow: 0 10px 22px rgba(220,38,38,.3); }
+.rp-btn-excel svg, .rp-btn-pdf svg { transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+.rp-btn-excel:hover svg, .rp-btn-pdf:hover svg { transform: translateY(2px); }
+
+/* แท็บมุมมอง (co-tabs): มุมมองคณะอยู่ช่องขวา → พื้นเลื่อนไปขวา */
+.rp-tabs { margin: 0 0 1.25rem; }
+.co-tabs[data-tab="faculty"] .co-tab-ind { transform: translateX(100%); }
+
+/* คำเตือนบัญชีไม่มีสังกัด */
+.rp-alert { display: flex; align-items: flex-start; gap: 10px; background: #FEF3C7; border: 1px solid #FCD34D; color: #92400E; padding: 14px 18px; border-radius: 14px; margin-bottom: 1.25rem; font-weight: 700; }
+.rp-alert svg { flex-shrink: 0; margin-top: 2px; }
+.rp-alert small { display: block; font-size: .9rem; font-weight: 500; }
+
+/* ป้ายหัวข้อ + อันดับ */
+.rp-section { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; font-size: 1rem; font-weight: 800; color: #2A2233; }
+.rp-own-rank { font-size: .78rem; font-weight: 800; color: #62368B; background: #F3EAFF; padding: 3px 10px; border-radius: 999px; }
+
+/* ── KPI (ad-kpi) ── */
+.rp-kpis { margin-bottom: 16px; }
+.rp-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .72rem; color: #9CA3AF; }
+
+/* ── แถว: แหล่งปล่อยตามขอบเขต + ประวัติย้อนหลัง ── */
+.rp-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: stretch; }
+.rp-row > .oe-panel { display: flex; flex-direction: column; min-width: 0; }
+.rp-unit { font-weight: 500; font-size: .78rem; color: #9CA3AF; }
+/* หัวแผง: หน่วยตกบรรทัดใต้ชื่อเมื่อแคบ (co-h2 เป็น flex — ไม่ wrap หน่วยจะถูกบีบเป็นคอลัมน์ข้างชื่อ) */
+.rp-row .co-h2 { flex-wrap: wrap; gap: 2px 8px; }
+
+/* แท่งแนวนอนรายขอบเขต + หมวดย่อย */
+.rp-scope { --sc: #62368B; margin-bottom: 14px; }
+.hbar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.hbar-label { flex: 0 0 72px; font-size: .85rem; font-weight: 800; color: #374151; }
+.hbar-track { flex: 1; min-width: 0; height: 14px; background: #F3F1F6; border-radius: 999px; overflow: hidden; }
+.hbar-fill { display: block; height: 100%; min-width: 2px; width: var(--w, 0%); background: var(--sc); border-radius: 999px; transform-origin: left center;
+             animation: adGrow 1s cubic-bezier(.22,1,.36,1) backwards; animation-delay: calc(.2s + var(--i, 0) * 90ms); }
+.hbar-val { flex: 0 0 128px; text-align: right; font-size: .88rem; font-weight: 800; color: var(--sc); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hbar-val small { font-weight: 600; font-size: .72rem; color: #9CA3AF; }
+.rpf-indirect { padding-left: 84px; margin: -2px 0 6px; font-size: .76rem; color: #6B7280; }
+.rpf-indirect b { color: #374151; }
+.rp-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+.rpf-cat { display: flex; align-items: center; gap: 12px; padding-left: 84px; margin-bottom: 3px; font-size: .78rem; }
+.rpf-cat.is-zero { opacity: .55; }
+.rp-cat-name { flex: 1; min-width: 0; color: #4B5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-cat-track { flex: 0 0 60px; height: 6px; background: #F3F1F6; border-radius: 999px; overflow: hidden; }
+.rp-cat-fill { display: block; height: 100%; width: var(--w, 0%); background: var(--sc); opacity: .6; transform-origin: left center; animation: adGrow .9s cubic-bezier(.22,1,.36,1) .45s backwards; }
+.rp-cat-val { flex: 0 0 64px; text-align: right; color: #374151; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* กราฟประวัติ (HTML — canvas ถูกย่อจนตัวอักษรอ่านไม่ออก) */
+.rpf-hist { flex: 1; display: flex; align-items: stretch; gap: 1.5rem; min-height: 240px; padding: 0 .5rem; }
+.rpf-hist-axis { flex: 0 0 auto; display: flex; flex-direction: column; margin-right: -.75rem; }
+.rp-axis-plot { flex: 1; padding-top: 22px; border-bottom: 2px solid transparent; }
+.rp-axis-scale { position: relative; height: 100%; min-width: 42px; }
+.rpf-hist-tick { position: absolute; right: 0; bottom: var(--b); transform: translateY(50%); font-size: .68rem; color: #9CA3AF; white-space: nowrap; }
+.rp-hist-foot { text-align: center; margin-top: 8px; }
+.rp-hist-foot.is-ghost { visibility: hidden; }
+.rp-hist-foot b { display: block; font-size: .85rem; font-weight: 800; color: #6B7280; }
+.rp-hist-foot span { display: block; font-size: .75rem; color: #9CA3AF; }
+.rpf-hist-year { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rpf-hist-year.is-cur .rp-hist-foot b { color: #62368B; }
+.rp-hist-plot { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 10px; border-bottom: 2px solid #E5E7EB; padding-top: 22px; position: relative; }
+.rpf-hist-grid { position: absolute; top: 22px; bottom: 0; left: -.75rem; right: -.75rem; pointer-events: none; }
+.rpf-hist-grid.is-first { left: 0; }
+.rpf-hist-grid.is-last { right: 0; }
+.rpf-hist-line { position: absolute; left: 0; right: 0; bottom: var(--b); border-top: 1px dashed #E5E7EB; }
+.rp-hist-col { --sc: #62368B; flex: 0 1 44px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
+.rp-hist-num { font-size: .72rem; font-weight: 800; color: var(--sc); margin-bottom: 3px; white-space: nowrap; font-variant-numeric: tabular-nums; animation: adFade .5s ease backwards; animation-delay: calc(.6s + var(--i, 0) * 60ms); }
+.rpf-hist-bar { width: 100%; height: var(--h, 0%); min-height: 2px; background: var(--sc); border-radius: 6px 6px 0 0; transform-origin: bottom center;
+                animation: rpRise .9s cubic-bezier(.22,1,.36,1) backwards; animation-delay: calc(.25s + var(--i, 0) * 60ms); }
+.rpf-hist-year:not(.is-cur) .rpf-hist-bar { opacity: .55; }
+.rp-legend { display: flex; justify-content: center; gap: 18px; margin-top: 12px; font-size: .8rem; flex-wrap: wrap; }
+.rp-legend span { display: inline-flex; align-items: center; gap: 6px; color: #4B5563; font-weight: 700; }
+.rp-legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--sc); }
+@keyframes rpRise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* ── โดนัทรายขอบเขต (มุมมองคณะ) ── */
+.rp-donut-panel { margin-bottom: 16px; }
+.rp-donut-sub { font-size: .82rem; color: #9CA3AF; margin: -10px 0 18px; }
+.rpf-donuts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+.rp-donut { text-align: center; min-width: 0; }
+.rp-donut canvas { max-width: 100%; animation: adZoom .6s cubic-bezier(.34,1.56,.64,1) backwards; animation-delay: calc(.2s + var(--i, 0) * 90ms); }
+.rp-donut-unit { font-size: .75rem; color: #9CA3AF; margin-top: .1rem; }
+.rp-donut-empty { font-size: .82rem; color: #9CA3AF; margin-top: .5rem; }
+.rp-scope-badge { display: inline-block; font-weight: 800; font-size: .8rem; padding: 4px 14px; border-radius: 999px; white-space: nowrap; margin-bottom: .5rem; }
+.rp-scope-badge.is-s1 { background: #FFEDD5; color: #C2410C; }
+.rp-scope-badge.is-s2 { background: #FCE7F3; color: #BE185D; }
+.rp-scope-badge.is-s3 { background: #DBEAFE; color: #1D4ED8; }
+.rp-legend-list { margin-top: .75rem; text-align: left; font-size: .8rem; line-height: 1.5; }
+.rpf-legend { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #F1EEF5; }
+.rpf-legend i { flex-shrink: 0; width: 9px; height: 9px; border-radius: 2px; background: var(--c); }
+.rpf-legend span { flex: 1; min-width: 0; color: #4B5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rpf-legend b { flex-shrink: 0; color: #374151; }
+
+/* ── พื้นที่เนื้อหาแคบ (container = .oe-page) ── */
+@container (max-width: 880px) {
+    .rp-row, .rpf-donuts { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 520px) {
+    .rp-head-actions { width: 100%; }
+    .rp-head-actions .oe-btn { flex: 1 1 auto; }
+    .hbar-label { flex-basis: 60px; }
+    .hbar-val { flex-basis: 104px; }
+    .rpf-indirect, .rpf-cat { padding-left: 0; }
+    .rpf-hist { gap: .75rem; padding: 0; }
+    .rp-hist-col { flex-basis: 34px; }
+    .rp-hist-plot { gap: 4px; }
+    .rp-hist-num { font-size: .62rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hbar-fill, .rp-cat-fill, .rpf-hist-bar, .rp-hist-num, .rp-donut canvas { animation: none; }
+    .rp-btn-excel svg, .rp-btn-pdf svg { transition: none; }
+    .rp-btn-excel:hover svg, .rp-btn-pdf:hover svg { transform: none; }
+}

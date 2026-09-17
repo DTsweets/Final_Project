@@ -17,6 +17,7 @@
 $ev_api  = $ev_api  ?? (($root ?? '../') . 'officer/api/manage_evidence.php');
 $ev_base = $ev_base ?? (($root ?? '../') . 'assets/images/evidence/');
 $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "ลิงก์" (เหลือ รูปภาพ/เอกสาร)
+require_once __DIR__ . '/../includes/evidence_upload.php';   // ขนาด / จำนวน / นามสกุลที่รับ (เซิร์ฟเวอร์ตรวจซ้ำ)
 ?>
 <style>
     /* ── ปุ่มเปิด popup ในตาราง (ไอคอน + badge) ── */
@@ -133,7 +134,7 @@ $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "�
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     </div>
                     <div class="t">คลิกเพื่อเลือกรูปภาพหลักฐาน</div>
-                    <div class="s">JPG, PNG, WebP (เลือกได้หลายไฟล์ — เลือกแล้วกด "บันทึกรูปภาพ")</div>
+                    <div class="s">JPG, PNG, WebP (ครั้งละไม่เกิน <?= EVIDENCE_MAX_FILES ?> ไฟล์ ไม่เกิน 10 MB ต่อไฟล์ — เลือกแล้วกด "บันทึกรูปภาพ")</div>
                     <input type="file" id="uevImgInput" multiple accept="image/*" style="display:none;" onchange="uevStage(this,'images')">
                 </label>
                 <div class="uev-staged" id="uevImgStaged"></div>
@@ -148,7 +149,7 @@ $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "�
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
                     </div>
                     <div class="t">คลิกเพื่อแนบไฟล์เอกสารหลักฐาน</div>
-                    <div class="s">PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (เลือกได้หลายไฟล์)</div>
+                    <div class="s">PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (ครั้งละไม่เกิน <?= EVIDENCE_MAX_FILES ?> ไฟล์ ไม่เกิน 10 MB ต่อไฟล์)</div>
                     <input type="file" id="uevDocInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" style="display:none;" onchange="uevStage(this,'documents')">
                 </label>
                 <div class="uev-staged" id="uevDocStaged"></div>
@@ -173,10 +174,14 @@ $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "�
 <script>
 (function(){
     var API  = <?= json_encode($ev_api) ?>;
+    var CSRF=<?= json_encode(csrf_token()) ?>;   // ส่งใน header X-CSRF-Token ทุกคำสั่ง POST (ตรวจที่ require_login)
     var BASE = <?= json_encode($ev_base) ?>;
     var cur = null;              // descriptor ปัจจุบัน
     var editing = false;
     var staged = {images:[], documents:[]};
+    // ค่าเดียวกับเซิร์ฟเวอร์ (includes/evidence_upload.php) — ตรวจตอนเลือกไฟล์ให้รู้ทันที
+    var EV_MAX_BYTES=<?= EVIDENCE_MAX_BYTES ?>, EV_MAX_FILES=<?= EVIDENCE_MAX_FILES ?>, EV_MAX_POST=<?= evidence_post_max_bytes() ?>;
+    var EV_EXTS={images:<?= json_encode(EVIDENCE_IMAGE_EXTS) ?>, documents:<?= json_encode(EVIDENCE_DOC_EXTS) ?>};
 
     var EXT_COLOR={pdf:'#EF4444',doc:'#3B82F6',docx:'#3B82F6',xls:'#10B981',xlsx:'#10B981',ppt:'#F97316',pptx:'#F97316'};
     var EXT_BG={pdf:'#FEF2F2',doc:'#EFF6FF',docx:'#EFF6FF',xls:'#ECFDF5',xlsx:'#ECFDF5',ppt:'#FFF7ED',pptx:'#FFF7ED'};
@@ -297,10 +302,26 @@ $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "�
         }).catch(function(){ grid.innerHTML='<div class="uev-empty" style="color:#EF4444;">เชื่อมต่อไม่ได้</div>'; });
     }
 
+    /** เหตุผลที่ไม่รับไฟล์ ('' = รับได้) */
+    function uevCheckFile(f,kind){
+        var dot=f.name.lastIndexOf('.'), ext=dot>0?f.name.slice(dot+1).toLowerCase():'';
+        if(EV_EXTS[kind].indexOf(ext)<0) return ext?'ไม่รองรับไฟล์ .'+ext:'ไม่รองรับไฟล์ชนิดนี้';
+        if(f.size>EV_MAX_BYTES) return 'ใหญ่เกิน 10 MB';
+        if(f.size===0) return 'ไฟล์ว่าง';
+        return '';
+    }
     window.uevStage = function(inp,kind){
-        for(var i=0;i<inp.files.length;i++) staged[kind].push(inp.files[i]);
+        var bad=[], total=staged[kind].reduce(function(t,f){return t+f.size;},0);
+        for(var i=0;i<inp.files.length;i++){
+            var f=inp.files[i], why=uevCheckFile(f,kind);
+            if(!why && staged[kind].length>=EV_MAX_FILES) why='เลือกได้ครั้งละไม่เกิน '+EV_MAX_FILES+' ไฟล์';
+            if(!why && total+f.size>EV_MAX_POST-1048576) why='ขนาดรวมเกิน '+Math.round(EV_MAX_POST/1048576)+' MB ต่อครั้ง';
+            if(why){ bad.push(f.name+' ('+why+')'); continue; }
+            staged[kind].push(f); total+=f.size;
+        }
         inp.value='';
         renderStaged(kind);
+        if(bad.length) alert('ไม่ได้เพิ่ม '+bad.length+' ไฟล์:\n'+bad.join('\n'));
     };
     function renderStaged(kind){
         var box=document.getElementById(kind==='images'?'uevImgStaged':'uevDocStaged');
@@ -335,7 +356,7 @@ $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "�
         var saveBar=document.getElementById(kind==='images'?'uevImgSave':'uevDocSave');
         if(loading) loading.style.display='block';
         if(saveBar) saveBar.style.display='none';
-        fetch(API+'?action=upload',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(res){
+        fetch(API+'?action=upload',{method:'POST',headers:{'X-CSRF-Token':CSRF},body:fd}).then(function(r){return r.json();}).then(function(res){
             if(loading) loading.style.display='none';
             if(!res.success){ alert(res.message||'อัปโหลดไม่สำเร็จ'); return; }
             staged[kind]=[]; renderStaged(kind); loadEv();
@@ -346,7 +367,7 @@ $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "�
         if(!url){ alert('กรุณาใส่ลิงก์'); return; }
         var fd=new FormData(); appendEntity(fd);
         fd.append('url',url); fd.append('label','');
-        fetch(API+'?action=add_link',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(res){
+        fetch(API+'?action=add_link',{method:'POST',headers:{'X-CSRF-Token':CSRF},body:fd}).then(function(r){return r.json();}).then(function(res){
             if(!res.success){ alert(res.message||'เพิ่มลิงก์ไม่สำเร็จ'); return; }
             document.getElementById('uevLinkUrl').value=''; loadEv();
         });
@@ -357,7 +378,7 @@ $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "�
         uevAskDel('ต้องการลบหลักฐานนี้?').then(function(ok){
             if(!ok) return;
             var fd=new FormData(); fd.append('evidence_id',id);
-            fetch(API+'?action=delete',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(res){
+            fetch(API+'?action=delete',{method:'POST',headers:{'X-CSRF-Token':CSRF},body:fd}).then(function(r){return r.json();}).then(function(res){
                 if(!res.success){ alert(res.message||'ลบไม่สำเร็จ'); return; } loadEv();
             });
         });
@@ -366,7 +387,7 @@ $ev_show_link = $ev_show_link ?? true;   // false = ซ่อนแท็บ "�
         uevAskDel('ลบหลักฐานทั้งหมด (ไฟล์+ลิงก์) ของรายการนี้?').then(function(ok){
             if(!ok) return;
             var fd=new FormData(); appendEntity(fd);
-            fetch(API+'?action=delete_all',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(res){
+            fetch(API+'?action=delete_all',{method:'POST',headers:{'X-CSRF-Token':CSRF},body:fd}).then(function(r){return r.json();}).then(function(res){
                 if(!res.success){ alert(res.message||'ลบไม่สำเร็จ'); return; } editing=false;
                 document.getElementById('uevModal').classList.remove('editing');
                 var eb=document.getElementById('uevEdit'); eb.classList.remove('on'); eb.innerHTML=SVG_PENCIL+' แก้ไข'; loadEv();

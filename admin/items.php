@@ -1,313 +1,110 @@
 <?php
 /**
- * ADMIN — Scope Items Management (items.php)
- * -------------------------------------------
- * สิทธิ์: admin, admin_c
- * จัดการ admin_item (รายการ emission factor)
- * ดู/เพิ่ม/แก้ไข/ลบ admin_item ตามปีและ scope
+ * ADMIN — ① เลือกปี / จัดการข้อมูลอ้างอิงกลาง (items.php)
+ * ---------------------------------------------------------
+ * การ์ดปีงบประมาณทุกปี (ยอดการดำเนินงานรวมทุกหน่วยงาน / จำนวนรายการ Emission Factor / หน่วยงานที่กรอก)
+ * เพิ่ม · เปลี่ยนเลขปี (ซ้ำ → ถามสลับ) · คัดลอกรายการจากปีอื่น · ลบปี (บอกจำนวนข้อมูลที่จะหาย) · จัดการหมวด (admin_g)
+ * logic อยู่ที่ includes/admin_items_entry.php · ขั้น ② ③ ใช้หน้ากลางร่วมกับ officer
+ *
+ * เดิม: ข้อความหลัง redirect ไม่เคยแสดง (ไม่อ่าน $_GET['msg']), ยอดบนการ์ดรวมกิจกรรม/แบบสอบถาม,
+ *       สลับปีเชื่อเลขปีจากฟอร์ม, สคริปต์ const ระดับบนสุดพังเมื่อ SPA โหลดซ้ำ, โค้ดเพิ่ม/แก้รายการที่ไม่มีปุ่มเรียก
  */
-
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/admin_items_entry.php';
 
 require_role(['admin']);
 
-$pdo = getDB();
+$pdo  = getDB();
 $root = '../';
-$role = $_SESSION['role'];
-$msg = '';
-$msg_type = 'success';
 
-// ── Masters ───────────────────────────────────────
-$fetch_years_sql = '
-    SELECT y.id, y.year, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
-    FROM admin_year y
-    LEFT JOIN user_item ui ON ui.id = (SELECT id FROM user_item WHERE year_id = y.id AND affiliation_id = ui.affiliation_id LIMIT 1) -- Fixed JOIN to prevent duplication if multiple affiliations exist? Wait, no.
-';
-// Actually, the user wants the GLOBAL total emission on the cards.
-$fetch_years_sql = '
-    SELECT y.id, y.year, COALESCE(SUM(ui.Vol * ai.AD)/1000, 0) AS total_emission
-    FROM admin_year y
-    LEFT JOIN user_item ui ON ui.year_id = y.id
-    LEFT JOIN admin_item ai ON ai.id = ui.admin_item_id
-    GROUP BY y.id, y.year
-    ORDER BY y.year DESC
-';
-$years = $pdo->query($fetch_years_sql)->fetchAll();
-$groups = $pdo->query('SELECT * FROM admin_g ORDER BY scope, order_num ASC, id ASC')->fetchAll();
+// ── POST → ทำงาน → redirect พร้อมข้อความ (รีเฟรชแล้วไม่ส่งซ้ำ) ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = (string) ($_POST['action'] ?? '');
+    $go = function (string $msg, string $type = 'success', string $extra = '') {
+        header('Location: items.php?msg=' . urlencode($msg) . ($type === 'danger' ? '&msg_type=danger' : '') . $extra);
+        exit;
+    };
 
-$selected_year = isset($_GET['year']) ? (int) $_GET['year'] : ($years[0]['id'] ?? 0);
-
-$affiliation_name = $_SESSION['affiliation_name'] ?? 'ADMIN(คณะ)';
-
-
-// ── Handle POST (admin เท่านั้นแก้ไข) ───────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role === 'admin') {
-    $action = $_POST['action'] ?? '';
-    $redirect_url = 'items.php?year=' . $selected_year;
-
-    // เพิ่ม item
-    if ($action === 'add') {
+    // เลื่อนหมวด (AJAX) → JSON
+    if ($action === 'move_group') {
+        header('Content-Type: application/json');
         try {
-            $stmt = $pdo->prepare(
-                'INSERT INTO admin_item (year_id, scope, name_tiem, unit, AD)
-                 VALUES (:y, :s, :n, :u, :a)'
-            );
-            $stmt->execute([
-                ':y' => (int) $_POST['year_id'],
-                ':s' => (int) $_POST['scope'],
-                ':n' => trim($_POST['name_tiem']),
-                ':u' => trim($_POST['unit']),
-                ':a' => (float) $_POST['AD'],
-            ]);
-            $msg = 'เพิ่มรายการสำเร็จ';
-        } catch (PDOException $e) {
-            $msg_type = 'danger';
-            $msg = $e->getCode() === '23000'
-                ? 'รายการนี้มีอยู่แล้วในปีและ scope เดียวกัน'
-                : 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+            $ok = admin_move_group($pdo, (int) ($_POST['group_id'] ?? 0), ($_POST['direction'] ?? '') === 'up' ? 'up' : 'down');
+            echo json_encode(['ok' => $ok, 'msg' => $ok ? '' : 'เลื่อนต่อไม่ได้แล้ว'], JSON_UNESCAPED_UNICODE);
+        } catch (Exception $e) {
+            echo json_encode(['ok' => false, 'msg' => safe_error_message($e)], JSON_UNESCAPED_UNICODE);
         }
+        exit;
     }
 
-    // แก้ไข item
-    if ($action === 'edit') {
-        try {
-            $stmt = $pdo->prepare(
-                'UPDATE admin_item SET scope=:s, name_tiem=:n, unit=:u, AD=:a WHERE id=:id'
-            );
-            $stmt->execute([
-                ':s' => (int) $_POST['scope'],
-                ':n' => trim($_POST['name_tiem']),
-                ':u' => trim($_POST['unit']),
-                ':a' => (float) $_POST['AD'],
-                ':id' => (int) $_POST['item_id'],
-            ]);
-            $msg = 'แก้ไขรายการสำเร็จ';
-        } catch (PDOException $e) {
-            $msg_type = 'danger';
-            $msg = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+    try {
+        switch ($action) {
+            case 'add_year':
+                $year = (int) ($_POST['new_year'] ?? 0);
+                admin_add_year($pdo, $year);
+                $go("เพิ่มปีงบประมาณ $year แล้ว");
+                // no break — $go จบการทำงาน
+            case 'edit_year':
+                $id   = (int) ($_POST['year_id'] ?? 0);
+                $year = (int) ($_POST['year_val'] ?? 0);
+                $dup  = admin_rename_year($pdo, $id, $year);
+                if ($dup !== null) { header("Location: items.php?swap=1&id1=$id&id2=$dup"); exit; }
+                $go("เปลี่ยนเป็นปีงบประมาณ $year แล้ว");
+            case 'swap_years':
+                admin_swap_years($pdo, (int) ($_POST['id1'] ?? 0), (int) ($_POST['id2'] ?? 0));
+                $go('สลับปีงบประมาณเรียบร้อยแล้ว');
+            case 'delete_year':
+                $id = (int) ($_POST['year_id'] ?? 0);
+                $label = admin_year_label($pdo, $id);
+                if (!admin_delete_year($pdo, $id)) throw new Exception('ไม่พบปีงบประมาณ');
+                $go("ลบปีงบประมาณ $label แล้ว");
+            case 'copy_items':
+                $to = (int) ($_POST['target_year_id'] ?? 0);
+                $n  = admin_copy_items($pdo, (int) ($_POST['source_year_id'] ?? 0), $to);
+                $go($n > 0 ? "คัดลอกรายการ Emission Factor มาปี " . admin_year_label($pdo, $to) . " แล้ว $n รายการ" : 'ไม่มีรายการใหม่ให้คัดลอก (ชื่อซ้ำกับปีปลายทางทั้งหมด)');
+            case 'add_group':
+                admin_add_group($pdo, (int) ($_POST['scope'] ?? 0), (string) ($_POST['name_tiem'] ?? ''));
+                $go('เพิ่มหมวดแล้ว', 'success', '&groups=1');
+            case 'delete_group':
+                admin_delete_group($pdo, (int) ($_POST['group_id'] ?? 0));
+                $go('ลบหมวดแล้ว', 'success', '&groups=1');
         }
+    } catch (Exception $e) {
+        $go('เกิดข้อผิดพลาด: ' . safe_error_message($e), 'danger', in_array($action, ['add_group', 'delete_group'], true) ? '&groups=1' : '');
     }
-
-    // ลบ item
-    if ($action === 'delete') {
-        try {
-            $pdo->prepare('DELETE FROM admin_item WHERE id=:id')
-                ->execute([':id' => (int) $_POST['item_id']]);
-            $msg = 'ลบรายการสำเร็จ';
-        } catch (PDOException $e) {
-            $msg_type = 'danger';
-            $msg = 'ไม่สามารถลบได้ มีข้อมูล user_item อ้างอิงอยู่';
-        }
-    }
-
-    // เพิ่มปีใหม่
-    if ($action === 'add_year') {
-        try {
-            $pdo->prepare('INSERT INTO admin_year (year) VALUES (:y)')
-                ->execute([':y' => (int) $_POST['new_year']]);
-            $new_id = $pdo->lastInsertId();
-            header("Location: items.php?year=$new_id&msg=เพิ่มปีสำเร็จ");
-            exit;
-        } catch (PDOException $e) {
-            $msg_type = 'danger';
-            $msg = 'ปีนี้มีอยู่แล้วในระบบ';
-        }
-    }
-
-    // แก้ไขปี
-    if ($action === 'edit_year') {
-        $target_id = (int) $_POST['year_id'];
-        $new_year_val = (int) $_POST['year_val'];
-
-        // ตรวจสอบว่ามีปีนี้อยู่แล้วหรือไม่ (ภายใต้ ID ที่ไม่ใช่ตัวเอง)
-        $stmt = $pdo->prepare('SELECT id, year FROM admin_year WHERE year = :y AND id != :id');
-        $stmt->execute([':y' => $new_year_val, ':id' => $target_id]);
-        $duplicate = $stmt->fetch();
-
-        if ($duplicate) {
-            // ถ้ามีอยู่แล้ว ส่งกลับไปให้กดยืนยันการสลับปี
-            $other_id = $duplicate['id'];
-            $target_year = $pdo->query("SELECT year FROM admin_year WHERE id = $target_id")->fetchColumn();
-
-            // ใช้ PRG เพื่อเตรียมแสดง Modal สลับปี
-            header("Location: items.php?year=$selected_year&msg=duplicate_year&id1=$target_id&id2=$other_id&y1=$target_year&y2=$new_year_val");
-            exit;
-        } else {
-            try {
-                $pdo->prepare('UPDATE admin_year SET year = :y WHERE id = :id')
-                    ->execute([':y' => $new_year_val, ':id' => $target_id]);
-                header("Location: items.php?year=$target_id&msg=แก้ไขปีสำเร็จ");
-                exit;
-            } catch (PDOException $e) {
-                $msg = $e->getMessage();
-            }
-        }
-    }
-
-    // สลับปี
-    if ($action === 'swap_years') {
-        $id1 = (int) $_POST['id1'];
-        $id2 = (int) $_POST['id2'];
-        $y1 = (int) $_POST['y1'];
-        $y2 = (int) $_POST['y2'];
-
-        try {
-            $pdo->beginTransaction();
-            // Step 1: Temp value for ID 2
-            $pdo->prepare('UPDATE admin_year SET year = -1 WHERE id = :id')->execute([':id' => $id2]);
-            // Step 2: Set ID 1 to Year 2
-            $pdo->prepare('UPDATE admin_year SET year = :y WHERE id = :id')->execute([':y' => $y2, ':id' => $id1]);
-            // Step 3: Set ID 2 to Year 1
-            $pdo->prepare('UPDATE admin_year SET year = :y WHERE id = :id')->execute([':y' => $y1, ':id' => $id2]);
-            $pdo->commit();
-            header("Location: items.php?year=$id1&msg=สลับข้อมูลปีเรียบร้อยแล้ว");
-            exit;
-        } catch (PDOException $e) {
-            $pdo->rollBack();
-            $msg = "เกิดข้อผิดพลาดในการสลับปี: " . $e->getMessage();
-        }
-    }
-
-    // ลบปี
-    if ($action === 'delete_year') {
-        try {
-            $pdo->prepare('DELETE FROM admin_year WHERE id = :id')
-                ->execute([':id' => (int) $_POST['year_id']]);
-            header("Location: items.php?msg=ลบปีสำเร็จ");
-            exit;
-        } catch (PDOException $e) {
-            $msg = $e->getMessage();
-        }
-    }
-
-    // คัดลอก admin_item จากปีต้นทางมายังปีปลายทาง
-    if ($action === 'copy_year') {
-        $target_year_id = (int) $_POST['target_year_id'];
-        $source_year_id = (int) $_POST['source_year_id'];
-
-        if ($target_year_id <= 0 || $source_year_id <= 0 || $target_year_id === $source_year_id) {
-            $msg = 'ข้อมูลไม่ถูกต้อง';
-            $msg_type = 'danger';
-        } else {
-            try {
-                // INSERT IGNORE: คัดลอกรายการที่ยังไม่มีในปีปลายทาง (จับคู่ด้วย scope + name_tiem)
-                $copy_stmt = $pdo->prepare('
-                    INSERT IGNORE INTO admin_item (year_id, scope, name_tiem, unit, AD)
-                    SELECT :tgt_year, scope, name_tiem, unit, AD
-                    FROM admin_item
-                    WHERE year_id = :src_year AND data_source = \'officer\'
-                ');
-                $copy_stmt->execute([':tgt_year' => $target_year_id, ':src_year' => $source_year_id]);
-                $copied = $copy_stmt->rowCount();
-
-                header("Location: items.php?year=$target_year_id&msg=" . urlencode("คัดลอกรายการสำเร็จ ($copied รายการ)"));
-                exit;
-            } catch (PDOException $e) {
-                $msg = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
-                $msg_type = 'danger';
-            }
-        }
-    }
-
-    // เพิ่มขอบเขต (Scope) ใหม่
-    if ($action === 'add_scope') {
-        try {
-            $stmt = $pdo->prepare('SELECT MAX(order_num) FROM admin_g WHERE scope = :s');
-            $stmt->execute([':s' => (int) $_POST['scope']]);
-            $max_order = (int) $stmt->fetchColumn();
-
-            $pdo->prepare('INSERT INTO admin_g (scope, name_tiem, order_num) VALUES (:s, :n, :o)')
-                ->execute([
-                    ':s' => (int) $_POST['scope'],
-                    ':n' => trim($_POST['name_tiem']),
-                    ':o' => $max_order + 1
-                ]);
-            $msg = 'เพิ่มขอบเขตสำเร็จ';
-            // Refresh groups
-            $groups = $pdo->query('SELECT * FROM admin_g ORDER BY scope, order_num ASC, id ASC')->fetchAll();
-        } catch (PDOException $e) {
-            $msg_type = 'danger';
-            $msg = 'เกิดข้อผิดพลาด: ขอบเขตนี้อาจมีอยู่แล้ว หรือ ' . $e->getMessage();
-        }
-    }
-
-    // เลื่อนขอบเขต (Scope)
-    if ($action === 'move_scope') {
-        try {
-            $scope_id = (int) $_POST['scope_id'];
-            $direction = $_POST['direction']; // 'up' or 'down'
-
-            $stmt = $pdo->prepare('SELECT * FROM admin_g WHERE id = ?');
-            $stmt->execute([$scope_id]);
-            $current = $stmt->fetch();
-
-            if ($current) {
-                $scope_group = $current['scope'];
-                $current_order = $current['order_num'];
-
-                if ($direction === 'up') {
-                    $stmt = $pdo->prepare('SELECT * FROM admin_g WHERE scope = ? AND order_num < ? ORDER BY order_num DESC, id DESC LIMIT 1');
-                } else {
-                    $stmt = $pdo->prepare('SELECT * FROM admin_g WHERE scope = ? AND order_num > ? ORDER BY order_num ASC, id ASC LIMIT 1');
-                }
-                $stmt->execute([$scope_group, $current_order]);
-                $swap = $stmt->fetch();
-
-                if ($swap) {
-                    $pdo->prepare('UPDATE admin_g SET order_num = ? WHERE id = ?')->execute([$swap['order_num'], $current['id']]);
-                    $pdo->prepare('UPDATE admin_g SET order_num = ? WHERE id = ?')->execute([$current['order_num'], $swap['id']]);
-                    $msg = 'เลื่อนลำดับสำเร็จ';
-                    $groups = $pdo->query('SELECT * FROM admin_g ORDER BY scope, order_num ASC, id ASC')->fetchAll();
-                } else {
-                    $msg_type = 'danger';
-                    $msg = 'ไม่สามารถเลื่อนได้แล้ว';
-                }
-            }
-        } catch (PDOException $e) {
-            $msg_type = 'danger';
-            $msg = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
-        }
-        if (isset($_POST['ajax'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => ($msg_type === 'success'), 'msg' => $msg]);
-            exit;
-        }
-    }
-
-    // ลบขอบเขต (Scope)
-    if ($action === 'delete_scope') {
-        try {
-            $pdo->prepare('DELETE FROM admin_g WHERE id=:id')
-                ->execute([':id' => (int) $_POST['scope_id']]);
-            $msg = 'ลบขอบเขตสำเร็จ';
-            // Refresh groups
-            $groups = $pdo->query('SELECT * FROM admin_g ORDER BY scope, order_num ASC, id ASC')->fetchAll();
-        } catch (PDOException $e) {
-            $msg_type = 'danger';
-            $msg = 'ไม่สามารถลบขอบเขตได้ เนื่องจากอาจมีข้อมูล Emission Factor ที่อ้างอิงอยู่';
-        }
-    }
+    $go('คำสั่งไม่ถูกต้อง', 'danger');
 }
 
-// ── ดึง admin_item ตามปี ─────────────────────────
-$items_sql = '
-    SELECT ai.*, ag.scope AS scope_group, ag.name_tiem AS group_name
-    FROM admin_item ai
-    JOIN admin_g ag ON ag.id = ai.scope
-    WHERE ai.year_id = :year AND ai.data_source = \'officer\'
-    ORDER BY ai.scope, ai.id
-';
-$stmt = $pdo->prepare($items_sql);
-$stmt->execute([':year' => $selected_year]);
-$items = $stmt->fetchAll();
+// ── ข้อมูลของหน้า ──
+$years       = admin_year_cards($pdo);
+$groups      = admin_groups($pdo);
+$affil_total = (int) $pdo->query('SELECT COUNT(*) FROM affiliation_id')->fetchColumn();
+$year_opts   = admin_year_options(array_column($years, 'year'));
+$edit_opts   = array_values(array_unique(array_merge(admin_year_options([]), array_column($years, 'year'))));
+rsort($edit_opts);
+$copy_ready  = array_values(array_filter($years, fn($y) => $y['items'] > 0));   // ปีที่เป็นต้นทางคัดลอกได้
+$latest      = $years[0] ?? null;
+$meta        = officer_scope_meta();
 
-// scope CSS
-$scope_css = [1 => 's1', 2 => 's2', 3 => 's3'];
-$remaining = session_remaining();
-$fullname = $_SESSION['firstname'] . ' ' . $_SESSION['lastname'];
-$page_title = "กรอกข้อมูล";
-$page_title2 = "UP Net Zero";
+// เปลี่ยนเลขปีไปชนปีที่มีอยู่ → ถามสลับ (อ่านเลขปีจากฐานข้อมูล ไม่ใช้ค่าจาก URL)
+$swap = null;
+if (isset($_GET['swap'])) {
+    $s1 = admin_year_label($pdo, (int) ($_GET['id1'] ?? 0));
+    $s2 = admin_year_label($pdo, (int) ($_GET['id2'] ?? 0));
+    if ($s1 !== null && $s2 !== null) $swap = ['id1' => (int) $_GET['id1'], 'id2' => (int) $_GET['id2'], 'y1' => $s1, 'y2' => $s2];
+}
+
+$flash   = (string) ($_GET['msg'] ?? '');
+$flash_t = (($_GET['msg_type'] ?? '') === 'danger') ? 'danger' : 'success';
+$page_title  = 'กรอกข้อมูล';
+$page_title2 = 'UP Net Zero';
+$h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
+$arrow = '<span class="oe-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></span>';
+$svg_edit = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+$svg_copy = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+$svg_del  = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+$svg_layers = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>';
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -315,14 +112,14 @@ $page_title2 = "UP Net Zero";
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการ Scope Items — UP Net Zero Admin</title>
+    <title>กรอกข้อมูล — UP Net Zero Admin</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
+    <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
 </head>
 
 <body>
@@ -332,690 +129,365 @@ $page_title2 = "UP Net Zero";
     <main class="main-content" style="background-color: transparent;">
         <?php include_once __DIR__ . '/includes/header.php'; ?>
 
-        <div class="page-content" style="padding-top: 1rem;">
-            <?php $toast_msg = $msg; $toast_type = $msg_type; include __DIR__ . '/../components/toast.php'; ?>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                <div style="color: var(--text-primary); font-weight: 800; font-size: 1.25rem;">
-                    ชื่อหน่วยงาน : <?= htmlspecialchars($affiliation_name ?? 'ADMIN(คณะ)') ?>
+        <div class="oe-page ai-page">
+            <?php $toast_msg = $flash; $toast_type = $flash_t; include __DIR__ . '/../components/toast.php'; ?>
+
+            <?= officer_entry_steps(1) ?>
+
+            <div class="oe-head">
+                <div>
+                    <h1 class="oe-title">กรอกข้อมูลการดำเนินงาน</h1>
+                    <div class="oe-sub">จัดการปีงบประมาณ หมวด และรายการ Emission Factor · เลือกปีเพื่อกรอกข้อมูลแทนหน่วยงาน</div>
                 </div>
-
-                <?php if ($role === 'admin'): ?>
-                    <div style="display: flex; gap: 12px;">
-                        <button onclick="openModal('modal-add-year')" class="btn-primary"
-                            style="background: #10B981; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); display: flex; align-items: center; gap: 8px; border: none;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                                <line x1="3" y1="10" x2="21" y2="10"></line>
-                                <line x1="12" y1="14" x2="12" y2="18"></line>
-                                <line x1="10" y1="16" x2="14" y2="16"></line>
-                            </svg>
-                            เพิ่มปี
-                        </button>
-                        <button onclick="openModal('modal-add-scope')" class="btn-primary"
-                            style="background: #6B7280; box-shadow: 0 4px 12px rgba(107, 114, 128, 0.2); display: flex; align-items: center; gap: 8px; border: none;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                            </svg>
-                            เพิ่มขอบเขต
-                        </button>
-                    </div>
-                <?php endif; ?>
+                <div class="oe-actions">
+                    <button type="button" class="oe-btn oe-btn-ghost" onclick="openModal('modal-groups')"><?= $svg_layers ?> จัดการหมวด</button>
+                    <button type="button" class="oe-btn oe-btn-success" onclick="aiAddYear()" <?= $year_opts ? '' : 'disabled title="เพิ่มครบทุกปีในช่วงที่เลือกได้แล้ว"' ?>>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> เพิ่มปี
+                    </button>
+                </div>
             </div>
-            <!-- Big Card -->
-            <div
-                style="background: #FFFFFF; border: 1px solid #D8B4E2; border-radius: 16px; padding: 32px; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
-                <h3
-                    style="color: #6B7280; font-size: 1.25rem; font-weight: 600; margin-bottom: 24px; border-bottom: 2px solid #F3F4F6; padding-bottom: 16px;">
-                    รายงานการปล่อยและการดูดกลับก๊าซเรือนกระจก
-                </h3>
 
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
-                    <?php foreach ($years as $y): ?>
-                        <!-- Sub Card -->
-                        <div
-                            style="border: 1px solid #E1CBAF; border-radius: 20px; padding: 24px; text-align: center; background: #FFFFFF; box-shadow: 0 4px 12px rgba(0,0,0,0.03); position: relative;">
+            <?php if ($latest): ?>
+            <!-- การ์ดสรุปของปีล่าสุด -->
+            <div class="co-kpis">
+                <div class="co-kpi oe-rise" style="--i:1;">
+                    <span class="co-kpi-ic"><?= ic('factory', 22) ?></span>
+                    <div><span class="co-kpi-label">การดำเนินงานปี <?= $h($latest['year']) ?></span>
+                        <b class="co-kpi-val"><?= number_format($latest['total'], 2) ?> <small>tCO₂e</small></b>
+                        <span class="co-kpi-sub">รวมทุกหน่วยงาน</span></div>
+                </div>
+                <div class="co-kpi oe-rise" style="--i:2;">
+                    <span class="co-kpi-ic"><?= ic('building', 22) ?></span>
+                    <div><span class="co-kpi-label">หน่วยงานที่กรอกแล้ว</span>
+                        <b class="co-kpi-val"><?= $latest['affils'] ?> <small>/ <?= $affil_total ?> หน่วยงาน</small></b>
+                        <span class="co-kpi-sub">ปีงบประมาณ <?= $h($latest['year']) ?></span></div>
+                </div>
+                <div class="co-kpi oe-rise" style="--i:3;">
+                    <span class="co-kpi-ic"><?= ic('doc', 22) ?></span>
+                    <div><span class="co-kpi-label">รายการ Emission Factor</span>
+                        <b class="co-kpi-val"><?= $latest['items'] ?> <small>รายการ</small></b>
+                        <span class="co-kpi-sub"><?= count($groups) ?> หมวด · ปี <?= $h($latest['year']) ?></span></div>
+                </div>
+            </div>
+            <?php endif; ?>
 
-                            <!-- Action Buttons (Top Right) -->
-                            <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 8px;">
-                                <!-- Copy Year Button -->
-                                <button onclick="openCopyYearModal(<?= $y['id'] ?>, '<?= $y['year'] ?>')"
-                                    style="background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%); color: white; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;"
-                                    title="คัดลอกข้อมูลจากปีอื่น"
-                                    onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 14px rgba(59,130,246,0.4)'"
-                                    onmouseout="this.style.transform='none'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                        <path
-                                            d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
-                                    </svg>
-                                </button>
-                                <!-- Edit Year Button -->
-                                <button onclick="openEditYearModal(<?= $y['id'] ?>, '<?= $y['year'] ?>')"
-                                    style="background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%); color: white; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;"
-                                    onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 14px rgba(245,158,11,0.4)'"
-                                    onmouseout="this.style.transform='none'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                        <path
-                                            d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                                    </svg>
-                                </button>
-                                <!-- Delete Year Button -->
-                                <form method="POST" style="margin:0;" id="deleteYearForm_<?= $y['id'] ?>">
-                                    <input type="hidden" name="action" value="delete_year">
-                                    <input type="hidden" name="year_id" value="<?= $y['id'] ?>">
-                                    <button type="button"
-                                        onclick="openConfirmDelete(document.getElementById('deleteYearForm_<?= $y['id'] ?>'), 'ยืนยันการลบปีงบประมาณ <?= $y['year'] ?>? \nรายการและข้อมูลทั้งหมดในปีนี้จะถูกลบถาวร!')"
-                                        style="background: #F87171; color: white; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;"
-                                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 14px rgba(248,113,113,0.45)'"
-                                        onmouseout="this.style.transform='none'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'">
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                            <path
-                                                d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                                        </svg>
-                                    </button>
-                                </form>
-                            </div>
-
-                            <div
-                                style="color: #6B7280; font-size: 1.1rem; font-weight: 500; margin-bottom: 8px; margin-top: 30px;">
-                                การปล่อยก๊าซเรือนกระจก</div>
-                            <div style="color: #374151; font-size: 1.5rem; font-weight: 700; margin-bottom: 20px;">
-                                ปี <?= htmlspecialchars($y['year']) ?>
-                            </div>
-
-                            <div
-                                style="background: #F5F1EE; border-radius: 12px; padding: 20px; color: #374151; font-weight: 700; font-size: 1.5rem; margin-bottom: 24px;">
-                                <?= number_format($y['total_emission'] ?? 0, 2) ?>
-                                <span style="font-size: 1rem; font-weight: 500; color: #6B7280;">tCO2e</span>
-                            </div>
-
-                            <a href="data_entry.php?year=<?= $y['id'] ?>"
-                                style="display: inline-block; background: #FBB03B; color: #FFFFFF; text-decoration: none; font-weight: 700; padding: 12px 48px; border-radius: 9999px; font-size: 1rem; box-shadow: 0 4px 6px rgba(251, 191, 36, 0.2); transition: all 0.2s;"
-                                onmouseover="this.style.background='#F59E0B'; this.style.transform='translateY(-2px)'"
-                                onmouseout="this.style.background='#FBB03B'; this.style.transform='none'">
-                                แก้ไขข้อมูล
-                            </a>
+            <?php if (empty($years)): ?>
+                <div class="oe-empty oe-rise oe-kpis-gap">
+                    <h3>ยังไม่มีปีงบประมาณในระบบ</h3>
+                    <p>เพิ่มปีงบประมาณก่อน แล้วกำหนดรายการ Emission Factor ให้หน่วยงานกรอก</p>
+                    <button type="button" onclick="aiAddYear()" class="oe-btn oe-btn-success">เพิ่มปีงบประมาณ <?= $arrow ?></button>
+                </div>
+            <?php else: ?>
+            <div class="oe-panel oe-rise oe-kpis-gap" style="--i:4;">
+                <h2 class="oe-panel-title">ปีงบประมาณทั้งหมด</h2>
+                <div class="oe-years">
+                    <?php foreach ($years as $i => $y):
+                        $pct  = $affil_total > 0 ? min(100, $y['affils'] / $affil_total * 100) : 0.0;
+                        $bare = $y['items'] === 0;
+                        $srcs = array_values(array_filter($copy_ready, fn($c) => $c['id'] !== $y['id']));
+                        $del_msg = admin_year_impact_text($y['year'], admin_year_impact($pdo, $y['id'])); ?>
+                    <div class="oe-year oe-rise<?= $bare ? ' is-bare' : '' ?>" style="--i:<?= $i + 5 ?>;" data-year-id="<?= $y['id'] ?>">
+                        <div class="oe-year-tools">
+                            <button type="button" class="oe-icon-btn oe-icon-edit" title="เปลี่ยนเลขปีงบประมาณ" aria-label="เปลี่ยนเลขปี <?= $y['year'] ?>"
+                                data-id="<?= $y['id'] ?>" data-year="<?= $y['year'] ?>" onclick="aiEditYear(this)"><?= $svg_edit ?></button>
+                            <?php if ($srcs): ?>
+                            <button type="button" class="oe-icon-btn oe-icon-copy" title="คัดลอกรายการ Emission Factor จากปีอื่น" aria-label="คัดลอกรายการมาปี <?= $y['year'] ?>"
+                                data-id="<?= $y['id'] ?>" data-year="<?= $y['year'] ?>" onclick="aiCopyYear(this)"><?= $svg_copy ?></button>
+                            <?php endif; ?>
+                            <button type="button" class="oe-icon-btn oe-icon-del" title="ลบปีงบประมาณ" aria-label="ลบปี <?= $y['year'] ?>"
+                                data-id="<?= $y['id'] ?>" data-msg="<?= $h($del_msg) ?>" onclick="aiDeleteYear(this)"><?= $svg_del ?></button>
                         </div>
+
+                        <div>
+                            <div class="oe-year-label">ปีงบประมาณ</div>
+                            <div class="oe-year-no"><?= $y['year'] ?></div>
+                        </div>
+                        <div class="oe-year-total"><?= number_format($y['total'], 2) ?> <small>tCO₂e</small></div>
+                        <div class="oe-year-stats">
+                            <div class="oe-year-stat"><span>รายการ EF</span><b class="ai-items"><?= $y['items'] ?></b></div>
+                            <div class="oe-year-stat"><span>หน่วยงานที่กรอก</span><b class="ai-affils"><?= $y['affils'] ?> / <?= $affil_total ?></b></div>
+                        </div>
+                        <div class="oe-track"><div class="oe-bar<?= $affil_total && $y['affils'] >= $affil_total ? ' is-done' : '' ?>" style="width:<?= number_format($pct, 2, '.', '') ?>%;"></div></div>
+                        <?php if (!$bare): ?>
+                        <a href="data_entry.php?year=<?= $y['id'] ?>" class="oe-btn oe-btn-amber">กรอกข้อมูล <?= $arrow ?></a>
+                        <?php elseif ($srcs): ?>
+                        <button type="button" class="oe-btn" data-id="<?= $y['id'] ?>" data-year="<?= $y['year'] ?>" onclick="aiCopyYear(this)"><?= $svg_copy ?> คัดลอกรายการจากปีอื่น</button>
+                        <?php else: ?>
+                        <a href="data_entry.php?year=<?= $y['id'] ?>" class="oe-btn">เพิ่มรายการ Emission Factor <?= $arrow ?></a>
+                        <?php endif; ?>
+                        <form method="POST" action="items.php" id="aiDelYear<?= $y['id'] ?>" hidden><?= csrf_field() ?>
+                            <input type="hidden" name="action" value="delete_year"><input type="hidden" name="year_id" value="<?= $y['id'] ?>">
+                        </form>
+                    </div>
                     <?php endforeach; ?>
                 </div>
             </div>
-        </div>
-
-        <!-- Modal: เพิ่ม item -->
-        <div class="modal-overlay" id="modal-add">
-            <div class="modal-box" style="max-width: 600px; height: auto;">
-                <div class="modal-title"><?= ic('add',20) ?>เพิ่มรายการ Emission Factor</div>
-                <form method="POST">
-                    <input type="hidden" name="action" value="add">
-                    <div class="form-row">
-                        <div class="form-group-dark">
-                            <label class="form-label-dark">ปี *</label>
-                            <select name="year_id" class="form-control-dark" required>
-                                <?php foreach ($years as $y): ?>
-                                    <option value="<?= $y['id'] ?>" <?= $y['id'] === $selected_year ? 'selected' : '' ?>>ปี
-                                        <?= $y['year'] ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="form-group-dark">
-                            <label class="form-label-dark">Scope Group *</label>
-                            <select name="scope" class="form-control-dark" required>
-                                <?php foreach ($groups as $g): ?>
-                                    <option value="<?= $g['id'] ?>">[Scope <?= $g['scope'] ?>]
-                                        <?= htmlspecialchars($g['name_tiem']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group-dark" style="margin-bottom:0.75rem;">
-                        <label class="form-label-dark">ชื่อรายการ *</label>
-                        <input type="text" name="name_tiem" class="form-control-dark" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group-dark">
-                            <label class="form-label-dark">หน่วย</label>
-                            <input type="text" name="unit" class="form-control-dark" placeholder="เช่น kWh, L">
-                        </div>
-                        <div class="form-group-dark">
-                            <label class="form-label-dark">Activity Data (AD) *</label>
-                            <input type="number" name="AD" step="0.0001" class="form-control-dark" required
-                                placeholder="0.0000">
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn-secondary" onclick="closeModal('modal-add')"
-                            style="background: transparent; border: 2px solid #6B7280; color: #6B7280;">ยกเลิก</button>
-                        <button type="submit" class="btn-primary"
-                            style="background: #FBB03B; color: white; border: none; box-shadow: 0 4px 12px rgba(251, 176, 59, 0.2);">บันทึก</button>
-                    </div>
-                </form>
-            </div>
+            <?php endif; ?>
         </div>
 
         <!-- Modal: เพิ่มปี -->
         <div class="modal-overlay" id="modal-add-year">
-            <div class="modal-box">
-                <div class="modal-title"><?= ic('add',20) ?>เพิ่มปีงบประมาณ</div>
-
-                <form method="POST" id="formAddYear">
+            <div class="modal-box co-modal">
+                <div class="modal-title"><?= ic('add', 22) ?><span>เพิ่มปีงบประมาณ</span></div>
+                <form method="POST" action="items.php" id="aiAddYearForm" novalidate><?= csrf_field() ?>
                     <input type="hidden" name="action" value="add_year">
-                    <div class="form-group-dark" style="margin-bottom:0.75rem;">
-                        <label class="form-label-dark">ปี (พ.ศ.) *</label>
-
+                    <div class="form-group-dark"><label class="form-label-dark">ปีงบประมาณ (พ.ศ.) *</label>
                         <?php
-                        $current_year_th = (int) date('Y') + 543;
-                        $existing_years = array_column($years, 'year');
-
-                        // ช่วงปี: ปีปัจจุบัน ถึง −10 (ไม่มีอนาคต) แต่ตัดปีที่มีแล้วออก กันเพิ่มซ้ำ
-                        $available_years = [];
-                        for ($i = $current_year_th; $i >= $current_year_th - 10; $i--) {
-                            if (!in_array($i, $existing_years)) {
-                                $available_years[] = $i;
-                            }
-                        }
-
-                        // ── เรียกใช้ Dropdown component ──
-                        $dd_id = 'yearSelectAddYear';
-                        $dd_name = 'new_year';
-                        $dd_options = $available_years; // [2567, 2568, ...]
-                        $dd_selected = '';
-                        $dd_placeholder = '-- เลือกปีงบประมาณ --';
-                        $dd_required = true;
-                        $dd_disabled = count($available_years) === 0;
+                        $dd_id = 'aiNewYear'; $dd_name = 'new_year'; $dd_options = $year_opts; $dd_selected = '';
+                        $dd_placeholder = '-- เลือกปีงบประมาณ --'; $dd_required = false; $dd_class = 'dd-field'; $dd_style = 'width:100%;';
                         include __DIR__ . '/../components/dropdown.php';
                         ?>
                     </div>
+                    <div class="oe-note">ปีใหม่ยังไม่มีรายการ Emission Factor — คัดลอกจากปีก่อนได้จากปุ่มบนการ์ดของปีนั้น</div>
                     <div class="modal-footer">
-                        <button type="button" class="btn-secondary" onclick="closeModal('modal-add-year')"
-                            style="background: transparent; border: 2px solid #6B7280; color: #6B7280;">ยกเลิก</button>
-                        <button type="submit" class="btn-primary" <?= count($available_years) > 0 ? '' : 'disabled' ?>
-                            style="background: #FBB03B; color: white; border: none; box-shadow: 0 4px 12px rgba(251, 176, 59, 0.2);">บันทึก</button>
+                        <span class="oe-msg co-modal-msg" role="alert"></span>
+                        <button type="button" class="btn-secondary" onclick="closeModal('modal-add-year')">ยกเลิก</button>
+                        <button type="submit" class="btn-primary">เพิ่มปีงบประมาณ</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- Modal: เพิ่ม Scope -->
-        <div class="modal-overlay" id="modal-add-scope">
-            <div class="modal-box" style="max-width: 800px;">
-                <div class="modal-title"><?= ic('add',20) ?>เพิ่มขอบเขต</div>
-
-                <div style="margin-bottom: 1.5rem; max-height: 240px; overflow-y: auto; padding-right: 6px;"
-                    class="scope-list-container" id="scope-list-wrapper">
-                    <style>
-                        .scope-list-container::-webkit-scrollbar {
-                            width: 6px;
-                        }
-
-                        .scope-list-container::-webkit-scrollbar-track {
-                            background: #F3F4F6;
-                            border-radius: 4px;
-                        }
-
-                        .scope-list-container::-webkit-scrollbar-thumb {
-                            background: #D1D5DB;
-                            border-radius: 4px;
-                        }
-
-                        .scope-list-container::-webkit-scrollbar-thumb:hover {
-                            background: #9CA3AF;
-                        }
-                    </style>
-                    <div style="font-weight: 600; color: #6B7280; font-size: 0.95rem; margin-bottom: 0.75rem;">
-                        ขอบเขตที่มีอยู่แล้ว</div>
-                    <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                        <?php foreach ($groups as $g): ?>
-                            <?php
-                            $bg = '#F3F4F6';
-                            if ($g['scope'] == 1)
-                                $bg = '#FFF8EB';
-                            elseif ($g['scope'] == 2)
-                                $bg = '#FDF0F4';
-                            elseif ($g['scope'] == 3)
-                                $bg = '#ECF3F9';
-                            ?>
-                            <div class="scope-row"
-                                style="background-color: <?= $bg ?>; padding: 0.6rem 1rem; border-radius: 6px; font-size: 0.95rem; color: #4B5563; border: 1px solid rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center; position: relative;">
-                                <div>ขอบเขตที่ <?= htmlspecialchars($g['scope']) ?>
-                                    <?= htmlspecialchars($g['name_tiem']) ?>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 4px;">
-                                    <form method="POST" class="move-form"
-                                        style="margin: 0; display: flex; align-items: center;">
-                                        <input type="hidden" name="action" value="move_scope">
-                                        <input type="hidden" name="scope_id" value="<?= $g['id'] ?>">
-                                        <input type="hidden" name="direction" value="up">
-                                        <button type="submit"
-                                            style="background: none; border: none; color: #4B5563; cursor: pointer; padding: 4px; border-radius: 4px; transition: background 0.2s; display: flex; align-items: center; justify-content: center;"
-                                            onmouseover="this.style.backgroundColor='rgba(0,0,0,0.05)'"
-                                            onmouseout="this.style.backgroundColor='transparent'" title="เลื่อนขึ้น">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                                stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="m5 12 7-7 7 7" />
-                                                <path d="M12 19V5" />
-                                            </svg>
-                                        </button>
-                                    </form>
-                                    <form method="POST" class="move-form"
-                                        style="margin: 0; display: flex; align-items: center;">
-                                        <input type="hidden" name="action" value="move_scope">
-                                        <input type="hidden" name="scope_id" value="<?= $g['id'] ?>">
-                                        <input type="hidden" name="direction" value="down">
-                                        <button type="submit"
-                                            style="background: none; border: none; color: #4B5563; cursor: pointer; padding: 4px; border-radius: 4px; transition: background 0.2s; display: flex; align-items: center; justify-content: center;"
-                                            onmouseover="this.style.backgroundColor='rgba(0,0,0,0.05)'"
-                                            onmouseout="this.style.backgroundColor='transparent'" title="เลื่อนลง">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                                stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="M12 5v14" />
-                                                <path d="m19 12-7 7-7-7" />
-                                            </svg>
-                                        </button>
-                                    </form>
-                                    <div style="width: 1px; height: 16px; background-color: #D1D5DB; margin: 0 4px;"></div>
-                                    <form method="POST" style="margin:0;" id="deleteScopeGroupForm_<?= $g['id'] ?>">
-                                        <input type="hidden" name="action" value="delete_scope">
-                                        <input type="hidden" name="scope_id" value="<?= $g['id'] ?>">
-                                        <button type="button" class="btn-icon-delete"
-                                            onclick="openConfirmDelete(document.getElementById('deleteScopeGroupForm_<?= $g['id'] ?>'), 'ยืนยันการลบกลุ่มขอบเขต: <?= htmlspecialchars($g['name_tiem']) ?>?')"
-                                            title="ลบกลุ่มนี้">
-                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path
-                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                        <?php if (empty($groups)): ?>
-                            <div style="text-align: center; color: #9CA3AF; padding: 1rem 0; font-size: 0.9rem;">
-                                ยังไม่มีข้อมูลขอบเขต</div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <form method="POST" id="ajax-add-scope-form"
-                    style="border-top: 1px dashed #D1D5DB; padding-top: 1.5rem;">
-                    <input type="hidden" name="action" value="add_scope">
-                    <div class="form-group-dark" style="margin-bottom:0.75rem;">
-                        <label class="form-label-dark">เลือกขอบเขต *</label>
-                        <?php
-                        $dd_id = 'addScopeDropdown';
-                        $dd_name = 'scope';
-                        $dd_options = [
-                            ['value' => 1, 'label' => 'ขอบเขต 1'],
-                            ['value' => 2, 'label' => 'ขอบเขต 2'],
-                            ['value' => 3, 'label' => 'ขอบเขต 3'],
-                        ];
-                        $dd_selected = '';
-                        $dd_placeholder = '-- เลือกขอบเขต --';
-                        $dd_required = true;
-                        $dd_disabled = false;
-                        include __DIR__ . '/../components/dropdown.php';
-                        ?>
-                    </div>
-                    <div class="form-group-dark" style="margin-bottom:0.75rem;">
-                        <label class="form-label-dark">ชื่อประเภทการปล่อยก๊าซ *</label>
-                        <input type="text" name="name_tiem" class="form-control-dark" required
-                            placeholder="เช่น ไฟฟ้า, น้ำมัน">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn-secondary" onclick="closeModal('modal-add-scope')"
-                            style="background: transparent; border: 2px solid #6B7280; color: #6B7280;">ยกเลิก</button>
-                        <button type="submit" class="btn-primary"
-                            style="background: #FBB03B; color: white; border: none; box-shadow: 0 4px 12px rgba(251, 176, 59, 0.2);">บันทึก</button>
-                    </div>
-                </form>
-
-                <script>
-                    function attachScopeListeners() {
-                        document.querySelectorAll('.move-form').forEach(form => {
-                            if (form.dataset.bound) return;
-                            form.dataset.bound = 'true';
-                            form.addEventListener('submit', async function (e) {
-                                e.preventDefault();
-                                const formData = new FormData(this);
-                                const direction = formData.get('direction');
-
-                                const currentRow = this.closest('.scope-row');
-                                const targetRow = direction === 'up' ? currentRow.previousElementSibling : currentRow.nextElementSibling;
-
-                                if (!targetRow || !targetRow.classList.contains('scope-row')) return;
-
-                                const currentRect = currentRow.getBoundingClientRect();
-                                const targetRect = targetRow.getBoundingClientRect();
-                                const delta = targetRect.top - currentRect.top;
-
-                                if (direction === 'up') {
-                                    currentRow.parentNode.insertBefore(currentRow, targetRow);
-                                } else {
-                                    currentRow.parentNode.insertBefore(targetRow, currentRow);
-                                }
-
-                                currentRow.style.transition = 'none';
-                                targetRow.style.transition = 'none';
-                                currentRow.style.transform = `translateY(${-delta}px)`;
-                                targetRow.style.transform = `translateY(${delta}px)`;
-
-                                currentRow.offsetHeight;
-
-                                currentRow.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)';
-                                targetRow.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)';
-                                currentRow.style.transform = '';
-                                targetRow.style.transform = '';
-
-                                formData.append('ajax', '1');
-                                await fetch(location.href, { method: 'POST', body: formData });
-                            });
-                        });
-                    }
-
-                    function updateScopeListWrapper(html) {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(html, 'text/html');
-                        const wrapperId = 'scope-list-wrapper';
-                        const newWrapper = doc.getElementById(wrapperId);
-                        const currentWrapper = document.getElementById(wrapperId);
-
-                        if (newWrapper && currentWrapper) {
-                            currentWrapper.innerHTML = newWrapper.innerHTML;
-                            attachScopeListeners();
-                        }
-                    }
-
-                    attachScopeListeners();
-
-                    const addForm = document.getElementById('ajax-add-scope-form');
-                    if (addForm) {
-                        addForm.addEventListener('submit', async function (e) {
-                            e.preventDefault();
-
-                            const scopeInput = document.getElementById('addScopeDropdown_input');
-                            if (scopeInput && !scopeInput.value) {
-                                alert('กรุณาเลือกขอบเขต');
-                                return;
-                            }
-
-                            const btn = this.querySelector('button[type="submit"]');
-                            if (btn) btn.disabled = true;
-
-                            const formData = new FormData(this);
-                            const response = await fetch(location.href, { method: 'POST', body: formData });
-                            const html = await response.text();
-
-                            updateScopeListWrapper(html);
-                            this.reset();
-                            ddReset('addScopeDropdown');
-
-                            if (btn) btn.disabled = false;
-
-                            setTimeout(() => {
-                                const wrapper = document.getElementById('scope-list-wrapper');
-                                if (wrapper) wrapper.scrollTop = wrapper.scrollHeight;
-                            }, 50);
-                        });
-                    }
-                </script>
-            </div>
-        </div>
-
-        <!-- Modal: แก้ไข item -->
-        <div class="modal-overlay" id="modal-edit">
-            <div class="modal-box">
-                <div class="modal-title"><?= ic('edit',20) ?>แก้ไขรายการ Emission Factor</div>
-                <form method="POST">
-                    <input type="hidden" name="action" value="edit">
-                    <input type="hidden" name="item_id" id="edit-item-id">
-                    <div class="form-group-dark" style="margin-bottom:0.75rem;">
-                        <label class="form-label-dark">Scope Group *</label>
-                        <select name="scope" id="edit-scope" class="form-control-dark" required>
-                            <?php foreach ($groups as $g): ?>
-                                <option value="<?= $g['id'] ?>">[Scope <?= $g['scope'] ?>]
-                                    <?= htmlspecialchars($g['name_tiem']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group-dark" style="margin-bottom:0.75rem;">
-                        <label class="form-label-dark">ชื่อรายการ *</label>
-                        <input type="text" name="name_tiem" id="edit-name" class="form-control-dark" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group-dark">
-                            <label class="form-label-dark">หน่วย</label>
-                            <input type="text" name="unit" id="edit-unit" class="form-control-dark">
-                        </div>
-                        <div class="form-group-dark">
-                            <label class="form-label-dark">Activity Data (AD) *</label>
-                            <input type="number" name="AD" id="edit-ad" step="0.0001" class="form-control-dark"
-                                required>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn-secondary" onclick="closeModal('modal-edit')"
-                            style="background: transparent; border: 2px solid #6B7280; color: #6B7280;">ยกเลิก</button>
-                        <button type="submit" class="btn-primary"
-                            style="background: #FBB03B; color: white; border: none; box-shadow: 0 4px 12px rgba(251, 176, 59, 0.2);">บันทึกการเปลี่ยนแปลง</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Modal: Edit Year -->
-        <div id="modalEditYear" class="modal-overlay">
-            <div class="modal-box">
-                <div class="modal-title"><?= ic('edit',20) ?>แก้ไขปีงบประมาณ</div>
-                <form method="POST">
+        <!-- Modal: เปลี่ยนเลขปี -->
+        <div class="modal-overlay" id="modalEditYear">
+            <div class="modal-box co-modal">
+                <div class="modal-title"><?= ic('edit', 22) ?><span>เปลี่ยนเลขปีงบประมาณ</span></div>
+                <form method="POST" action="items.php" id="aiEditYearForm" novalidate><?= csrf_field() ?>
                     <input type="hidden" name="action" value="edit_year">
-                    <input type="hidden" name="year_id" id="edit_year_id">
-                    <div class="form-group-dark">
-                        <label class="form-label-dark">ปีงบประมาณ (พ.ศ.)</label>
+                    <input type="hidden" name="year_id" id="aiEditYearId">
+                    <div class="form-group-dark"><label class="form-label-dark">เปลี่ยนปี <b id="aiEditYearFrom">-</b> เป็นปี *</label>
                         <?php
-                        $current_year_th = (int) date('Y') + 543;
-
-                        // สร้างรายการปีที่เลือกได้ (ปีปัจจุบัน ถึง ปีปัจจุบัน-10) ให้ตรงกับ modal "เพิ่มปี"
-                        // หมายเหตุ: ไม่กรอง $existing_years ออก เพราะปีปัจจุบันของแถวที่กำลังแก้ไข
-                        // ต้องอยู่ในลิสต์ด้วยเสมอ (ระบบจัดการปีซ้ำด้วย modal "สลับปี" อยู่แล้ว)
-                        $edit_year_options = [];
-                        for ($i = $current_year_th; $i >= $current_year_th - 10; $i--) {
-                            $edit_year_options[] = $i;
-                        }
-
-                        // ── เรียกใช้ Dropdown component ──
-                        $dd_id = 'editYearDropdown';
-                        $dd_name = 'year_val';
-                        $dd_options = $edit_year_options;
-                        $dd_selected = '';
-                        $dd_placeholder = '-- เลือกปีงบประมาณ --';
-                        $dd_required = true;
-                        $dd_disabled = false;
+                        $dd_id = 'aiEditYear'; $dd_name = 'year_val'; $dd_options = $edit_opts; $dd_selected = '';
+                        $dd_placeholder = '-- เลือกปีงบประมาณ --'; $dd_required = false; $dd_class = 'dd-field'; $dd_style = 'width:100%;';
                         include __DIR__ . '/../components/dropdown.php';
                         ?>
                     </div>
+                    <div class="oe-note">ข้อมูลทั้งหมดของปีนี้ย้ายตามไปด้วย · ถ้าเลือกปีที่มีอยู่แล้ว ระบบจะถามเพื่อสลับเลขปีของทั้งสองปี</div>
                     <div class="modal-footer">
-                        <button type="button" class="btn-secondary" onclick="closeModal('modalEditYear')"
-                            style="background: transparent; border: 2px solid #6B7280; color: #6B7280;">ยกเลิก</button>
-                        <button type="submit" class="btn-primary"
-                            style="background: #FBB03B; color: white; border: none; box-shadow: 0 4px 12px rgba(251, 176, 59, 0.2);">บันทึกการแก้ไข</button>
+                        <span class="oe-msg co-modal-msg" role="alert"></span>
+                        <button type="button" class="btn-secondary" onclick="closeModal('modalEditYear')">ยกเลิก</button>
+                        <button type="submit" class="btn-primary">บันทึกการเปลี่ยนปี</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- Modal: Confirm Delete -->
-        <div id="modalConfirmDelete" class="modal-overlay">
-            <div class="modal-box" style="max-width: 400px; text-align: center;">
-                <div
-                    style="background: #FEE2E2; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="#EF4444">
-                        <path
-                            d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" />
-                    </svg>
-                </div>
-                <h3
-                    style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; color: #111827; letter-spacing: -0.025em;">
-                    ยืนยันการลบ?
-                </h3>
-                <p id="confirmDeleteMsg"
-                    style="color: #6B7280; margin-bottom: 2rem; font-size: 0.95rem; line-height: 1.5;">
-                    รายการนี้จะถูกลบออกถาวรและไม่สามารถกู้คืนได้</p>
-
-                <div style="display: flex; gap: 12px;">
-                    <button type="button" class="btn-secondary" onclick="closeModal('modalConfirmDelete')"
-                        style="flex: 1; background: transparent; border: 2px solid #6B7280; color: #6B7280;">ยกเลิก</button>
-                    <button type="button" id="confirmDeleteBtn" class="btn-danger" style="flex: 1;">ลบรายการ</button>
-                </div>
+        <?php if ($swap): ?>
+        <!-- Modal: ยืนยันสลับปี -->
+        <div class="modal-overlay open" id="modalConfirmSwap" style="display:flex;">
+            <div class="modal-box co-modal" style="text-align:center;">
+                <div class="ai-swap-ic"><svg viewBox="0 0 24 24" width="32" height="32" fill="#F59E0B"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg></div>
+                <h3 class="ai-swap-title">ปี <?= $swap['y2'] ?> มีอยู่แล้ว</h3>
+                <p class="oe-muted" style="font-size:.95rem;margin:0 0 1.5rem;">ต้องการสลับเลขปีระหว่างปี <b><?= $swap['y1'] ?></b> กับ <b><?= $swap['y2'] ?></b> หรือไม่?<br>ข้อมูลของแต่ละปีจะย้ายตามเลขปีใหม่</p>
+                <form method="POST" action="items.php"><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="swap_years">
+                    <input type="hidden" name="id1" value="<?= $swap['id1'] ?>"><input type="hidden" name="id2" value="<?= $swap['id2'] ?>">
+                    <div class="modal-footer" style="justify-content:center;">
+                        <a class="btn-secondary" href="items.php" style="text-decoration:none;">ยกเลิก</a>
+                        <button type="submit" class="btn-primary" style="background:#F59E0B;border-color:#F59E0B;">สลับเลขปี</button>
+                    </div>
+                </form>
             </div>
         </div>
-
-        <!-- Modal: Confirm Swap Years -->
-        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'duplicate_year'): ?>
-            <div id="modalConfirmSwap" class="modal-overlay" style="display: flex;">
-                <div class="modal-box" style="max-width: 450px; text-align: center;">
-                    <div
-                        style="background: #FEF3C7; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
-                        <svg viewBox="0 0 24 24" width="32" height="32" fill="#F59E0B">
-                            <path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z" />
-                        </svg>
-                    </div>
-                    <div class="modal-title" style="justify-content: center; border: none; margin-bottom: 0.5rem;">
-                        ปีงบประมาณซ้ำ</div>
-                    <p style="color: #6B7280; margin-bottom: 2rem;">
-                        ปี <strong><?= htmlspecialchars($_GET['y2']) ?></strong> มีอยู่ในระบบแล้ว <br>
-                        คุณต้องการทำการ <strong>"สลับข้อมูล"</strong> ระหว่างปี <br>
-                        <strong><?= htmlspecialchars($_GET['y1']) ?></strong> กับ
-                        <strong><?= htmlspecialchars($_GET['y2']) ?></strong> หรือไม่?
-                    </p>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="swap_years">
-                        <input type="hidden" name="id1" value="<?= (int) $_GET['id1'] ?>">
-                        <input type="hidden" name="id2" value="<?= (int) $_GET['id2'] ?>">
-                        <input type="hidden" name="y1" value="<?= (int) $_GET['y1'] ?>">
-                        <input type="hidden" name="y2" value="<?= (int) $_GET['y2'] ?>">
-                        <div style="display: flex; gap: 12px;">
-                            <button type="button" class="btn-secondary"
-                                onclick="location.href='items.php?year=<?= $selected_year ?>'"
-                                style="flex: 1; background: transparent; border: 2px solid #6B7280; color: #6B7280;">ยกเลิก</button>
-                            <button type="submit" class="btn-primary"
-                                style="flex: 1; background: #FBB03B; color: white; border: none; box-shadow: 0 4px 12px rgba(251, 176, 59, 0.2);">ใช่,
-                                สลับข้อมูลปี</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
         <?php endif; ?>
 
-        <!-- Modal: คัดลอก admin_item จากปีอื่น -->
-        <div id="modalCopyYear" class="modal-overlay">
-            <div class="modal-box" style="max-width: 480px;">
-                <div class="modal-title"><?= ic('copy',20) ?>คัดลอกรายการจากปีอื่น</div>
-                <form method="POST">
-                    <input type="hidden" name="action" value="copy_year">
-                    <input type="hidden" name="target_year_id" id="copy_target_year_id">
-
-                    <div
-                        style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 14px 16px; margin-bottom: 1.25rem; display: flex; align-items: flex-start; gap: 10px;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="#3B82F6"
-                            style="flex-shrink:0; margin-top:1px;">
-                            <path
-                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-                        </svg>
-                        <p style="color: #1D4ED8; font-size: 0.85rem; line-height: 1.5; margin: 0;">
-                            ระบบจะ<strong>คัดลอกรายการ Emission Factor ทั้งหมด</strong> จากปีต้นทางมายังปี <strong
-                                id="copy_target_year_label">-</strong><br>
-                            รายการที่มีอยู่แล้วในปีปลายทางจะ<strong>ไม่ถูกเขียนทับ</strong> (INSERT IGNORE)
-                        </p>
-                    </div>
-
-                    <div class="form-group-dark" style="margin-bottom:1.5rem;">
-                        <label class="form-label-dark">เลือกปีที่ต้องการคัดลอกรายการมาจาก (ต้นทาง) *</label>
+        <?php if ($copy_ready): ?>
+        <!-- Modal: คัดลอกรายการจากปีอื่น -->
+        <div class="modal-overlay" id="modalCopyYear">
+            <div class="modal-box co-modal">
+                <div class="modal-title"><?= ic('copy', 22) ?><span>คัดลอกรายการจากปีอื่น</span></div>
+                <form method="POST" action="items.php" id="aiCopyForm" novalidate><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="copy_items">
+                    <input type="hidden" name="target_year_id" id="aiCopyTarget">
+                    <div class="form-group-dark"><label class="form-label-dark">คัดลอกจากปี → ปี <b id="aiCopyTargetLabel">-</b> *</label>
                         <?php
-                        $dd_id = 'copySourceYear';
-                        $dd_name = 'source_year_id';
-                        $dd_placeholder = '-- เลือกปีต้นทาง --';
-                        $dd_options = [];
-                        foreach ($years as $cy) {
-                            $dd_options[] = ['value' => $cy['id'], 'label' => 'ปีงบประมาณ ' . $cy['year']];
-                        }
+                        $dd_id = 'aiCopySrc'; $dd_name = 'source_year_id';
+                        $dd_options = array_map(fn($c) => ['value' => $c['id'], 'label' => 'ปี ' . $c['year'] . ' (' . $c['items'] . ' รายการ)'], $copy_ready);
+                        $dd_selected = ''; $dd_placeholder = '-- เลือกปีต้นทาง --'; $dd_required = false; $dd_class = 'dd-field'; $dd_style = 'width:100%;';
                         include __DIR__ . '/../components/dropdown.php';
                         ?>
                     </div>
-
+                    <div class="oe-note">คัดลอกชื่อ หน่วย และค่าการปล่อยของทุกหมวด · รายการที่ชื่อซ้ำในหมวดเดียวกันของปีปลายทางจะถูกข้าม · ปริมาณที่หน่วยงานกรอกไม่ถูกคัดลอก</div>
                     <div class="modal-footer">
-                        <button type="button" class="btn-secondary" onclick="closeModal('modalCopyYear')"
-                            style="background: transparent; border: 2px solid #6B7280; color: #6B7280;">ยกเลิก</button>
-                        <button type="submit" class="btn-primary"
-                            style="background: #FBB03B; color: white; border: none; box-shadow: 0 4px 12px rgba(251, 176, 59, 0.2);">คัดลอกรายการ</button>
+                        <span class="oe-msg co-modal-msg" role="alert"></span>
+                        <button type="button" class="btn-secondary" onclick="closeModal('modalCopyYear')">ยกเลิก</button>
+                        <button type="submit" class="btn-primary">คัดลอกรายการ</button>
                     </div>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Modal: จัดการหมวด -->
+        <div class="modal-overlay" id="modal-groups">
+            <div class="modal-box co-modal co-modal-wide">
+                <div class="modal-title"><?= $svg_layers ?><span>จัดการหมวด</span></div>
+                <div class="oe-gm-list" id="aiGroupList">
+                    <?php foreach ([1, 2, 3] as $sc): $m = $meta[$sc];
+                        $mine = array_values(array_filter($groups, fn($g) => $g['scope'] === $sc)); ?>
+                    <div class="ai-gm-block" style="--sc:<?= $m['color'] ?>;--sc-soft:<?= $m['soft'] ?>;--sc-line:<?= $m['color'] ?>66;">
+                        <h4 class="oe-gm-scope">ขอบเขต <?= $sc ?> · <?= $m['name'] ?></h4>
+                        <?php if (!$mine): ?><p class="oe-muted" style="margin:0 0 6px 16px;">ยังไม่มีหมวด</p><?php endif; ?>
+                        <?php foreach ($mine as $g): ?>
+                        <div class="oe-gm-row" data-id="<?= $g['id'] ?>">
+                            <span class="oe-gm-name"><?= $h($g['name_tiem']) ?></span>
+                            <span class="oe-gm-count"><?= $g['items'] ? $g['items'] . ' รายการ' : 'ยังไม่ใช้' ?></span>
+                            <button type="button" class="oe-gm-btn oe-gm-up" title="เลื่อนขึ้น" aria-label="เลื่อน <?= $h($g['name_tiem']) ?> ขึ้น" onclick="aiMoveGroup(this, 'up')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m18 15-6-6-6 6"/></svg></button>
+                            <button type="button" class="oe-gm-btn oe-gm-down" title="เลื่อนลง" aria-label="เลื่อน <?= $h($g['name_tiem']) ?> ลง" onclick="aiMoveGroup(this, 'down')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button>
+                            <button type="button" class="oe-gm-btn is-del" <?= $g['items'] ? 'disabled title="ลบไม่ได้ ยังมีรายการ Emission Factor ' . $g['items'] . ' รายการใช้หมวดนี้"' : 'title="ลบหมวด"' ?>
+                                aria-label="ลบ <?= $h($g['name_tiem']) ?>" data-id="<?= $g['id'] ?>" data-name="<?= $h($g['name_tiem']) ?>" onclick="aiDeleteGroup(this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <form method="POST" action="items.php" class="oe-gm-add" id="aiGroupForm" novalidate><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="add_group">
+                    <div class="co-form-grid">
+                        <div class="form-group-dark"><label class="form-label-dark">ขอบเขต *</label>
+                            <?php
+                            $dd_id = 'aiGroupScope'; $dd_name = 'scope';
+                            $dd_options = array_map(fn($sc) => ['value' => $sc, 'label' => 'ขอบเขต ' . $sc . ' · ' . $meta[$sc]['name']], [1, 2, 3]);
+                            $dd_selected = ''; $dd_placeholder = '-- เลือกขอบเขต --'; $dd_required = false; $dd_class = 'dd-field'; $dd_style = 'width:100%;';
+                            include __DIR__ . '/../components/dropdown.php';
+                            ?>
+                        </div>
+                        <div class="form-group-dark"><label class="form-label-dark" for="aiGroupName">ชื่อหมวดใหม่ *</label>
+                            <input class="form-control-dark" id="aiGroupName" name="name_tiem" maxlength="255" placeholder="เช่น การเผาไหม้อยู่กับที่" autocomplete="off"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <span class="oe-msg co-modal-msg" role="alert"></span>
+                        <button type="button" class="btn-secondary" onclick="closeModal('modal-groups')">ปิด</button>
+                        <button type="submit" class="btn-primary">เพิ่มหมวด</button>
+                    </div>
+                </form>
+                <form method="POST" action="items.php" id="aiGroupDelForm" hidden><?= csrf_field() ?>
+                    <input type="hidden" name="action" value="delete_group"><input type="hidden" name="group_id" value="">
                 </form>
             </div>
         </div>
 
         <script>
-            var formToSubmit = null;   // var (ไม่ใช่ let) เพื่อให้ SPA re-run script ได้โดยไม่ error ประกาศซ้ำ
+            // ประกาศผ่าน window / IIFE — SPA รันสคริปต์ซ้ำทุกครั้งที่เข้าหน้านี้ (let/const ระดับบนสุดจะ error ประกาศซ้ำ)
+            (function () {
+                var d = document;
+                function $(id) { return d.getElementById(id); }
 
-            function openConfirmDelete(form, msg) {
-                formToSubmit = form;
-                if (msg) document.getElementById('confirmDeleteMsg').innerText = msg;
-                document.getElementById('modalConfirmDelete').style.display = 'flex';
-            }
-
-            document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
-                if (formToSubmit) formToSubmit.submit();
-            });
-
-            function openEditYearModal(id, year) {
-                document.getElementById('edit_year_id').value = id;
-                ddSetValue('editYearDropdown', year, year);
-                document.getElementById('modalEditYear').style.display = 'flex';
-            }
-
-            function openCopyYearModal(targetId, targetYear) {
-                document.getElementById('copy_target_year_id').value = targetId;
-                document.getElementById('copy_target_year_label').textContent = targetYear;
-
-                // reset ค่า dropdown ต้นทาง กลับเป็น placeholder
-                const ddInput = document.getElementById('copySourceYear_input');
-                const ddLabel = document.getElementById('copySourceYear_label');
-                if (ddInput) ddInput.value = '';
-                if (ddLabel) {
-                    ddLabel.textContent = '-- เลือกปีต้นทาง --';
-                    ddLabel.style.color = '#9CA3AF';
+                window.openModal = function (id) { var m = $(id); if (!m) return; m.classList.add('open'); m.style.display = 'flex'; var b = m.querySelector('.modal-box'); if (b) { b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; } };
+                window.closeModal = function (id) { var m = $(id); if (m) { m.classList.remove('open'); m.style.display = 'none'; } };
+                d.querySelectorAll('.ai-page ~ .modal-overlay').forEach(function (el) {
+                    el.addEventListener('click', function (e) { if (e.target === el && el.id !== 'modalConfirmSwap') closeModal(el.id); });
+                });
+                if (!window.__coEsc) {
+                    window.__coEsc = true;
+                    d.addEventListener('keydown', function (e) {
+                        if (e.key !== 'Escape') return;
+                        d.querySelectorAll('.modal-overlay.open').forEach(function (m) { closeModal(m.id); });
+                    });
                 }
 
-                // ซ่อนปีปลายทางออกจากตัวเลือก + ล้างสถานะ active
-                document.querySelectorAll('#copySourceYear_menu .dd-option').forEach(opt => {
-                    opt.classList.remove('active');
-                    opt.style.display = (opt.dataset.value == targetId) ? 'none' : '';
+                // ── dropdown: กลับเป็นค่าว่าง + ซ่อนตัวเลือกที่ไม่ควรเลือก ──
+                function ddClear(id, hide) {
+                    var wrap = $(id); if (!wrap) return;
+                    $(id + '_input').value = '';
+                    var label = $(id + '_label');
+                    label.textContent = wrap.dataset.emptyLabel; label.style.color = '#9CA3AF';
+                    wrap.querySelectorAll('.dd-option').forEach(function (o) {
+                        o.classList.remove('active');
+                        o.style.display = hide && String(o.dataset.value) === String(hide) ? 'none' : '';
+                    });
+                }
+                // ส่งฟอร์มไม่ได้ → ข้อความในหน้าต่าง + สั่น (ไม่ใช้ alert)
+                function guard(form, check) {
+                    if (!form || form.dataset.bound) return;
+                    form.dataset.bound = '1';
+                    form.addEventListener('submit', function (e) {
+                        var err = check();
+                        var msg = form.querySelector('.co-modal-msg');
+                        if (msg) msg.textContent = err || '';
+                        if (!err) { var btn = form.querySelector('[type="submit"]'); if (btn) btn.disabled = true; return; }
+                        e.preventDefault();
+                        var box = form.closest('.modal-box');
+                        box.classList.remove('oe-shake'); void box.offsetWidth; box.classList.add('oe-shake');
+                    });
+                }
+                function val(id) { var el = $(id); return el ? el.value.trim() : ''; }
+
+                window.aiAddYear = function () {
+                    ddClear('aiNewYear'); $('aiAddYearForm').querySelector('.co-modal-msg').textContent = '';
+                    openModal('modal-add-year');
+                };
+                guard($('aiAddYearForm'), function () { return val('aiNewYear_input') ? '' : 'กรุณาเลือกปีงบประมาณ'; });
+
+                window.aiEditYear = function (b) {
+                    $('aiEditYearId').value = b.dataset.id;
+                    $('aiEditYearFrom').textContent = b.dataset.year;
+                    ddClear('aiEditYear', b.dataset.year); $('aiEditYearForm').querySelector('.co-modal-msg').textContent = '';
+                    openModal('modalEditYear');
+                };
+                guard($('aiEditYearForm'), function () { return val('aiEditYear_input') ? '' : 'กรุณาเลือกปีงบประมาณใหม่'; });
+
+                window.aiCopyYear = function (b) {
+                    if (!$('modalCopyYear')) return;
+                    $('aiCopyTarget').value = b.dataset.id;
+                    $('aiCopyTargetLabel').textContent = b.dataset.year;
+                    ddClear('aiCopySrc', b.dataset.id); $('aiCopyForm').querySelector('.co-modal-msg').textContent = '';
+                    openModal('modalCopyYear');
+                };
+                guard($('aiCopyForm'), function () { return val('aiCopySrc_input') ? '' : 'กรุณาเลือกปีต้นทาง'; });
+
+                window.aiDeleteYear = function (b) {
+                    confirmDelete({ title: 'ลบปีงบประมาณ?', message: b.dataset.msg, confirmText: 'ลบปีงบประมาณ' }).then(function (ok) {
+                        if (ok && $('aiDelYear' + b.dataset.id)) $('aiDelYear' + b.dataset.id).submit();
+                    });
+                };
+
+                // ── หมวด ──
+                guard($('aiGroupForm'), function () {
+                    if (!val('aiGroupScope_input')) return 'กรุณาเลือกขอบเขต';
+                    if (!val('aiGroupName')) return 'กรุณากรอกชื่อหมวด';
+                    return '';
                 });
+                window.aiDeleteGroup = function (b) {
+                    if (b.disabled) return;
+                    confirmDelete({ title: 'ลบหมวด?', message: 'ลบหมวด "' + b.dataset.name + '" ออกจากระบบ?', confirmText: 'ลบหมวด' }).then(function (ok) {
+                        if (!ok) return;
+                        var f = $('aiGroupDelForm');
+                        f.querySelector('[name="group_id"]').value = b.dataset.id;
+                        f.submit();
+                    });
+                };
+                // เลื่อนลำดับ: สลับแถวทันทีพร้อมแอนิเมชัน (FLIP) แล้วบันทึกเบื้องหลัง — ไม่สำเร็จ → สลับกลับ
+                window.aiMoveGroup = function (btn, dir) {
+                    var row = btn.closest('.oe-gm-row');
+                    var other = dir === 'up' ? row.previousElementSibling : row.nextElementSibling;
+                    if (!other || !other.classList.contains('oe-gm-row')) return;
+                    function swap(a, b, up) {
+                        var ra = a.getBoundingClientRect().top, rb = b.getBoundingClientRect().top;
+                        if (up) a.parentNode.insertBefore(a, b); else a.parentNode.insertBefore(b, a);
+                        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                        if (reduce) return;
+                        [[a, ra], [b, rb]].forEach(function (p) {
+                            var dy = p[1] - p[0].getBoundingClientRect().top;
+                            p[0].style.transition = 'none'; p[0].style.transform = 'translateY(' + dy + 'px)';
+                            void p[0].offsetHeight;
+                            p[0].style.transition = 'transform .3s cubic-bezier(.2,.8,.2,1)'; p[0].style.transform = '';
+                        });
+                    }
+                    swap(row, other, dir === 'up');
+                    var fd = new FormData();
+                    fd.append('action', 'move_group'); fd.append('group_id', row.dataset.id); fd.append('direction', dir);
+                    fd.append('csrf_token', <?= json_encode(csrf_token()) ?>);
+                    fetch('items.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (res) { if (!res.ok) throw new Error(res.msg); })
+                        .catch(function () { swap(row, other, dir !== 'up'); });
+                };
 
-                openModal('modalCopyYear');
-            }
-
-            function openModal(id) { document.getElementById(id).classList.add('open'); document.getElementById(id).style.display = 'flex'; }
-            function closeModal(id) { document.getElementById(id).classList.remove('open'); document.getElementById(id).style.display = 'none'; }
-            document.querySelectorAll('.modal-overlay').forEach(el => {
-                el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
-            });
-            function openEditModal(item) {
-                document.getElementById('edit-item-id').value = item.id;
-                document.getElementById('edit-scope').value = item.scope;
-                document.getElementById('edit-name').value = item.name_tiem;
-                document.getElementById('edit-unit').value = item.unit || '';
-                document.getElementById('edit-ad').value = item.AD;
-                openModal('modal-edit');
-            }
+                <?php if (isset($_GET['groups'])): ?>openModal('modal-groups');<?php endif; ?>
+            })();
         </script>
-
+        <?php include __DIR__ . '/../components/confirm_modal.php'; ?>
     </main>
 
     <script src="<?= $root ?>assets/js/session-timer.js<?= asset_v('assets/js/session-timer.js') ?>"></script>

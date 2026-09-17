@@ -5,7 +5,8 @@
  * รับ username + password → ตรวจสอบกับ DB → set session → redirect ตาม role
  */
 
-session_start();
+// เริ่ม session ผ่าน auth.php (cookie httponly / samesite ชุดเดียวกับทุกหน้า) + ใช้ csrf_field / csrf_valid
+require_once __DIR__ . '/includes/auth.php';
 
 // ถ้า login อยู่แล้ว → โยนให้ router จัดการ
 if (isset($_SESSION['user_id'])) {
@@ -14,19 +15,25 @@ if (isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/password.php';
 
 $error = '';
 $timeout = isset($_GET['timeout']) && $_GET['timeout'] === '1';
 
-// Read cookies for Remember Password feature
+// จำชื่อผู้ใช้ (ไม่จำรหัสผ่าน — ให้เบราว์เซอร์จำเองผ่าน autocomplete)
 $cookie_user = $_COOKIE['rm_username'] ?? '';
-$cookie_pass = $_COOKIE['rm_password'] ?? '';
+$cookie_opts = fn(int $expires) => ['expires' => $expires, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax'];
+// เดิมเก็บรหัสผ่านจริงในคุกกี้ rm_password 30 วัน (JS อ่านได้) → ลบทิ้งทุกครั้งที่ยังเหลืออยู่
+if (isset($_COOKIE['rm_password'])) setcookie('rm_password', '', ['expires' => time() - 3600, 'path' => '/']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if (empty($username) || empty($password)) {
+    if (!csrf_valid()) {
+        // login CSRF: ไม่ตรวจรหัสผ่านถ้าไม่ได้ส่งมาจากฟอร์มของหน้านี้
+        $error = 'หน้านี้หมดอายุ กรุณาลองเข้าสู่ระบบอีกครั้ง';
+    } elseif (empty($username) || empty($password)) {
         $error = 'กรุณากรอกชื่อผู้ใช้งานและรหัสผ่าน';
     } else {
         try {
@@ -43,20 +50,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$user) {
                 $error = 'ไม่พบชื่อผู้ใช้งานนี้ในระบบ';
-            } elseif ($user['password'] !== $password) {
+            } elseif (!user_password_verify((string) $user['password'], $password)) {
                 $error = 'รหัสผ่านไม่ถูกต้อง';
             } else {
                 // ป้องกัน session fixation
                 session_regenerate_id(true);
+                unset($_SESSION['csrf_token']);   // token ใหม่หลัง login (ไม่ใช้ token ที่ได้ก่อนเข้าสู่ระบบ)
 
-                // Remember Password (Set cookies for 30 days)
-                if (isset($_POST['remember'])) {
-                    setcookie('rm_username', $username, time() + (86400 * 30), "/");
-                    setcookie('rm_password', $password, time() + (86400 * 30), "/");
-                } else {
-                    setcookie('rm_username', '', time() - 3600, "/");
-                    setcookie('rm_password', '', time() - 3600, "/");
+                // รหัสเก่าที่ยังเป็น plaintext (หรือ cost เปลี่ยน) → เข้ารหัสใหม่ทันที
+                if (user_password_needs_upgrade((string) $user['password'])) {
+                    $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([user_password_hash($password), $user['id']]);
                 }
+
+                // จำชื่อผู้ใช้ 30 วัน (ไม่เก็บรหัสผ่าน)
+                if (isset($_POST['remember'])) {
+                    setcookie('rm_username', $username, $cookie_opts(time() + 86400 * 30));
+                } else {
+                    setcookie('rm_username', '', $cookie_opts(time() - 3600));
+                }
+                setcookie('rm_password', '', ['expires' => time() - 3600, 'path' => '/']);
 
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
@@ -73,8 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
         } catch (Exception $e) {
-            error_log($e->getMessage());
-            $error = $e->getMessage();
+            $error = safe_error_message($e, 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
         }
     }
 }
@@ -126,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Form Box -->
             <form method="POST" action=""
-                style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+                style="width: 100%; display: flex; flex-direction: column; align-items: center;"><?= csrf_field() ?>
                 <div class="form-wrapper">
                     <h2 class="form-title">ลงชื่อเพื่อเข้าใช้งานระบบ</h2>
 
@@ -152,14 +163,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z" />
                             </svg>
                             <input type="password" name="password" placeholder="password"
-                                value="<?= htmlspecialchars($cookie_pass) ?>" autocomplete="current-password">
+                                autocomplete="current-password">
                         </div>
                     </div>
 
                     <div class="remember-row">
                         <input type="checkbox" id="remember" name="remember" class="custom-checkbox"
                             <?= !empty($cookie_user) ? 'checked' : '' ?>>
-                        <label for="remember">จำรหัสผ่าน</label>
+                        <label for="remember">จำชื่อผู้ใช้</label>
                     </div>
                 </div>
 

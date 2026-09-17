@@ -1,0 +1,139 @@
+/* ==========================================================================
+   หน้าตั้งค่าผู้ใช้งาน (admin/settings.php) — คลาส au- ทั้งหมด
+   ใช้คู่กับ officer-entry.css (oe-) และ collect.css (co-) · SPA ของ admin เก็บ stylesheet ไว้ข้ามหน้า จึงห้ามใช้ชื่อคลาสกลาง ๆ
+   สีสิทธิ์: admin = ม่วง, officer = เขียว, dean = ฟ้า
+   ========================================================================== */
+
+.au-role-admin   { --k: #62368B; --k-soft: #F3EAFF; }
+.au-role-officer { --k: #059669; --k-soft: #D1FAE5; }
+.au-role-dean    { --k: #2563EB; --k-soft: #DBEAFE; }
+
+/* การ์ดสรุป = ปุ่มกรอง */
+button.au-kpi { font-family: 'Sarabun', sans-serif; text-align: left; cursor: pointer; width: 100%; }
+.au-kpi { position: relative; overflow: hidden; }
+.au-kpi::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--k); transform: scaleX(0); transform-origin: left center; transition: transform .35s cubic-bezier(.22,1,.36,1); }
+.au-kpi[aria-pressed="true"] { border-color: var(--k); background: var(--k-soft); box-shadow: 0 10px 24px rgba(42,34,51,.08); }
+.au-kpi[aria-pressed="true"]::after { transform: scaleX(1); }
+.au-kpi[aria-pressed="true"] .co-kpi-sub::before { content: '✓ กำลังกรอง · '; color: var(--k); font-weight: 700; }
+.au-kpi:focus-visible { outline: 2px solid var(--k); outline-offset: 2px; }
+
+/* แถบเครื่องมือของตาราง */
+.au-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.oe-search.au-search { width: 280px; max-width: 100%; margin: 0; height: 44px; }
+
+/* ตาราง */
+.au-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; table-layout: fixed; }
+.au-table th { font-size: .78rem; font-weight: 700; color: #6B7280; text-align: left; padding: 4px 12px; }
+.au-table th:last-child { text-align: center; }
+.au-table td { padding: 10px 12px; background: #FAFAFB; vertical-align: middle; font-size: .9rem; color: #374151; overflow-wrap: anywhere; transition: background-color .2s ease; }
+.au-table td:first-child { border-radius: 14px 0 0 14px; box-shadow: inset 4px 0 0 transparent; transition: box-shadow .25s ease, background-color .2s ease; }
+.au-table td:last-child { border-radius: 0 14px 14px 0; }
+.au-row:hover td { background: #F5F2F9; }
+.au-row:hover td:first-child { box-shadow: inset 4px 0 0 #C4A5E8; }
+.au-row[hidden] { display: none !important; }
+.au-in { animation: oeRise .4s cubic-bezier(.22,1,.36,1) backwards; animation-delay: calc(var(--i, 0) * 30ms); }
+/* แถวที่เพิ่งบันทึก: ไฮไลต์จางลง */
+.au-row.is-hl td { animation: auFlash 2.4s ease .3s backwards; }
+@keyframes auFlash { 0%, 35% { background: #FEF3C7; } 100% { background: #FAFAFB; } }
+
+.au-user { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.au-avatar { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px #fff, 0 2px 8px rgba(42,34,51,.12);
+             transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
+.au-avatar.is-initial { display: inline-flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; background: linear-gradient(135deg, #8B5CF6, #62368B); }
+.au-row:hover .au-avatar { transform: scale(1.08) rotate(-4deg); }
+.au-user-text { min-width: 0; line-height: 1.3; }
+.au-user-text b { display: block; color: #1F2937; font-weight: 700; }
+.au-user-text small { color: #9CA3AF; font-size: .78rem; }
+.au-self { display: inline-block; font-size: .68rem; font-weight: 800; color: #B45309; background: #FEF3C7; padding: 1px 8px; border-radius: 999px; vertical-align: middle; }
+.au-pill { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 700; color: var(--k); background: var(--k-soft); padding: 4px 12px; border-radius: 999px; white-space: nowrap; }
+.au-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--k); }
+.oe-tools .oe-icon-btn[disabled] { background: #E5E7EB; color: #9CA3AF; cursor: not-allowed; box-shadow: none; transform: none; }
+
+.au-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.au-pager { display: inline-flex; align-items: center; gap: 8px; }
+.au-pager b { font-size: .85rem; color: #2A2233; min-width: 48px; text-align: center; }
+.au-pager .oe-gm-btn { background: #F3F1F6; }
+.au-size { height: 32px; border: 1.5px solid #E5E7EB; border-radius: 8px; padding: 0 6px; font-family: 'Sarabun', sans-serif; font-weight: 700; color: #374151; background: #fff; cursor: pointer; }
+.au-size:focus { outline: none; border-color: #62368B; box-shadow: 0 0 0 3px rgba(98,54,139,.15); }
+.au-empty { margin-top: 8px; }
+.au-empty[hidden] { display: none; }
+
+/* หน้าต่างเพิ่ม/แก้ไข */
+.au-err { display: block; min-height: 0; color: #DC2626; font-size: .76rem; font-weight: 700; margin-top: 4px; animation: oeRise .25s ease backwards; }
+.au-err:empty { display: none; }
+.au-modal .form-control-dark[aria-invalid="true"], .au-modal .dd-trigger[aria-invalid="true"] { border-color: #EF4444; box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
+.au-roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+.au-role { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 12px 8px; border: 2px solid #EEF0F3; border-radius: 14px;
+           cursor: pointer; font-size: .82rem; font-weight: 700; color: #4B5563; background: #fff;
+           transition: border-color .2s ease, background-color .2s ease, transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease; }
+.au-role input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.au-role-ic { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--k); background: var(--k-soft);
+              transition: transform .3s cubic-bezier(.34,1.56,.64,1), background-color .2s ease, color .2s ease; }
+.au-role:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(42,34,51,.08); }
+.au-role:has(input:checked) { border-color: var(--k); background: var(--k-soft); color: var(--k); }
+.au-role:has(input:checked) .au-role-ic { background: var(--k); color: #fff; transform: scale(1.08) rotate(-6deg); }
+.au-role:has(input:focus-visible) { outline: 2px solid var(--k); outline-offset: 2px; }
+.au-role:has(input:disabled) { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+.au-role-lock { display: block; margin-top: 6px; }
+.au-role-lock[hidden] { display: none; }
+.au-new-affil { margin-top: 10px; animation: oeOpen .3s cubic-bezier(.22,1,.36,1); }
+.au-new-affil[hidden] { display: none; }
+.au-pw { position: relative; display: block; }
+.au-pw .form-control-dark { padding-right: 48px; }
+.au-eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: none; border-radius: 10px; background: transparent; color: #9CA3AF; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; transition: color .2s ease, background-color .2s ease; }
+.au-eye:hover, .au-eye:focus-visible { color: #62368B; background: #F3EAFF; }
+.au-eye.is-on { color: #62368B; }
+
+/* หน้าต่างส่งออก */
+.au-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.au-chip { position: relative; cursor: pointer; }
+.au-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.au-chip span { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid #E5E7EB; font-size: .85rem; font-weight: 700; color: #6B7280; background: #fff;
+                transition: background-color .2s ease, color .2s ease, border-color .2s ease, transform .25s cubic-bezier(.34,1.56,.64,1); }
+.au-chip:hover span { transform: translateY(-1px); border-color: #C4A5E8; }
+.au-chip input:checked + span { background: #62368B; border-color: #62368B; color: #fff; }
+.au-chip input:checked + span::before { content: '✓'; }
+.au-chip input:focus-visible + span { outline: 2px solid #C4A5E8; outline-offset: 2px; }
+
+/* ตาราง → การ์ด เมื่อพื้นที่เนื้อหาแคบ */
+/* เมนูข้างกว้างคงที่ 390px → จอ 1280 เหลือพื้นที่เนื้อหา ~810px, 1366 ~900px, 1536 ~1070px (เดิมตัดที่ 860/1100 → โน้ตบุ๊กทั่วไปได้ layout มือถือ) */
+@container (max-width: 760px) {
+    .au-tools, .oe-search.au-search { width: 100%; }
+    .au-tools .dd-component { width: 100% !important; }
+    .au-table, .au-table tbody { display: block; }
+    .au-table thead { display: none; }
+    /* การ์ด: ชื่อ + ปุ่มจัดการแถวบน · อีเมล / หน่วยงาน / สิทธิ์ เรียงกันแถวล่าง */
+    .au-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 10px 14px; background: #FAFAFB; border-radius: 16px; padding: 14px; margin-bottom: 10px; }
+    .au-row td, .au-row:hover td { display: block; padding: 0; background: none; border-radius: 0; box-shadow: none !important; }
+    .au-row td:first-child { grid-column: 1 / 4; }
+    .au-row td:last-child { grid-column: 4; grid-row: 1; align-self: start; }
+    .au-row td[data-label] { grid-row: 2; font-size: .85rem; }
+    .au-row td[data-label]::before { content: attr(data-label); display: block; font-size: .7rem; font-weight: 700; color: #9CA3AF; }
+    .au-row.is-hl { animation: auFlash 2.4s ease .3s backwards; }
+    .au-row.is-hl td { animation: none; }
+    .au-foot { justify-content: center; }
+}
+/* หน้าต่างอยู่นอก .oe-page (container) → ใช้ความกว้างจอ */
+@container (max-width: 560px) {
+    .au-row { grid-template-columns: 1fr auto; }
+    .au-row td:first-child { grid-column: 1; }
+    .au-row td:last-child { grid-column: 2; }
+    .au-row td[data-label] { grid-row: auto; grid-column: 1 / -1; }
+}
+/* จอเตี้ย (1366×768 / 1920×1080 ขยาย 125%): หน้าต่างกว้างขึ้น + การ์ดสิทธิ์เป็นแนวนอน → ทั้งหน้าต่างพอดีจอ ไม่ต้องเลื่อน */
+@media (max-height: 820px) and (min-width: 601px) {
+    .modal-box.au-modal { max-width: 720px; }
+    .au-role { flex-direction: row; justify-content: center; gap: 8px; padding: 8px 10px; }
+    .au-role-ic { width: 30px; height: 30px; border-radius: 10px; }
+}
+@media (max-width: 600px) {
+    .au-roles { grid-template-columns: 1fr; }
+    .au-role { flex-direction: row; text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .au-in, .au-row.is-hl, .au-row.is-hl td, .au-err, .au-new-affil { animation: none; }
+    .au-kpi::after, .au-avatar, .au-role, .au-role-ic, .au-chip span, .au-eye { transition: none; }
+    .au-row:hover .au-avatar, .au-role:hover, .au-role:has(input:checked) .au-role-ic, .au-chip:hover span { transform: none; }
+}

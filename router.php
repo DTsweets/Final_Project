@@ -9,9 +9,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// ถ้ายังไม่ได้ล็อกอินหรือ session หาย ให้เตะไปหน้า landing (หน้าโชว์ 3D Model)
+// ถ้ายังไม่ได้ล็อกอินหรือ session หาย ให้ไปหน้า login ตรง ๆ
+// (ถอดหน้า landing 3D ออกจากทางเข้าแล้ว — ไฟล์ landing.php ยังเก็บไว้ เปิดใช้ใหม่ได้โดยเปลี่ยนกลับเป็น 'landing.php')
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
-    header('Location: landing.php');
+    header('Location: login.php');
     exit;
 }
 

@@ -1,0 +1,174 @@
+/* ==========================================================================
+   หน้า แบบสอบถาม & กิจกรรม (includes/collect_page.php — admin / officer)
+   ต่อยอดจาก officer-entry.css (ปุ่ม, แถบบันทึก, ตารางกรอก, แอนิเมชันลอยขึ้น)
+   ไฟล์ <link>: SPA ของเมนูด้านข้างฉีด stylesheet จาก <link> ของหน้าใหม่ให้เอง
+   ========================================================================== */
+
+.co-year-label { font-size: .85rem; font-weight: 700; color: #6B7280; }
+
+/* ── การ์ดสรุป 3 ใบ ── */
+.co-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.co-kpi { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid #EDE7F3; border-radius: 18px; padding: 18px 20px; min-width: 0;
+          --k: #62368B; --k-soft: #F3EAFF;
+          transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.co-kpi:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(42,34,51,.08); border-color: #D8B4E2; }
+.co-kpi-green { --k: #16A34A; --k-soft: #DCFCE7; }
+.co-kpi-green:hover { border-color: #86EFAC; }
+.co-kpi-ic { flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: var(--k); background: var(--k-soft);
+             transition: transform .35s cubic-bezier(.34,1.56,.64,1); }
+.co-kpi:hover .co-kpi-ic { transform: rotate(-8deg) scale(1.08); }
+.co-kpi > div { min-width: 0; }
+.co-kpi-label { display: block; font-size: .8rem; font-weight: 700; color: #6B7280; }
+.co-kpi-val { display: block; font-size: 1.5rem; font-weight: 800; color: var(--k); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.co-kpi-val small { font-size: .8rem; font-weight: 600; color: #6B7280; }
+.co-kpi-sub { display: block; font-size: .75rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── แท็บ: แถบม่วงเลื่อนตามแท็บที่เลือก ── */
+.co-tabs { position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; background: #EFEAF5; border-radius: 999px; padding: 4px; margin: 1.5rem 0 1rem; }
+.co-tab-ind { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 999px; background: #62368B;
+              box-shadow: 0 6px 14px rgba(98,54,139,.28); transition: transform .45s cubic-bezier(.34,1.56,.64,1); }
+.co-tabs[data-tab="event"] .co-tab-ind { transform: translateX(100%); }
+.co-tab { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 24px; border-radius: 999px;
+          font-weight: 700; font-size: .95rem; color: #5B5168; text-decoration: none; white-space: nowrap; transition: color .3s ease; }
+.co-tab:not(.is-on):hover { color: #62368B; }
+.co-tab.is-on { color: #fff; }
+.co-tab:focus-visible { outline: 2px solid #C4A5E8; outline-offset: 2px; }
+.co-tab-n { font-size: .72rem; font-weight: 800; padding: 1px 8px; border-radius: 999px; background: rgba(98,54,139,.12); color: #62368B; transition: background-color .3s ease, color .3s ease; }
+.co-tab.is-on .co-tab-n { background: rgba(255,255,255,.22); color: #fff; }
+
+/* ── รายชื่อ (การ์ด) ── */
+.co-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.co-h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.1rem; font-weight: 800; color: #2A2233; }
+.co-count { font-size: .78rem; font-weight: 800; color: #62368B; background: #F3EAFF; padding: 2px 10px; border-radius: 999px; }
+.co-empty { padding: 2.25rem 1.25rem; }
+.co-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; }
+.co-card { position: relative; display: flex; flex-direction: column; min-width: 0; background: #fff; border: 1.5px solid #EDE7F3; border-radius: 18px;
+           transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease, background-color .25s ease; }
+.co-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(42,34,51,.09); border-color: #D8B4E2; }
+.co-card.is-selected { border-color: #62368B; background: linear-gradient(180deg, #FAF6FE, #fff 70%); box-shadow: 0 0 0 4px rgba(98,54,139,.12), 0 14px 30px rgba(98,54,139,.12); }
+.co-card-main { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 18px 18px 12px; color: inherit; text-decoration: none; border-radius: 18px 18px 0 0; }
+.co-card-main:focus-visible { outline: 2px solid #C4A5E8; outline-offset: -2px; }
+.co-card-kicker { font-size: .75rem; font-weight: 600; color: #6B7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.co-card-name { font-size: 1.02rem; font-weight: 800; color: #1F2937; line-height: 1.4; overflow-wrap: anywhere;
+                display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.co-card-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; }
+.co-card-stats > span { display: flex; flex-direction: column; line-height: 1.25; }
+.co-card-stats small { font-size: .7rem; font-weight: 700; color: #9CA3AF; }
+.co-card-stats b { font-size: .98rem; color: #2A2233; white-space: nowrap; }
+.co-page b.is-purple { color: #62368B; }
+.co-page b.is-green { color: #16A34A; }
+.co-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px 12px 18px; border-top: 1px dashed #EEE8F4; }
+.co-card-go { display: inline-flex; align-items: center; gap: 4px; font-size: .85rem; font-weight: 700; color: #62368B; text-decoration: none; white-space: nowrap; }
+.co-card:hover .co-card-go .oe-arrow { transform: translateX(4px); }
+.co-card.is-selected .co-card-go { color: #6B7280; }
+.co-card-tools { display: flex; align-items: center; gap: 6px; }
+.co-card-tools form { display: inline-flex; margin: 0; }
+.co-card-tools .oe-icon-btn, .co-tools-cell .oe-icon-btn { width: 32px; height: 32px; }
+
+/* ── รายละเอียด (ตารางกรอก) ── */
+.co-detail { position: relative; margin-top: 22px; background: #fff; border: 1px solid #E9D5FF; border-radius: 22px; padding: 26px 24px 20px;
+             box-shadow: 0 10px 30px rgba(98,54,139,.07); scroll-margin-top: 16px; }
+.co-detail::before { content: ''; position: absolute; top: 0; left: 24px; right: 24px; height: 4px; border-radius: 0 0 6px 6px; background: linear-gradient(90deg, #A78BFA, #62368B);
+                     transform-origin: left center; animation: oeGrow .8s cubic-bezier(.22,1,.36,1) .15s backwards; }
+.co-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.co-detail-title { min-width: 0; flex: 1 1 280px; }
+.co-detail-title h2 { margin: 4px 0 0; font-size: 1.35rem; font-weight: 800; color: #1F2937; overflow-wrap: anywhere; }
+.co-eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 800; color: #62368B; background: #F3EAFF; padding: 3px 10px; border-radius: 999px; }
+.co-btn-green { background: #DCFCE7; color: #166534; }
+.co-btn-green:hover, .co-btn-green:focus-visible { background: #16A34A; color: #fff; box-shadow: 0 10px 22px rgba(22,163,74,.28); }
+
+.co-sec { --sc: #62368B; --sc-soft: #F7F2FC; margin-top: 18px; }
+.co-sec + .co-sec { margin-top: 30px; padding-top: 22px; border-top: 1px dashed #EEE8F4; }
+.co-sec-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font-size: 1rem; font-weight: 800; color: #2A2233; }
+.co-sec-title::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--sc); box-shadow: 0 0 0 4px var(--sc-soft); }
+.co-sec-title small { font-size: .78rem; font-weight: 600; color: #6B7280; }
+.co-sec-green { --sc: #16A34A; --sc-soft: #F0FDF4; }
+.co-sec-green .total-pill, .co-sec-green .oe-dock b.is-purple { color: #16A34A; }
+.co-sec-green .oe-dock { border-color: #BBF7D0; }
+.co-row-sub { display: block; margin-top: 2px; font-size: .74rem; font-weight: 600; color: #9CA3AF; }
+.co-tools-cell { white-space: nowrap; }
+.co-tools-cell .oe-icon-btn { margin: 0 2px; }
+.co-sec .oe-dock { bottom: 12px; }
+
+/* ── หน้าต่าง ── */
+/* กล่องสูงตามเนื้อหา ไม่เลื่อนในกล่อง (เดิม max-height 92vh + overflow auto → แถบเลื่อนยื่นนอกขอบโค้ง, ซ้อนกับแถบเลื่อนในรายการ,
+   ปุ่มท้ายตกขอบจอ และเมนู dropdown ในฟอร์มถูกตัด) · จอเตี้ยกว่ากล่อง → เลื่อนทั้งฉากหลังแทน (แถบเลื่อนเดียวที่ขอบจอ) */
+.co-modal { max-width: 520px; padding: 2.5rem; margin: auto; }
+.modal-overlay:has(> .co-modal) { overflow-y: auto; padding: 16px; overscroll-behavior: contain; }
+.co-modal-wide { max-width: 620px; }
+.co-modal .modal-title { font-size: 1.5rem; margin-bottom: 1.75rem; gap: .75rem; }
+.co-modal .form-group-dark { margin-bottom: 1.25rem; }
+.co-modal .form-group-dark[hidden] { display: none; }
+.co-modal .form-control-dark { height: 52px; border-radius: 14px; }
+.co-modal .modal-footer { margin-top: 1.25rem; padding-top: 1.5rem; }
+.co-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.co-span2 { grid-column: 1 / -1; }
+.co-modal-msg { color: #DC2626; font-size: .85rem; font-weight: 700; margin: 0 0 .5rem; }
+.co-modal-msg:empty { display: none; }
+.co-modal .oe-note { margin-bottom: .75rem; }
+
+/* ── หน้า GHG Removal (includes/removal_page.php) ── */
+.rm-panel { margin-top: 1.5rem; }   /* เว้นจากการ์ดสรุป (หน้านี้ไม่มีแถบแท็บคั่นเหมือนหน้าแบบสอบถาม & กิจกรรม) */
+.rm-kpi-total { --k: #0F766E; --k-soft: #CCFBF1; }
+.rm-kpi-total:hover { border-color: #5EEAD4; }
+a.rm-kpi-link { display: inline-flex; align-items: center; gap: 4px; color: #16A34A; font-weight: 700; text-decoration: none; }
+a.rm-kpi-link:hover { color: #166534; }
+a.rm-kpi-link:hover .oe-arrow { transform: translateX(4px); }
+.rm-share { display: flex; align-items: center; gap: 8px; margin-top: 8px; max-width: 320px; }
+.rm-share-track { flex: 1; height: 6px; border-radius: 999px; background: #E7F5EC; overflow: hidden; }
+.rm-share-bar { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4ADE80, #16A34A); transform-origin: left center;
+                transition: width .35s ease; animation: oeGrow .9s cubic-bezier(.22,1,.36,1) backwards; animation-delay: calc(.25s + var(--i, 0) * 60ms); }
+.rm-share-pct { flex-shrink: 0; min-width: 42px; text-align: right; font-size: .72rem; font-weight: 800; color: #16A34A; }
+
+/* จอเตี้ย (โน้ตบุ๊ก 1366×768, จอ 1920×1080 ที่ขยาย 125%) — ลดระยะห่างให้กล่องส่วนใหญ่พอดีจอโดยไม่ต้องเลื่อน */
+@media (max-height: 820px) {
+    .co-modal { padding: 1.75rem 2rem; border-radius: 28px; }
+    .co-modal .modal-title { font-size: 1.3rem; margin-bottom: 1rem; }
+    .co-modal .form-group-dark { margin-bottom: .8rem; }
+    .co-modal .form-label-dark { margin-bottom: .45rem; font-size: .92rem; }
+    .co-modal .form-control-dark { height: 46px; }
+    .co-modal .modal-footer { margin-top: .75rem; padding-top: 1rem; }
+    .co-modal .btn-primary, .co-modal .btn-secondary { padding-top: 11px; padding-bottom: 11px; }
+}
+@media (max-height: 680px) {
+    .co-modal { padding: 1.25rem 1.75rem; }
+    .co-modal .modal-title { margin-bottom: .75rem; }
+    .co-modal .form-group-dark { margin-bottom: .65rem; }
+}
+
+@media (max-width: 600px) {
+    .co-modal { padding: 1.75rem 1.25rem; border-radius: 28px; }
+    .co-modal .modal-title { font-size: 1.25rem; }
+    .co-form-grid { grid-template-columns: 1fr; }
+    .co-modal .modal-footer { flex-direction: column-reverse; }
+    .co-modal .modal-footer button { width: 100%; }
+}
+
+/* พื้นที่เนื้อหาแคบ (มีเมนูด้านข้าง / แท็บเล็ต / มือถือ) — ตารางเปลี่ยนเป็นการ์ดตาม officer-entry.css */
+/* เมนูข้างกว้างคงที่ 390px → จอ 1280 เหลือพื้นที่เนื้อหา ~810px, 1366 ~900px, 1536 ~1070px (เดิมตัดที่ 860/1100 → โน้ตบุ๊กทั่วไปได้ layout มือถือ) */
+@container (max-width: 600px) {
+    .co-kpis { grid-template-columns: 1fr; gap: 10px; }
+}
+@container (max-width: 860px) {
+    .co-kpi { padding: 14px 16px; }
+    .co-tabs { display: grid; width: 100%; box-sizing: border-box; }
+    .co-detail { padding: 22px 14px 16px; }
+    .co-detail-head .oe-actions { width: 100%; }
+    .co-detail-head .oe-actions .oe-btn { flex: 1 1 auto; }
+}
+@container (max-width: 760px) {
+    .oe-table .item-row td.co-tools-cell { grid-column: 1 / -1; text-align: right; }
+}
+/* การ์ดสรุป 3 ใบในพื้นที่แคบ (จอ 1024 เหลือ ~650–710px) — ตัวเลข "30.976 tCO₂e" เคยถูกตัด 5px → ไอคอน/ตัวเลขเล็กลงเฉพาะช่วงนี้ (≤ 600px เป็นแถวเดียว ขนาดเดิม) */
+@container (min-width: 601px) and (max-width: 760px) {
+    .co-kpi { gap: 10px; }
+    .co-kpi-ic { width: 40px; height: 40px; }
+    .co-kpi-val { font-size: 1.3rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .co-detail::before, .rm-share-bar { animation: none; }
+    .rm-share-bar { transition: none; }
+    .co-kpi, .co-kpi-ic, .co-card, .co-tab, .co-tab-ind, .co-tab-n { transition: none; }
+    .co-kpi:hover, .co-kpi:hover .co-kpi-ic, .co-card:hover, .co-card:hover .co-card-go .oe-arrow { transform: none; }
+}

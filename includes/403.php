@@ -39,8 +39,8 @@ http_response_code(403);
 <div class="login-wrapper">
     <div class="login-card error-card">
         <div class="error-code">403</div>
-        <h1 class="error-title">ไม่มีสิทธิ์เข้าถึง</h1>
-        <p class="error-desc">คุณไม่มีสิทธิ์เข้าถึงหน้านี้<br>กรุณาติดต่อผู้ดูแลระบบ</p>
+        <h1 class="error-title"><?= htmlspecialchars($forbidden_title ?? 'ไม่มีสิทธิ์เข้าถึง') ?></h1>
+        <p class="error-desc"><?= isset($forbidden_desc) ? htmlspecialchars($forbidden_desc) : 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้<br>กรุณาติดต่อผู้ดูแลระบบ' ?></p>
         <a href="javascript:history.back()" class="btn-back">
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
                 <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/>

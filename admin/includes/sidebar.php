@@ -150,7 +150,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
         <!-- Category: ตั้งค่า -->
         <div class="nav-category">ตั้งค่า</div>
         <a href="<?= $root ?? '../' ?>admin/settings.php"
-            class="nav-item <?= ($current_page == 'settings.php' || $current_page == 'users.php') ? 'active' : '' ?>">
+            class="nav-item <?= $current_page == 'settings.php' ? 'active' : '' ?>">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <circle cx="12" cy="12" r="3"></circle>

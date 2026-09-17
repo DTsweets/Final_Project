@@ -4,13 +4,13 @@
     {
       "name": "upnetzero",
       "runtimeExecutable": "C:\\xampp\\php\\php.exe",
-      "runtimeArgs": ["-S", "localhost:8000"],
+      "runtimeArgs": ["-S", "localhost:8000", "server.php"],
       "port": 8000
     },
     {
       "name": "upnetzero-preview",
       "runtimeExecutable": "C:\\xampp\\php\\php.exe",
-      "runtimeArgs": ["-S", "localhost:8010"],
+      "runtimeArgs": ["-S", "localhost:8010", "server.php"],
       "port": 8010,
       "autoPort": false
     }
