@@ -148,25 +148,30 @@ ck('E3b ย้ายไปปีที่ Admin ยังไม่กำหน�
     catch (Exception $e) { return str_contains($e->getMessage(), 'ยังไม่มีรายการ') && $snap() == $s && officer_year_move_check($pdo, $aff, $year, $empty) !== null; }
 }));
 
-ck('E3c รายการที่กรอกค่า หรือแนบหลักฐาน แต่ปีใหม่ไม่มีคู่ → ไม่ให้ย้าย (ข้อมูลไม่หายเงียบ) · ถ้าว่างจริง → ย้ายได้ และแถวว่างนั้นถูกลบ', in_tx($pdo, function () use ($pdo, $aff, $year, $other, $beforeOther, $snap) {
-    if ($beforeOther['officer'] > 0) officer_delete_year($pdo, $aff, $other);
+ck('E3c รายการที่กรอกค่า หรือแนบหลักฐาน แต่ปีใหม่ไม่มีคู่ → ไม่ให้ย้าย (ข้อมูลไม่หายเงียบ) · ถ้าว่างจริง → ย้ายได้ และแถวว่างนั้นถูกลบ', in_tx($pdo, function () use ($pdo, $aff, $year) {
+    // ปีปลายทางสร้างใหม่เฉพาะเทสต์นี้ (rollback ทิ้งท้าย in_tx) — คุมได้ว่ามีรายการคู่ครบ "ยกเว้น" ตัวที่ทดสอบ
+    // เดิมใช้ $other ซึ่งเป็นปีจริงที่มีแม่บทครบอยู่แล้ว รายการที่ตั้งใจให้ "ไม่มีคู่" จึงมีคู่ → เคสนี้ทดสอบไม่ได้จริง
+    $pdo->exec('INSERT INTO admin_year (year) VALUES (2698)');
+    $to  = (int) $pdo->lastInsertId();
     $row = $pdo->query("SELECT ui.id, ui.admin_item_id, ai.name_tiem FROM user_item ui JOIN admin_item ai ON ai.id = ui.admin_item_id
         WHERE ui.affiliation_id = $aff AND ui.year_id = $year AND ui.source = 'officer' AND ui.Vol > 0
           AND NOT EXISTS (SELECT 1 FROM evidence ev WHERE ev.entity_type = 'user_item' AND ev.entity_id = ui.id) ORDER BY ui.id LIMIT 1")->fetch();
-    pair_items($pdo, $year, $other, [(int) $row['admin_item_id']]);
-    $s = $snap();
-    try { officer_move_year($pdo, $aff, $year, $other); return false; }                       // กรอกค่าไว้
-    catch (Exception $e) { if (!str_contains($e->getMessage(), $row['name_tiem']) || $snap() != $s) return false; }
+    if (!$row) return false;
+    pair_items($pdo, $year, $to, [(int) $row['admin_item_id']]);
+    $snapTo = fn() => $pdo->query("SELECT id, year_id, admin_item_id, Vol FROM user_item WHERE affiliation_id = $aff AND source = 'officer' AND year_id IN ($year, $to) ORDER BY id")->fetchAll();
+    $s = $snapTo();
+    try { officer_move_year($pdo, $aff, $year, $to); return false; }                       // กรอกค่าไว้
+    catch (Exception $e) { if (!str_contains($e->getMessage(), $row['name_tiem']) || $snapTo() != $s) return false; }
     $pdo->exec("UPDATE user_item SET Vol = 0 WHERE id = {$row['id']}");
     $pdo->exec("INSERT INTO evidence (entity_type, entity_id, kind, url, label) VALUES ('user_item', {$row['id']}, 'link', 'https://example.com', 't')");
-    $s = $snap();
-    try { officer_move_year($pdo, $aff, $year, $other); return false; }                       // ว่างแต่มีหลักฐาน
-    catch (Exception $e) { if ($snap() != $s) return false; }
+    $s = $snapTo();
+    try { officer_move_year($pdo, $aff, $year, $to); return false; }                       // ว่างแต่มีหลักฐาน
+    catch (Exception $e) { if ($snapTo() != $s) return false; }
     $pdo->exec("DELETE FROM evidence WHERE entity_type = 'user_item' AND entity_id = {$row['id']} AND url = 'https://example.com'");
     $n = count($s);
-    officer_move_year($pdo, $aff, $year, $other);                                                   // ว่างจริง → ย้ายได้
+    officer_move_year($pdo, $aff, $year, $to);                                             // ว่างจริง → ย้ายได้
     return (int) $pdo->query("SELECT COUNT(*) FROM user_item WHERE id = {$row['id']}")->fetchColumn() === 0
-        && src_counts($pdo, $aff, $other)['officer'] === $n - 1;
+        && src_counts($pdo, $aff, $to)['officer'] === $n - 1;
 }));
 
 ck('E4 สลับปี: ยอดสองปีสลับกันจริง ตรงกันทุกจุดที่แสดง · id แถวเดิม · ไม่มีแถวที่ปีไม่ตรงรายการ · กิจกรรม/แบบสอบถามไม่ขยับ',
@@ -318,7 +323,8 @@ ck('P1e หน้าต่างชุดเดียวกับ admin: co-moda
 
 $h2 = $render('data_entry.php', "year=$year");
 ck('P2 ② data_entry.php เรนเดอร์ได้ แถบขั้นตอนขั้น 2 (ขั้น 1 เป็นลิงก์)', $noErr($h2)
-    && strpos($h2, '<a class="oe-step is-done" href="items.php">') !== false && strpos($h2, 'aria-current="step"><span class="oe-step-no">2</span>') !== false, substr($h2, 0, 300));
+    && strpos($h2, '<a class="oe-step is-done" href="items.php?year=' . $year . '">') !== false   // ขั้น ① พาปีที่กำลังกรอกกลับไปด้วย
+    && strpos($h2, 'aria-current="step"><span class="oe-step-no">2</span>') !== false, substr($h2, 0, 300));
 ck('P2b การ์ดหมวดเป็น <label> ครอบ checkbox (คลิกครั้งเดียวติ๊ก) ไม่มี onclick ของแถว', (function () use ($h2, $stats) {
     $n = preg_match_all('#<label class="oe-group[^"]*" data-scope="\d"[^>]*>\s*<input type="checkbox" name="scope_groups\[\]"#', $h2);
     return $n === count($stats) && strpos($h2, "cb.checked = !cb.checked") === false;

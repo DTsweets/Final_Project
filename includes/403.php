@@ -33,6 +33,7 @@ http_response_code(403);
         }
         .btn-back:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(79,70,229,0.4); }
     </style>
+    <script src="<?= str_repeat('../', substr_count($_SERVER['PHP_SELF'], '/') - 2) ?>assets/js/app-zoom.js"></script>
 </head>
 <body>
 <div class="bg-canvas"></div>

@@ -1,7 +1,7 @@
 <?php
 /**
  * เนื้อ Dashboard ของคณะ — ใช้ร่วมกัน dean/index.php และ officer/index.php (หน้าตาชุดเดียวกัน ตัวเลขชุดเดียวกัน)
- * การ์ดหลัก ปล่อย / ดูดกลับ / Net → ขอบเขต 1/2/3 (+ ความครบถ้วน) → แถบกิจกรรมที่คณะจัด → อันดับรายคณะ + ภาพรวมทุกปี
+ * การ์ดหลัก ปล่อย / ดูดกลับ / Net → ขอบเขต 1/2/3 (+ ความครบถ้วน) → แถบแบบสอบถาม / กิจกรรมที่คณะจัด → อันดับรายคณะ + ภาพรวมทุกปี
  * ตัวแปรที่หน้าที่ include ต้องมี: $o (dean_dash_overview), $sum, $years, $year_label, $affil_id, $affil_name, $scope_meta, $arrow, $h, $n2, $pct
  */
 ?>
@@ -68,17 +68,35 @@
                 <?php endforeach; ?>
             </div>
 
-            <?php if ($o['event_count'] > 0): ?>
-            <!-- ── กิจกรรมที่คณะจัด: แถบเดียว (กิจกรรมเยอะแค่ไหนก็สูงเท่าเดิม · รายชื่องานดูในหน้าต่าง) ── -->
-            <div class="ad-evbar oe-rise" style="--i:7;">
-                <span class="ad-evbar-ic"><?= ic('note', 20) ?></span>
-                <div class="ad-evbar-text">
-                    <b>กิจกรรมที่คณะจัด <span class="ad-evbar-count"><?= $o['event_count'] ?></span> งาน · <span class="ad-evbar-total" data-count="<?= number_format($sum['event_total'], 4, '.', '') ?>" data-digits="4"><?= number_format($sum['event_total'], 4) ?></span> tCO₂e</b>
-                    <small>นับรวมในยอดปล่อยทั้งหมดด้านบนแล้ว</small>
+            <!-- ── แบบสอบถาม / กิจกรรมที่คณะจัด: แถบบรรทัดเดียว (ข้อมูลเยอะแค่ไหนก็สูงเท่าเดิม · รายชื่อดูในหน้าต่าง) ──
+                 แบบสอบถามแสดงเสมอ แม้ยังไม่มีชุดใด เพื่อให้เห็นว่าคณะกรอกช่องทางนี้ได้ · กิจกรรมแสดงเมื่อคณะมีกิจกรรมในปีนั้น -->
+            <div class="ad-srcbars<?= $o['event_count'] > 0 ? '' : ' is-one' ?>">
+                <div class="ad-evbar is-survey oe-rise" style="--i:7;">
+                    <span class="ad-evbar-ic"><?= ic('survey', 20) ?></span>
+                    <div class="ad-evbar-text">
+                        <?php if ($o['survey_count'] > 0): ?>
+                        <b>แบบสอบถามของคณะ <span class="ad-src-count"><?= $o['survey_count'] ?></span> ชุด · <span class="ad-src-total" data-count="<?= number_format($sum['survey_total'], 4, '.', '') ?>" data-digits="4"><?= number_format($sum['survey_total'], 4) ?></span> tCO₂e</b>
+                        <small>การเดินทางของบุคลากร/นิสิต · นับรวมในขอบเขต 3 แล้ว</small>
+                        <?php else: ?>
+                        <b>แบบสอบถามของคณะ <span class="ad-src-count">0</span> ชุด</b>
+                        <small>ยังไม่มีแบบสอบถามในปีนี้ — กรอกได้ที่เมนู เก็บข้อมูลกิจกรรม/แบบสอบถาม</small>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ($o['survey_count'] > 0): ?>
+                    <button type="button" class="ad-evbar-btn" data-ad-open="surveys">ดูรายละเอียดแบบสอบถาม <?= $arrow ?></button>
+                    <?php endif; ?>
                 </div>
-                <button type="button" class="ad-evbar-btn" data-ad-open="events">ดูรายละเอียดกิจกรรม <?= $arrow ?></button>
+                <?php if ($o['event_count'] > 0): ?>
+                <div class="ad-evbar oe-rise" style="--i:8;">
+                    <span class="ad-evbar-ic"><?= ic('note', 20) ?></span>
+                    <div class="ad-evbar-text">
+                        <b>กิจกรรมที่คณะจัด <span class="ad-evbar-count"><?= $o['event_count'] ?></span> งาน · <span class="ad-evbar-total" data-count="<?= number_format($sum['event_total'], 4, '.', '') ?>" data-digits="4"><?= number_format($sum['event_total'], 4) ?></span> tCO₂e</b>
+                        <small>นับรวมในยอดปล่อยทั้งหมดด้านบนแล้ว</small>
+                    </div>
+                    <button type="button" class="ad-evbar-btn" data-ad-open="events">ดูรายละเอียดกิจกรรม <?= $arrow ?></button>
+                </div>
+                <?php endif; ?>
             </div>
-            <?php endif; ?>
 
             <div class="ad-grid is-even">
                 <!-- ── อันดับรายคณะ/หน่วยงาน: อันดับของคณะ (ตัวใหญ่) + แถบตำแหน่ง + 3 อันดับแรก — อันดับทั้งหมดเปิดในหน้าต่าง ── -->

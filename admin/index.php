@@ -21,10 +21,8 @@ $root = '../';
 $page_title = 'Dashboard';
 
 $years = ghg_years($pdo);
-$selected_year = isset($_GET['year']) ? (int) $_GET['year'] : (int) ($years[0]['year_id'] ?? 0);
-$year_label = '';
-foreach ($years as $y) if ((int) $y['year_id'] === $selected_year) $year_label = (string) $y['year'];
-if ($year_label === '' && $years) { $selected_year = (int) $years[0]['year_id']; $year_label = (string) $years[0]['year']; }
+$selected_year = ghg_pick_year($years, $_GET['year'] ?? null, $_SESSION);   // จำปีที่เลือกไว้ข้ามหน้า
+$year_label = ghg_year_label($years, $selected_year);
 
 $o   = $years ? admin_dash_overview($pdo, $years, $selected_year) : null;
 $sum = $o['summary'] ?? null;
@@ -61,6 +59,7 @@ $ad_data = $o ? [
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin-dashboard.css<?= asset_v('assets/css/admin-dashboard.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 
 <body>
@@ -92,7 +91,7 @@ $ad_data = $o ? [
             <div class="oe-empty oe-rise">
                 <h3>ยังไม่มีปีงบประมาณในระบบ</h3>
                 <p>เริ่มจากเพิ่มปีงบประมาณและรายการ Emission Factor ที่หน้ากรอกข้อมูล</p>
-                <a class="oe-btn" href="items.php">ไปหน้ากรอกข้อมูล <?= $arrow ?></a>
+                <a class="oe-btn" href="<?= ghg_year_url('items.php', $selected_year) ?>">ไปหน้ากรอกข้อมูล <?= $arrow ?></a>
             </div>
             <?php else: ?>
 

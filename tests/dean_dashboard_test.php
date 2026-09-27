@@ -171,7 +171,54 @@ ck('R1g แถบกิจกรรม: animation (เข้า + ไอคอ�
         && preg_match('/\.ad-evbar:hover \.ad-evbar-ic \{[^}]*rotate\(/', $css)
         && strpos($r, '.ad-evbar-btn,') !== false && strpos($r, '.ad-evbar-btn:hover,') !== false && strpos($r, '.ad-evbar:hover .ad-evbar-ic') !== false
         && preg_match('/@container \(max-width: 520px\) \{[^@]*\.ad-evbar \{ flex-wrap: wrap; \}\s*\.ad-evbar-btn \{ width: 100%;/', $css)
-        && $noEv > 0 && strpos($h2, 'id="adData"') !== false && strpos($h2, 'class="ad-evbar') === false;
+        && $noEv > 0 && strpos($h2, 'id="adData"') !== false
+        && strpos($h2, 'class="ad-evbar oe-rise"') === false          // ไม่มีกิจกรรม → ไม่มีแถบกิจกรรม
+        && strpos($h2, 'class="ad-srcbars is-one"') !== false;        // เหลือแถบแบบสอบถามแถบเดียว เต็มแถว
+})());
+ck('R1g2 แถบแบบสอบถาม: จำนวนชุด + ยอดตรงการ์ด + ปุ่มเปิดหน้าต่าง · ข้อมูลกลุ่มฝังในหน้าและรวมได้เท่า survey_total', (function () use ($pdo, $year, $years, $render, $near) {
+    // คณะที่มีแบบสอบถามในปีล่าสุด (ถ้าไม่มีเลย ถือว่าไม่ผ่าน — ต้องมีข้อมูลให้ตรวจ)
+    $a = (int) $pdo->query("SELECT q.affiliation_id FROM questionnaire q
+        JOIN questionnaire_item qi ON qi.questionnaire_id = q.id
+        JOIN survey_summary ss ON ss.questionnaire_item_id = qi.id AND ss.affiliation_id = q.affiliation_id
+        WHERE q.year_id = $year AND ss.year_id = $year LIMIT 1")->fetchColumn();
+    if ($a <= 0) return false;
+    $x = dean_dash_overview($pdo, $years, $year, $a);
+    $html = $render($a, (string) $year);
+    $data = preg_match('#<script type="application/json" id="adData">(.*?)</script>#s', $html, $m) ? json_decode($m[1], true) : null;
+    $groups = $x['survey_groups'];
+    return $x['survey_count'] === count($groups) && $x['survey_count'] > 0
+        && $near(array_sum(array_column($groups, 'total')), $x['summary']['survey_total'])
+        && preg_match('#class="ad-evbar is-survey oe-rise"#', $html)
+        && preg_match('#class="ad-src-count">(\d+)<#', $html, $c) && (int) $c[1] === $x['survey_count']
+        && preg_match('#class="ad-src-total"[^>]*>([0-9,.]+)<#', $html, $t) && $t[1] === number_format($x['summary']['survey_total'], 4)
+        && preg_match('#<button type="button" class="ad-evbar-btn" data-ad-open="surveys">ดูรายละเอียดแบบสอบถาม#u', $html)
+        && is_array($data) && $data['surveyGroups'] == $groups && $near($data['surveyTotal'], $x['summary']['survey_total'])
+        && strpos($html, 'data-ad-source') === false;   // คณะต้องไม่เรียก API ของ admin (ซึ่งดึงทุกคณะ)
+})());
+ck('R1g3 แบบสอบถามที่คณะเห็น = ชุดของคณะตัวเองเท่านั้น · คณะที่ยังไม่มีแบบสอบถาม เห็นแถบสถานะว่างและไม่มีปุ่ม', (function () use ($pdo, $year, $years, $render) {
+    $rows = $pdo->query("SELECT q.affiliation_id aff, q.id FROM questionnaire q WHERE q.year_id = $year")->fetchAll(PDO::FETCH_KEY_PAIR | PDO::FETCH_GROUP);
+    foreach (array_keys($rows) as $a) {
+        $ids = array_column($pdo->query("SELECT id FROM questionnaire WHERE year_id = $year AND affiliation_id = $a")->fetchAll(), 'id');
+        $got = array_column(dean_dash_survey_groups($pdo, (int) $a, $year), 'id');
+        if (array_diff($got, array_map('intval', $ids))) return false;   // มีชุดของคณะอื่นปน = ไม่ผ่าน
+    }
+    $none = (int) $pdo->query("SELECT a.id FROM affiliation_id a WHERE NOT EXISTS
+        (SELECT 1 FROM questionnaire q JOIN questionnaire_item qi ON qi.questionnaire_id = q.id
+         JOIN survey_summary ss ON ss.questionnaire_item_id = qi.id AND ss.affiliation_id = q.affiliation_id
+         WHERE q.affiliation_id = a.id AND q.year_id = $year) ORDER BY a.id LIMIT 1")->fetchColumn();
+    if ($none <= 0) return false;
+    $h = $render($none, (string) $year);
+    return dean_dash_survey_groups($pdo, $none, $year) === []
+        && strpos($h, 'ยังไม่มีแบบสอบถามในปีนี้') !== false
+        && strpos($h, 'data-ad-open="surveys"') === false;
+})());
+ck('R1g4 หน้าต่างแบบสอบถามของคณะอ่านจากข้อมูลที่ฝังในหน้า (ไม่เรียก API) และผูกกับปุ่ม data-ad-open="surveys"', (function () {
+    $js = (string) file_get_contents(__DIR__ . '/../assets/js/admin-dashboard.js');
+    $fn = substr($js, (int) strpos($js, 'function surveysView()'));
+    $fn = substr($fn, 0, (int) strpos($fn, 'function surveyDetailView'));
+    return strpos($js, 'surveys: surveysView') !== false && strpos($js, 'function surveyDetailView(g)') !== false
+        && strpos($fn, 'D.surveyGroups') !== false && strpos($fn, 'getJSON') === false
+        && preg_match('/\.ad-srcbars\.is-one \{ grid-template-columns: minmax\(0, 1fr\); \}/', (string) file_get_contents(__DIR__ . '/../assets/css/admin-dashboard.css'));
 })());
 ck('R1h การ์ดอันดับ: อันดับตัวใหญ่นับขึ้น + ยอด/สัดส่วน/เทียบค่าเฉลี่ยและอันดับ 1 ตรง · จุดครบทุกหน่วยงาน จุดคณะตัวเองอยู่ตำแหน่งตามอันดับ + ป้าย · 3 อันดับแรก · ปุ่มดูทั้งหมด', (function () use ($html, $o, $n2) {
     $rank = $o['ranking']; $own = $o['own_rank']; $hero = dean_dash_rank_hero($rank, $own);

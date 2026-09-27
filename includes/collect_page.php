@@ -47,6 +47,7 @@ function ensure_questionnaire(PDO $pdo, int $year, string $group, int $affil, ?i
 }
 
 require_once __DIR__ . '/admin_g.php';
+require_once __DIR__ . '/year_state.php';   // ปีที่ผู้ใช้เลือกไว้ ใช้ต่อข้ามหน้า
 require_once __DIR__ . '/collect_entry.php';
 
 // แท็บ: แบบสอบถาม + กิจกรรม — เปิดให้ทั้ง admin และ officer (officer เห็น/แก้เฉพาะคณะตัวเอง)
@@ -58,7 +59,7 @@ $years  = $pdo->query("SELECT id AS year_id, year FROM admin_year ORDER BY year 
 // หมวดย่อยทั้งหมด (admin_g) — ใช้เป็นตัวเลือกในฟอร์มเพิ่ม/แก้ไขรายการ แทนการเดาจากเลขขอบเขต
 $all_groups = $pdo->query("SELECT id, scope, name_tiem FROM admin_g ORDER BY scope ASC, order_num ASC, id ASC")->fetchAll();
 $affils = $is_admin ? $pdo->query("SELECT id, affiliation_item FROM affiliation_id ORDER BY id")->fetchAll() : [];
-$selected_year = isset($_GET['year']) ? (int) $_GET['year'] : ($years[0]['year_id'] ?? 0);
+$selected_year = ghg_pick_year($years, $_GET['year'] ?? null, $_SESSION);   // จำปีที่เลือกไว้ข้ามหน้า
 $tab = (isset($_GET['tab']) && isset($TABS[$_GET['tab']])) ? $_GET['tab'] : array_key_first($TABS);
 $is_survey = $tab === 'survey';
 $group = trim((string)($_GET['group'] ?? ''));   // แบบสอบถามที่เลือก ('' = ยังไม่เลือก แสดงเฉพาะลิสต์)
@@ -466,6 +467,7 @@ $i = 0;   // ลำดับแอนิเมชันลอยขึ้น
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 <body style="background:#F6F4F9;">
     <?php include $SIDEBAR; ?>

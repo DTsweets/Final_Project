@@ -120,6 +120,7 @@ $svg_layers = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" strok
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 
 <body>

@@ -26,9 +26,8 @@ $is_admin   = ($_SESSION['role'] ?? '') === 'admin';
 $page_title = "รายงาน GHG";
 
 $years = ghg_years($pdo);
-$selected_year = isset($_GET['year']) ? (int)$_GET['year'] : ($years[0]['year_id'] ?? 0);
-$year_label = '';
-foreach ($years as $y) { if ($y['year_id'] == $selected_year) { $year_label = $y['year']; break; } }
+$selected_year = ghg_pick_year($years, $_GET['year'] ?? null, $_SESSION);   // จำปีที่เลือกไว้ข้ามหน้า
+$year_label = ghg_year_label($years, $selected_year);
 
 // มุมมองรายงาน — ใช้ตัวเดียวกับ export_report.php / report_print.php (กันหน้าเว็บกับไฟล์ไม่ตรงกัน)
 $view = ghg_resolve_view($_SESSION['role'] ?? '', $_GET['view'] ?? null);
@@ -123,6 +122,7 @@ $svg_pdf = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin-dashboard.css<?= asset_v('assets/css/admin-dashboard.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/reports.css<?= asset_v('assets/css/reports.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 <body>
 

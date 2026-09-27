@@ -21,8 +21,12 @@ function ck(string $name, bool $ok, string $detail = ''): void {
 $hasLib = is_file("$root/includes/blocked_paths.php");
 if ($hasLib) require_once "$root/includes/blocked_paths.php";
 
+// ไฟล์สำรองที่มีอยู่จริงตอนรัน (ชื่อเปลี่ยนไปตามวันที่ dump และไฟล์เก่าถูกลบทิ้งได้) — ไม่มีเลยก็ยังตรวจกฎด้วยชื่อสมมุติได้
+$backups = glob("$root/database/backup_*.sql") ?: [];
+$backup  = '/database/' . basename($backups ? end($backups) : 'backup_YYYYMMDD_example.sql');
+
 // ── S1 กฎกันเส้นทาง ──
-$blocked = ['/database/backup_20260918_before_password_hash.sql', '/database/upnetzero.sql', '/database/', '/DATABASE/backup.sql',
+$blocked = [$backup, '/database/upnetzero.sql', '/database/', '/DATABASE/backup.sql',
     '/database./backup.sql', '/tests/password_test.php', '/tests/', '/config/db.php', '/.env', '/.git/config', '/.gitignore',
     '/CLAUDE.md', '/README.md', '/assets/x.sql', '/database/backup.sql::$DATA', '/a/../database/backup.sql', '/%2Eenv', '/.claude/launch.json'];
 $allowed = ['/', '/login.php', '/index.php', '/router.php', '/admin/index.php', '/officer/api/manage_evidence.php?action=list',
@@ -46,11 +50,11 @@ $get = function (string $path) use ($port): array {
 if ($srv) {
     for ($i = 0; $i < 50 && $get('/login.php')[0] === 0; $i++) usleep(100000);
     $codes = [];
-    foreach (['/database/backup_20260918_before_password_hash.sql', '/database/upnetzero.sql', '/.env', '/tests/password_test.php',
+    foreach ([$backup, '/database/upnetzero.sql', '/.env', '/tests/password_test.php',
         '/CLAUDE.md', '/login.php', '/assets/css/login.css'] as $p) $codes[$p] = $get($p)[0];
-    $leak = $get('/database/backup_20260918_before_password_hash.sql')[1];
+    $leak = $get($backup)[1];
     ck('S2 เปิดผ่านเซิร์ฟเวอร์จริง: ไฟล์สำรอง/.env/tests/.md → 403 และไม่มีเนื้อไฟล์หลุด · login.php กับ css ยังได้ 200',
-        $codes['/database/backup_20260918_before_password_hash.sql'] === 403 && $codes['/database/upnetzero.sql'] === 403
+        $codes[$backup] === 403 && $codes['/database/upnetzero.sql'] === 403
         && $codes['/.env'] === 403 && $codes['/tests/password_test.php'] === 403 && $codes['/CLAUDE.md'] === 403
         && $codes['/login.php'] === 200 && $codes['/assets/css/login.css'] === 200
         && !str_contains($leak, 'INSERT INTO') && !str_contains($leak, 'DB_PASS'),

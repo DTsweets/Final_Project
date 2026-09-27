@@ -116,6 +116,7 @@
 .ad-evbar-btn:hover .oe-arrow { transform: translateX(3px); }
 /* Dashboard admin: แถบแบบสอบถาม (โทนม่วง) + กิจกรรม วางคู่กัน */
 .ad-srcbars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.ad-srcbars.is-one { grid-template-columns: minmax(0, 1fr); }   /* คณะที่ยังไม่มีกิจกรรม: แถบแบบสอบถามเต็มแถว ไม่เหลือช่องว่าง */
 .ad-srcbars .ad-evbar { margin-top: 0; }
 .ad-evbar.is-survey { background: #F5F3FF; border-color: #DDD6FE; }
 .ad-evbar.is-survey .ad-evbar-ic { background: #EDE9FE; color: #6D28D9; }

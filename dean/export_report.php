@@ -20,12 +20,10 @@ $affil_name = $_SESSION['affiliation_name'] ?? '-';
 $view = ghg_resolve_view($_SESSION['role'] ?? '', $_GET['view'] ?? null);
 $aff  = $view === 'faculty' ? $affil_id : null;
 
-// ปีที่รายงาน — ไม่ระบุ/ไม่พบ → ใช้ปีล่าสุด (เหมือน PDF)
+// ปีที่รายงาน — ไม่ระบุ → ใช้ปีที่ผู้ใช้เลือกไว้ล่าสุด (ghg_pick_year) · ไม่เคยเลือก → ปีล่าสุดในระบบ
 $years = ghg_years($pdo);
-$year  = isset($_GET['year']) ? (int)$_GET['year'] : 0;
-$year_label = '';
-foreach ($years as $y) { if ((int)$y['year_id'] === $year) { $year_label = (string)$y['year']; break; } }
-if ($year_label === '' && $years) { $year = (int)$years[0]['year_id']; $year_label = (string)$years[0]['year']; }
+$year  = ghg_pick_year($years, $_GET['year'] ?? null, $_SESSION);
+$year_label = ghg_year_label($years, $year);
 
 // ── ตัวเลข: ฟังก์ชันกลางตัวเดียวกับหน้าเว็บและ PDF ──
 $sum  = ghg_report_summary($pdo, $year, $aff);

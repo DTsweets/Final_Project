@@ -70,7 +70,7 @@ ck('A12 ghgBarLabelPlan: ปีไม่มีข้อมูล → "ไม่�
   && plan[2].mode === 'total' && plan[2].text === 'รวม 514.60' && Math.abs(plan[2].total - 514.6) < 1e-9
   && charts.ghgBarLabelPlan(null, 26, measure).length === 0, JSON.stringify(plan));
 ck('A13 หน้าต่างอันดับ (ranking) ทั้งคณบดีและ admin · admin กดแถวไปรายการของหน่วยงาน คณบดีกดได้เฉพาะคณะตัวเอง · ปุ่มสลับกราฟ · กราฟมีตัวเลขทั้งสองหน้า + แท่งโตแบบแอนิเมชัน (ปิดได้)',
-  src.includes('removal: function () { return eventsView(true); }, events: function () { return eventsView(false); }, ranking: rankingView }')
+  src.includes('removal: function () { return eventsView(true); }, events: function () { return eventsView(false); }, surveys: surveysView, ranking: rankingView }')
   && src.includes('cumulative: cumulativeView, reports: reportsView, ranking: rankingView }')
   && src.includes("link = faculty ? mine : true") && src.includes('if (faculty) { push(itemsView(0)); return; }')
   && src.includes('push(affilYearView(Number(r.affil_id), r.name, D.year, D.yearLabel))')

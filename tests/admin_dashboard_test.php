@@ -163,7 +163,7 @@ $rep = fn(string $role) => (string) shell_exec(sprintf('%s %s %s %d 2>&1', escap
 $ra = $rep('admin'); $rd = $rep('dean');
 ck('R2 หน้ารายงาน: admin เห็นเมนูข้าง/แถบหัวของ admin (เมนู Dashboard ไม่ไฮไลต์ — เมนูที่ไฮไลต์กดแล้วไม่เปลี่ยนหน้า) · dean ยังเห็นเมนูของคณบดีเหมือนเดิม',
     $noErr($ra) && str_contains($ra, 'admin/settings.php') && !str_contains($ra, 'dean/profile.php')
-    && (bool) preg_match('#admin/index.php"\s+class="nav-item "#', $ra) && !str_contains($ra, 'class="nav-item active"') && str_contains($ra, '<title>รายงาน GHG — UP Net Zero</title>')
+    && (bool) preg_match('#admin/index\.php(\?year=\d+)?"\s+class="nav-item "#', $ra)   // ลิงก์เมนูพาปีที่เลือกไปด้วย && !str_contains($ra, 'class="nav-item active"') && str_contains($ra, '<title>รายงาน GHG — UP Net Zero</title>')
     && $noErr($rd) && str_contains($rd, 'dean/profile.php') && !str_contains($rd, 'admin/settings.php') && str_contains($rd, '<title>รายงาน GHG (คณบดี) — UP Net Zero</title>'));
 @unlink($rprobe);
 

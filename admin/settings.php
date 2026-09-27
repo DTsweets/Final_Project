@@ -110,6 +110,7 @@ $export_cols = ['col_firstname' => 'ชื่อ', 'col_lastname' => 'นาม�
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin-users.css<?= asset_v('assets/css/admin-users.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 
 <body>

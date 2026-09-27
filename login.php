@@ -105,7 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="assets/css/login.css<?= asset_v('assets/css/login.css') ?>">
     
     <!-- Preload Critical Assets (Point 6: Preload & Priority) -->
-    <link rel="preload" as="image" href="assets/images/island_bg.webp">
+    <link rel="preload" as="image" href="assets/images/sky_bg.webp">
+    <script src="assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 
 <body>

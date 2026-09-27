@@ -2,7 +2,11 @@
 /**
  * Sidebar — โซนบุคลากร/คณบดี (Dean, ดูอย่างเดียว)
  */
+require_once __DIR__ . '/../../includes/year_state.php';
 $current_page = basename($_SERVER['PHP_SELF']);
+// ปีที่ผู้ใช้เลือกไว้ — ติดไปกับทุกลิงก์เมนู เพื่อให้แถบที่อยู่ตรงกับปีที่กำลังดู
+$nav_year = (int) ($_SESSION[YEAR_STATE_KEY] ?? 0);
+$nav = fn(string $href) => ghg_year_url($href, $nav_year);
 $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['firstname'] . ' ' . $_SESSION['lastname'] : 'DEAN';
 ?>
 <!-- ปุ่มเปิด/ปิดเมนู (แสดงเฉพาะจอเล็ก ≤1024px) -->
@@ -54,7 +58,7 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
     </div>
 
     <nav class="sidebar-nav">
-        <a href="<?= $root ?? '../' ?>dean/index.php"
+        <a href="<?= $nav(($root ?? '../') . 'dean/index.php') ?>"
             class="nav-item <?= ($current_page == 'index.php') ? 'active' : '' ?>">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -65,7 +69,7 @@ $admin_name = isset($_SESSION['firstname'], $_SESSION['lastname']) ? $_SESSION['
         </a>
 
         <div class="nav-category">รายงาน</div>
-        <a href="<?= $root ?? '../' ?>dean/reports.php"
+        <a href="<?= $nav(($root ?? '../') . 'dean/reports.php') ?>"
             class="nav-item <?= ($current_page == 'reports.php') ? 'active' : '' ?>">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">

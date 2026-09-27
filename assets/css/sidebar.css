@@ -4,7 +4,9 @@
 .sidebar-body {
     display: flex;
     flex-direction: column;
-    height: 95vh;
+    /* สูงจากขอบบนถึงขอบล่างพอดี: จอเต็ม − margin บน 20 − ล่าง 20
+       หาร --app-zoom เพราะหน่วย vh ไม่ถูกย่อตาม zoom — assets/js/app-zoom.js (เดิมสั้นกว่าจอ ไม่ชนขอบล่าง) */
+    height: calc(100vh / var(--app-zoom, 1) - 40px);
     width: 350px;
     /* ใช้ px คงที่เมื่อจอปกติ เพื่อไม่ให้ขนาดเปลี่ยนไปตามความสูงหน้าจอ */
     background-color: #FFFFFF;

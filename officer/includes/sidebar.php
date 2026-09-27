@@ -2,7 +2,11 @@
 /**
  * Sidebar Component for Officer (เจ้าหน้าที่คณะ)
  */
+require_once __DIR__ . '/../../includes/year_state.php';
 $current_page = basename($_SERVER['PHP_SELF']);
+// ปีที่ผู้ใช้เลือกไว้ — ติดไปกับทุกลิงก์เมนู เพื่อให้แถบที่อยู่ตรงกับปีที่กำลังดู
+$nav_year = (int) ($_SESSION[YEAR_STATE_KEY] ?? 0);
+$nav = fn(string $href) => ghg_year_url($href, $nav_year);
 $admin_name = isset($_SESSION['firstname']) && isset($_SESSION['lastname']) ? $_SESSION['firstname'] . ' ' . $_SESSION['lastname'] : 'เจ้าหน้าที่';
 $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Officer';
 ?>
@@ -72,7 +76,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Officer';
 
     <!-- Navigation Scroll Area -->
     <nav class="sidebar-nav">
-        <a href="<?= $root ?? '../' ?>officer/index.php"
+        <a href="<?= $nav(($root ?? '../') . 'officer/index.php') ?>"
             class="nav-item <?= ($current_page == 'index.php') ? 'active' : '' ?>">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -85,7 +89,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Officer';
         <!-- Category: กรอกข้อมูล -->
         <div class="nav-category">กรอกข้อมูล</div>
         <?php $is_data_entry_active = ($current_page == 'items.php' || $current_page == 'data_entry.php' || $current_page == 'data_entry_items.php' || $current_page == 'ghg.php' || $current_page == 'collect.php'); ?>
-        <a href="<?= $root ?? '../' ?>officer/data_entry.php" id="data-entry-toggle"
+        <a href="<?= $nav(($root ?? '../') . 'officer/data_entry.php') ?>" id="data-entry-toggle"
             class="nav-item <?= $is_data_entry_active ? 'active' : '' ?>">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -104,7 +108,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Officer';
             style="<?= $is_data_entry_active ? 'display:block !important;max-height:1000px !important;opacity:1 !important;overflow:visible !important;' : '' ?>">
             <div class="sub-nav">
                 <!-- 1. UP Net Zero -->
-                <a href="<?= $root ?? '../' ?>officer/items.php"
+                <a href="<?= $nav(($root ?? '../') . 'officer/items.php') ?>"
                     class="sub-item <?= ($current_page == 'items.php' || $current_page == 'data_entry.php' || $current_page == 'data_entry_items.php') ? 'active' : '' ?>">
                     <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
@@ -118,7 +122,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Officer';
                     UP Net Zero
                 </a>
                 <!-- 2. แบบสอบถาม & กิจกรรม -->
-                <a href="<?= $root ?? '../' ?>officer/collect.php"
+                <a href="<?= $nav(($root ?? '../') . 'officer/collect.php') ?>"
                     class="sub-item <?= ($current_page == 'collect.php') ? 'active' : '' ?>">
                     <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
@@ -132,7 +136,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Officer';
                 </a>
                 <?php if ((int) ($_SESSION['affiliation_id'] ?? 0) === 1): /* GHG Removal: เฉพาะศูนย์สิ่งแวดล้อม */ ?>
                 <!-- 3. GHG Removal -->
-                <a href="<?= $root ?? '../' ?>officer/ghg.php"
+                <a href="<?= $nav(($root ?? '../') . 'officer/ghg.php') ?>"
                     class="sub-item <?= ($current_page == 'ghg.php') ? 'active' : '' ?>">
                     <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
@@ -181,7 +185,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Officer';
         let isNavigating = false;
 
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px);z-index:9999;display:none;cursor:wait;';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px);z-index:9999;display:none;cursor:wait;';
         document.body.appendChild(overlay);
 
         /**

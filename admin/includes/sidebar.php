@@ -2,7 +2,11 @@
 /**
  * Sidebar Component for Super Admin
  */
+require_once __DIR__ . '/../../includes/year_state.php';
 $current_page = basename($_SERVER['PHP_SELF']);
+// ปีที่ผู้ใช้เลือกไว้ — ติดไปกับทุกลิงก์เมนู เพื่อให้แถบที่อยู่ตรงกับปีที่กำลังดู
+$nav_year = (int) ($_SESSION[YEAR_STATE_KEY] ?? 0);
+$nav = fn(string $href) => ghg_year_url($href, $nav_year);
 $admin_name = isset($_SESSION['firstname']) && isset($_SESSION['lastname']) ? $_SESSION['firstname'] . ' ' . $_SESSION['lastname'] : 'ADMIN CESM';
 $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
 ?>
@@ -72,7 +76,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
 
     <!-- Navigation Scroll Area -->
     <nav class="sidebar-nav">
-        <a href="<?= $root ?? '../' ?>admin/index.php"
+        <a href="<?= $nav(($root ?? '../') . 'admin/index.php') ?>"
             class="nav-item <?= ($current_page == 'index.php') ? 'active' : '' ?>">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -85,7 +89,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
         <!-- Category: กรอกข้อมูล -->
         <div class="nav-category">กรอกข้อมูล</div>
         <?php $is_data_entry_active = ($current_page == 'items.php' || $current_page == 'data_entry.php' || $current_page == 'data_entry_items.php' || $current_page == 'ghg.php' || $current_page == 'collect.php'); ?>
-        <a href="<?= $root ?? '../' ?>admin/items.php" id="data-entry-toggle"
+        <a href="<?= $nav(($root ?? '../') . 'admin/items.php') ?>" id="data-entry-toggle"
             class="nav-item <?= $is_data_entry_active ? 'active' : '' ?>">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -104,7 +108,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
             style="<?= $is_data_entry_active ? 'display:block !important;max-height:1000px !important;opacity:1 !important;overflow:visible !important;' : '' ?>">
             <div class="sub-nav">
                 <!-- 1. UP Net Zero -->
-                <a href="<?= $root ?? '../' ?>admin/items.php"
+                <a href="<?= $nav(($root ?? '../') . 'admin/items.php') ?>"
                     class="sub-item <?= ($current_page == 'items.php' || $current_page == 'data_entry.php' || $current_page == 'data_entry_items.php') ? 'active' : '' ?>">
                     <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
@@ -118,7 +122,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                     UP Net Zero
                 </a>
                 <!-- 2. แบบสอบถาม & กิจกรรม (รวม 3 แท็บ) -->
-                <a href="<?= $root ?? '../' ?>admin/collect.php"
+                <a href="<?= $nav(($root ?? '../') . 'admin/collect.php') ?>"
                     class="sub-item <?= ($current_page == 'collect.php') ? 'active' : '' ?>">
                     <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
@@ -131,7 +135,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
                     แบบสอบถาม &amp; กิจกรรม
                 </a>
                 <!-- 3. GHG -->
-                <a href="<?= $root ?? '../' ?>admin/ghg.php"
+                <a href="<?= $nav(($root ?? '../') . 'admin/ghg.php') ?>"
                     class="sub-item <?= ($current_page == 'ghg.php') ? 'active' : '' ?>">
                     <svg class="sub-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2.5C7 4.5 4 9 4 14C4 18.5 8 21.5 12 22.5V2.5Z" fill="#E1CBAF" />
@@ -149,7 +153,7 @@ $admin_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'Admin';
 
         <!-- Category: ตั้งค่า -->
         <div class="nav-category">ตั้งค่า</div>
-        <a href="<?= $root ?? '../' ?>admin/settings.php"
+        <a href="<?= $nav(($root ?? '../') . 'admin/settings.php') ?>"
             class="nav-item <?= $current_page == 'settings.php' ? 'active' : '' ?>">
             <div class="nav-icon-box">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">

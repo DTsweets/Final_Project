@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/year_state.php';   // ghg_pick_year() — ปีที่ผู้ใช้เลือกไว้ ใช้ต่อข้ามหน้า
+
 function qty_fmt($v): string
 {
     return rtrim(rtrim(number_format((float) $v, 2, '.', ','), '0'), '.');

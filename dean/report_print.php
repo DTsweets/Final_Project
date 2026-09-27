@@ -18,12 +18,10 @@ $affil_name = $_SESSION['affiliation_name'] ?? '-';
 $view = ghg_resolve_view($_SESSION['role'] ?? '', $_GET['view'] ?? null);
 $aff  = $view === 'faculty' ? $affil_id : null;
 
-// ปีที่รายงาน — ไม่ระบุ/ไม่พบ → ใช้ปีล่าสุด (หัวรายงานแสดงปีที่ใช้จริงเสมอ)
+// ปีที่รายงาน — ไม่ระบุ → ปีที่ผู้ใช้เลือกไว้ล่าสุด · ไม่เคยเลือก → ปีล่าสุดในระบบ (หัวรายงานแสดงปีที่ใช้จริงเสมอ)
 $years = ghg_years($pdo);
-$year  = isset($_GET['year']) ? (int)$_GET['year'] : 0;
-$year_label = '';
-foreach ($years as $y) { if ((int)$y['year_id'] === $year) { $year_label = (string)$y['year']; break; } }
-if ($year_label === '' && $years) { $year = (int)$years[0]['year_id']; $year_label = (string)$years[0]['year']; }
+$year  = ghg_pick_year($years, $_GET['year'] ?? null, $_SESSION);   // ไม่ระบุ → ปีที่ผู้ใช้เลือกไว้ล่าสุด
+$year_label = ghg_year_label($years, $year);
 
 // ── ตัวเลขปีนี้ + ปีก่อนหน้า (นิยามเดียวกับหน้าเว็บ) ──
 $sum  = ghg_report_summary($pdo, $year, $aff);
@@ -103,6 +101,10 @@ $summary_rows = array_map(fn($l) => [
     <title>รายงานคาร์บอนฟุตพริ้นท์ขององค์กร — <?= $h($org_unit) ?> ปี <?= $h($year_label) ?></title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* ขนาดตั้งต้นของเว็บ = 90% (ชุดเดียวกับ assets/css/admin.css · ผู้ใช้กำหนด 28 ก.ย. 2569)
+           พิมพ์/บันทึก PDF ตั้งกลับเป็น 1 ให้พอดีหน้ากระดาษ */
+        :root { zoom: 0.9; }
+        @media print { :root { zoom: 1; } }
         :root { --primary:#62368B; --primary-soft:#F3EAFF; --ink:#1F2937; --muted:#6B7280; --line:#E5E7EB; --good:#15803D; --bad:#DC2626; }
         * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
         @page { size:A4; margin:14mm 14mm 16mm; }
@@ -195,6 +197,7 @@ $summary_rows = array_map(fn($l) => [
             .sheet + .sheet { break-before:page; }
         }
     </style>
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 <body>
     <div class="toolbar">

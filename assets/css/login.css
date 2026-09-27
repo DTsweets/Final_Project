@@ -1,3 +1,14 @@
+/* =====================================================
+   ขนาดตั้งต้นของเว็บ = 90%
+   ผู้ใช้เปิดเบราว์เซอร์ที่ 100% แล้วได้ภาพเท่ากับตอนซูม 90% เอง (ผู้ใช้กำหนด 28 ก.ย. 2569)
+   ใช้ zoom ไม่ใช่ transform: scale เพราะ zoom จัดเลย์เอาต์ใหม่จริง — ตำแหน่ง fixed/sticky, ความสูงจอ (vh)
+   และการคำนวณตำแหน่งเมนูด้วย JS ยังถูกต้อง ส่วน scale จะทำให้ตำแหน่งเพี้ยนและมีแถบเลื่อนเกิน
+   ผู้ใช้ยังซูมเพิ่ม/ลดเองได้ตามปกติ (คูณทับค่านี้) · เวลาพิมพ์/บันทึก PDF ตั้งกลับเป็น 1 ให้พอดีหน้ากระดาษ
+   ===================================================== */
+:root { --app-zoom: 0.9; zoom: var(--app-zoom); }
+@media print { :root { --app-zoom: 1; zoom: 1; } }
+/* หมายเหตุ: หน่วย vh ไม่ถูกย่อตาม zoom — ความสูงเต็มจอต้องเขียนเป็น calc(100vh / var(--app-zoom)) */
+
 :root {
     --bg-sky: linear-gradient(180deg, #DCEEF5 0%, #FFFFFF 100%);
     --card-bg: #FCFCFC;
@@ -22,10 +33,10 @@ body, input, button, select, textarea {
 }
 
 body {
-    background: #DCEEF5 url('../images/island_bg.webp') no-repeat center center fixed;
+    background: #DCEEF5 url('../images/sky_bg.webp') no-repeat center center fixed;
     background-size: cover;
-    height: 100vh;
-    /* ใช้ height แทน min-height เพื่อคุมระดับหน้าจอ */
+    height: calc(100vh / var(--app-zoom));
+    /* ใช้ height แทน min-height เพื่อคุมระดับหน้าจอ · หาร zoom ให้เต็มจอจริง ไม่งั้นการ์ดลอยไปชิดขอบบน */
     display: flex;
     justify-content: center;
     align-items: center;

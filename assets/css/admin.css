@@ -2,6 +2,17 @@
    ADMIN PANEL — Consolidated Minimal Light Theme
    ===================================================== */
 
+/* =====================================================
+   ขนาดตั้งต้นของเว็บ = 90%
+   ผู้ใช้เปิดเบราว์เซอร์ที่ 100% แล้วได้ภาพเท่ากับตอนซูม 90% เอง (ผู้ใช้กำหนด 28 ก.ย. 2569)
+   ใช้ zoom ไม่ใช่ transform: scale เพราะ zoom จัดเลย์เอาต์ใหม่จริง — ตำแหน่ง fixed/sticky, ความสูงจอ (vh)
+   และการคำนวณตำแหน่งเมนูด้วย JS ยังถูกต้อง ส่วน scale จะทำให้ตำแหน่งเพี้ยนและมีแถบเลื่อนเกิน
+   ผู้ใช้ยังซูมเพิ่ม/ลดเองได้ตามปกติ (คูณทับค่านี้) · เวลาพิมพ์/บันทึก PDF ตั้งกลับเป็น 1 ให้พอดีหน้ากระดาษ
+   ===================================================== */
+:root { --app-zoom: 0.9; zoom: var(--app-zoom); }
+@media print { :root { --app-zoom: 1; zoom: 1; } }
+/* หมายเหตุ: หน่วย vh ไม่ถูกย่อตาม zoom — ความสูงเต็มจอต้องเขียนเป็น calc(100vh / var(--app-zoom)) */
+
 :root {
     /* Branding Colors */
     --clr-primary: #62368B;
@@ -62,7 +73,7 @@ body {
         url('../images/island_bg_opt.webp') no-repeat center center fixed;
     background-size: cover;
     color: var(--text-primary);
-    min-height: 100vh;
+    min-height: calc(100vh / var(--app-zoom));   /* หาร zoom ให้สูงเต็มจอจริง */
     display: flex;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;

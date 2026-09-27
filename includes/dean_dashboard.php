@@ -82,6 +82,44 @@ function dean_dash_event_groups(array $eventRows, array $removalRows): array
     return $out;
 }
 
+/**
+ * แบบสอบถามของคณะในปี — จัดกลุ่มตามชุด (questionnaire) พร้อมรายคำถาม
+ * อ่านค่าดิบจาก survey_summary (จำนวนผู้ตอบ × เฉลี่ย/คน) ด้วยเงื่อนไขเดียวกับ reaggregate_survey()
+ * ผลรวม total ของทุกกลุ่ม = $summary['survey_total'] ของการ์ด (มีเทสต์ล็อกไว้)
+ *
+ * @return array [['id','audience','respondents','total'=>float,
+ *                 'rows'=>[['name','unit','avg','qty','emission'], ...]], ...] เรียงยอดมาก → น้อย แล้วตามชื่อกลุ่ม
+ */
+function dean_dash_survey_groups(PDO $pdo, int $affil, int $year): array
+{
+    if ($affil <= 0) return [];
+    $stmt = $pdo->prepare("
+        SELECT q.id AS qid, q.audience, ss.respondents, ss.avg_value, ai.name_tiem, ai.unit,
+               ss.respondents * ss.avg_value AS qty,
+               ss.respondents * ss.avg_value * ai.AD / 1000 AS emission
+        FROM survey_summary ss
+        JOIN questionnaire_item qi ON qi.id = ss.questionnaire_item_id
+        JOIN questionnaire q       ON q.id  = qi.questionnaire_id
+        JOIN admin_item ai         ON ai.id = ss.admin_item_id
+        JOIN admin_g ag            ON ag.id = ai.scope
+        WHERE ss.year_id = :y AND ss.affiliation_id = :aff AND q.affiliation_id = :aff2 AND ag.scope = 3
+        ORDER BY q.id ASC, ai.id ASC");
+    $stmt->execute([':y' => $year, ':aff' => $affil, ':aff2' => $affil]);
+
+    $g = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $id = (int) $r['qid'];
+        $g[$id] ??= ['id' => $id, 'audience' => (string) $r['audience'], 'respondents' => 0, 'total' => 0.0, 'rows' => []];
+        $g[$id]['respondents'] = max($g[$id]['respondents'], (int) $r['respondents']);   // ผู้ตอบของชุด = มากสุดในชุด (แบบเดียวกับหน้าต่างของ admin)
+        $g[$id]['rows'][] = ['name' => (string) $r['name_tiem'], 'unit' => (string) $r['unit'],
+                              'avg' => (float) $r['avg_value'], 'qty' => (float) $r['qty'], 'emission' => (float) $r['emission']];
+        $g[$id]['total'] += (float) $r['emission'];
+    }
+    $out = array_values($g);
+    usort($out, fn($a, $b) => [$b['total'], $a['audience']] <=> [$a['total'], $b['audience']]);
+    return $out;
+}
+
 /** แถวของคณะตัวเองในอันดับ (ghg_affiliation_ranking()) · ยังไม่มีข้อมูลการดำเนินงาน → null */
 function dean_dash_own_rank(array $ranking, int $affil): ?array
 {
@@ -129,7 +167,7 @@ function dean_dash_cumulative(PDO $pdo, array $years, ?int $affil): float
 
 /**
  * ภาพรวมทั้งหน้า — รวมทุก query ไว้ที่เดียว
- * @return array summary, offset, compare, badge, items, detail_rows, fill, event_groups, event_count, history, cumulative, ranking, own_rank,
+ * @return array summary, offset, compare, badge, items, detail_rows, fill, event_groups, event_count, survey_groups, survey_count, history, cumulative, ranking, own_rank,
  *               uni_history, uni_cumulative, affil_total
  */
 function dean_dash_overview(PDO $pdo, array $years, int $year, int $affil): array
@@ -139,6 +177,7 @@ function dean_dash_overview(PDO $pdo, array $years, int $year, int $affil): arra
     $items   = dean_dash_items($pdo, $affil, $year, $summary);
     $evc = $pdo->prepare('SELECT COUNT(*) FROM event WHERE affiliation_id = :a AND year_id = :y');
     $evc->execute([':a' => $affil, ':y' => $year]);
+    $surveys = dean_dash_survey_groups($pdo, $affil, $year);
     // อันดับรายคณะ/หน่วยงาน ชุดเดียวกับหน้ารายงาน GHG มุมมองทั้งมหาวิทยาลัย (คณบดีเปิดแท็บนั้นได้อยู่แล้ว)
     $ranking = ghg_affiliation_ranking(ghg_by_affiliation($pdo, $year), ghg_scope_by_affiliation($pdo, $year));
     return [
@@ -151,6 +190,8 @@ function dean_dash_overview(PDO $pdo, array $years, int $year, int $affil): arra
         'fill'         => ghg_item_fill($items),
         'event_groups' => dean_dash_event_groups($summary['event_rows'], $summary['removal_rows']),
         'event_count'  => (int) $evc->fetchColumn(),
+        'survey_groups' => $surveys,
+        'survey_count'  => count($surveys),
         'history'      => ghg_scope_history($pdo, $years, $affil),
         'cumulative'   => dean_dash_cumulative($pdo, $years, $affil),
         'ranking'      => $ranking,

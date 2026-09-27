@@ -33,6 +33,10 @@ $textureSuffix = $isNight ? '_night' : '_day';
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
     <style>
+        /* ขนาดตั้งต้นของเว็บ = 90% (ชุดเดียวกับ assets/css/admin.css · ผู้ใช้กำหนด 28 ก.ย. 2569)
+           พิมพ์/บันทึก PDF ตั้งกลับเป็น 1 ให้พอดีหน้ากระดาษ */
+        :root { zoom: 0.9; }
+        @media print { :root { zoom: 1; } }
         * {
             margin: 0;
             padding: 0;
@@ -317,6 +321,7 @@ $textureSuffix = $isNight ? '_night' : '_day';
             display: none;
         }
     </style>
+    <script src="assets/js/app-zoom.js"></script>
 </head>
 
 <body>

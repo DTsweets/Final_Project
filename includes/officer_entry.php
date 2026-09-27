@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/year_state.php';   // ghg_year_url() — พาปีที่เลือกไปกับลิงก์
 /**
  * ข้อมูลของหน้ากรอกข้อมูลเจ้าหน้าที่ (officer/items.php → data_entry.php → data_entry_items.php)
  * ------------------------------------------------------------------------------------------
@@ -337,7 +338,8 @@ function officer_scope_meta(): array
  */
 function officer_entry_steps(int $current, int $year = 0, string $extra = ''): string
 {
-    $steps = [1 => ['เลือกปี', 'items.php'], 2 => ['เลือกหมวด', $year ? 'data_entry.php?year=' . $year . $extra : ''], 3 => ['กรอกปริมาณ', '']];
+    // ขั้น ① พาปีที่กำลังกรอกกลับไปด้วย — หน้าเลือกปีจะได้รู้ว่าผู้ใช้ทำงานอยู่ปีไหน
+    $steps = [1 => ['เลือกปี', ghg_year_url('items.php', $year)], 2 => ['เลือกหมวด', $year ? 'data_entry.php?year=' . $year . $extra : ''], 3 => ['กรอกปริมาณ', '']];
     $html = '<nav class="oe-steps" aria-label="ขั้นตอนการกรอกข้อมูล">';
     foreach ($steps as $n => [$label, $href]) {
         $state = $n < $current ? 'done' : ($n === $current ? 'current' : 'todo');

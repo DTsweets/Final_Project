@@ -47,6 +47,15 @@ $before = $fingerprint();
 $full  = (int) $one("SELECT ai.year_id FROM admin_item ai LEFT JOIN user_item ui ON ui.admin_item_id = ai.id AND ui.source = 'officer' AND ui.Vol > 0 AND ui.affiliation_id <> 1
     WHERE ai.data_source = 'officer' GROUP BY ai.year_id ORDER BY COUNT(DISTINCT ui.affiliation_id) DESC, COUNT(ui.id) DESC, ai.year_id DESC LIMIT 1");
 $bare  = (int) $one("SELECT id FROM admin_year y WHERE NOT EXISTS (SELECT 1 FROM admin_item a WHERE a.year_id = y.id AND a.data_source = 'officer') ORDER BY year DESC LIMIT 1");
+// ไม่มีปีว่างเหลือแล้ว (ทุกปีมีรายการครบ) → สร้างปีว่างชั่วคราวไว้ทดสอบ แล้วลบทิ้งท้ายไฟล์ (fingerprint ต้องกลับมาเท่าเดิม)
+$bare_tmp = false;
+if ($bare <= 0) {
+    $y = 2599;
+    while ($one("SELECT 1 FROM admin_year WHERE year = $y")) $y--;
+    $bare = admin_add_year($pdo, $y);
+    $bare_tmp = true;
+    $before = $fingerprint();   // ถือปีชั่วคราวเป็นส่วนหนึ่งของสถานะตั้งต้น
+}
 $fullY = admin_year_label($pdo, $full);
 $bareY = admin_year_label($pdo, $bare);
 // หน่วยงานที่มีข้อมูลการดำเนินงานในปีนั้น แต่ไม่ใช่หน่วยงานของ admin (1)
@@ -329,6 +338,10 @@ ck('C1 ปุ่มเพิ่มรายการ/ปุ่มหมวดม
     && (bool) preg_match('#prefers-reduced-motion: reduce\) \{[^}]*\.ai-swap-ic[^}]*animation: none;.*?\.oe-add-btn, \.oe-gm-btn, \.oe-gm-row \{ transition: none; \}#s', $css));
 
 ck('Z ข้อมูลอ้างอิงกลางและปริมาณทุกแถวเท่าเดิมหลังเทสต์', $fingerprint() === $before);
+if ($bare_tmp) {   // เก็บกวาดปีว่างชั่วคราว
+    admin_delete_year($pdo, $bare);
+    ck('Z2 ลบปีว่างชั่วคราวที่เทสต์สร้างไว้แล้ว', admin_year_label($pdo, $bare) === null);
+}
 
 @unlink($probe);
 echo "\n==== PASS=$pass  FAIL=$fail ====\n";

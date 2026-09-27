@@ -393,9 +393,9 @@ foreach ([['dean', 'faculty', $aff0], ['admin', 'system', $aff0]] as [$role, $vi
     $okLines = true;
     foreach (ghg_summary_lines($view) as $l) {
         $r = $find($l['label'] . ($l['desc'] !== '' ? ' · ' . $l['desc'] : ''));
-        $last = $r ? end($r) : null;
-        // ไม่มีคอลัมน์เปรียบเทียบ (ข้อมูลทดสอบปีก่อนไม่มีการดำเนินงาน) → เซลล์สุดท้ายคือปีนี้
-        if (!$r || $last['t'] !== 'Number' || !feq($last['v'], $sumX[$l['key']])) { $okLines = false; break; }
+        // มีปีก่อนให้เทียบ → แถวเป็น [ป้าย, ปีก่อน, ปีนี้, %เปลี่ยน] · ไม่มี → [ป้าย, ปีนี้]
+        $cell = $r ? (count($r) >= 3 ? $r[2] : $r[1]) : null;
+        if (!$cell || $cell['t'] !== 'Number' || !feq($cell['v'], $sumX[$l['key']])) { $okLines = false; break; }
     }
     ck("X3 [$view] บทสรุปครบทุกแถว ตัวเลขเป็น Number และตรงกับ ghg_report_summary()", $okLines);
 

@@ -11,7 +11,7 @@ require_once __DIR__ . '/ghg_report.php';
 require_once __DIR__ . '/removal_entry.php';
 
 $years = $pdo->query("SELECT id AS year_id, year FROM admin_year ORDER BY year DESC")->fetchAll();
-$selected_year = isset($_GET['year']) ? (int) $_GET['year'] : ($years[0]['year_id'] ?? 0);
+$selected_year = ghg_pick_year($years, $_GET['year'] ?? null, $_SESSION);   // จำปีที่เลือกไว้ข้ามหน้า
 
 // ── POST ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -79,6 +79,7 @@ $arrow = '<span class="oe-arrow"><svg viewBox="0 0 24 24" width="14" height="14"
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 <body style="background:#F6F4F9;">
     <?php include $SIDEBAR; ?>

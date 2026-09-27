@@ -76,7 +76,22 @@ function mock_2569_chance(float $p): bool
  */
 function mock_2569_rows(array $catalog): array
 {
-    mt_srand(MOCK_SEED);
+    $picks   = mock_2569_picks(MOCK_SEED);
+    $targets = [];
+    foreach (mock_2569_profiles() as $aff => [, $sz]) $targets[$aff] = mock_2569_unit_target($sz);
+    $picks = mock_2569_calibrate($picks, $catalog, $targets);
+
+    return mock_2569_rows_from_picks($picks, 2026, 1, 8);
+}
+
+/**
+ * สุ่ม "คละรายการ" ของทุกหน่วยงาน (ยังไม่ปรับเทียบยอด)
+ * แยกออกมาให้ปีอื่นเรียกใช้ซ้ำได้ — database/mock_history.php (ปี 2567/2568)
+ * @return array [affiliation_id => [admin_item_id (แม่บทปี 2569) => vol]]
+ */
+function mock_2569_picks(int $seed): array
+{
+    mt_srand($seed);
     $picks = [];                                          // affiliation_id => [admin_item_id => vol]
 
     foreach (mock_2569_profiles() as $aff => [$mwh, $sz, $tags]) {
@@ -130,15 +145,20 @@ function mock_2569_rows(array $catalog): array
         $picks[$aff] = $pick;
     }
 
-    $targets = [];
-    foreach (mock_2569_profiles() as $aff => [, $sz]) $targets[$aff] = mock_2569_unit_target($sz);
-    $picks = mock_2569_calibrate($picks, $catalog, $targets);
+    return $picks;
+}
 
+/**
+ * แปลง picks เป็นแถว user_item พร้อมวันที่กรอก (กระจายในเดือน $m_from–$m_to ของปี ค.ศ. $ce)
+ * @return array [['admin_item_id'=>int, 'affiliation_id'=>int, 'vol'=>float, 'date'=>'Y-m-d'], ...]
+ */
+function mock_2569_rows_from_picks(array $picks, int $ce, int $m_from, int $m_to): array
+{
     $rows = [];
     foreach ($picks as $aff => $pick) {
         foreach ($pick as $item => $vol) {
-            // วันที่กรอก: กระจายช่วง ม.ค.–ส.ค. 2569 (ค.ศ. 2026) เหมือนเจ้าหน้าที่ทยอยกรอก
-            $date = sprintf('2026-%02d-%02d', mt_rand(1, 8), mt_rand(1, 28));
+            // วันที่กรอก: กระจายเหมือนเจ้าหน้าที่ทยอยกรอกระหว่างปี
+            $date = sprintf('%04d-%02d-%02d', $ce, mt_rand($m_from, $m_to), mt_rand(1, 28));
             $rows[] = ['admin_item_id' => $item, 'affiliation_id' => $aff, 'vol' => (float) $vol, 'date' => $date];
         }
     }
@@ -168,8 +188,9 @@ function mock_2569_unit_target(float $size): float
  * @param array $picks   [affiliation_id => [admin_item_id => vol]]
  * @param array $catalog [admin_item_id => ['ad' => float, 'scope' => int]]
  * @param array $targets [affiliation_id => tCO₂e]
+ * @param array $share   สัดส่วนขอบเขต [1=>..,2=>..,3=>..] (ค่าตั้งต้น = ปี 2569)
  */
-function mock_2569_calibrate(array $picks, array $catalog, array $targets): array
+function mock_2569_calibrate(array $picks, array $catalog, array $targets, array $share = MOCK_SCOPE_SHARE): array
 {
     foreach ($picks as $aff => &$pick) {
         $cur = [1 => 0.0, 2 => 0.0, 3 => 0.0];
@@ -181,7 +202,7 @@ function mock_2569_calibrate(array $picks, array $catalog, array $targets): arra
             $s = $catalog[$id]['scope'];
             // เฉพาะรายการที่มีค่าการปล่อย — โซลาร์ (EF = 0) ไม่ต้องปรับ
             if ($catalog[$id]['ad'] <= 0 || $cur[$s] <= 0) continue;
-            $v   = $vol * $targets[$aff] * MOCK_SCOPE_SHARE[$s] / $cur[$s];
+            $v   = $vol * $targets[$aff] * $share[$s] / $cur[$s];
             $vol = $v >= 1000 ? round($v / 10) * 10 : max(1.0, round($v));
         }
         unset($vol);

@@ -2,6 +2,7 @@
 /**
  * Root index.php — URL Masking Wrapper
  * ใช้ Iframe เพื่อล็อก URL ให้อยู่ที่ http://localhost:3000 ตลอดเวลา
+ * ห้ามตั้ง zoom ที่นี่ — หน้าในกรอบ (login/แดชบอร์ด) ตั้ง 90% ไว้แล้ว ถ้าตั้งซ้ำจะกลายเป็น 81%
  */
 ?>
 <!DOCTYPE html>

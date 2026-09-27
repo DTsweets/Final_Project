@@ -68,6 +68,20 @@ ck('O4 ปุ่ม "กรอก / แก้ไขข้อมูล" ไป it
     return strpos($html, '<a class="ad-evbar-btn" href="items.php?year=' . $year . '">กรอก / แก้ไขข้อมูล') !== false
         && strpos($html, 'id="adYear"') !== false && strpos($html, 'reports.php') === false;
 })());
+ck('O4b แถบแบบสอบถามของคณะ: แสดงเสมอ · มีชุด → จำนวน/ยอดตรงการ์ด + ปุ่มเปิดหน้าต่าง · ไม่มีชุด → สถานะว่าง ไม่มีปุ่ม · ข้อมูลกลุ่มฝังในหน้าและเป็นของคณะตัวเอง', (function () use ($html, $data, $o, $aff) {
+    $sum = $o['summary'];
+    $embedded = is_array($data) && $data['surveyGroups'] == $o['survey_groups']
+        && abs((float) $data['surveyTotal'] - $sum['survey_total']) < 1e-6
+        && abs(array_sum(array_column($o['survey_groups'], 'total')) - $sum['survey_total']) < 1e-6
+        && strpos($html, 'data-ad-source') === false;   // ไม่เรียก API ของ admin ที่ดึงทุกคณะ
+    if (!$embedded || strpos($html, 'class="ad-evbar is-survey oe-rise"') === false) return false;
+    if ($o['survey_count'] > 0) {
+        return preg_match('#class="ad-src-count">(\d+)<#', $html, $c) && (int) $c[1] === $o['survey_count']
+            && preg_match('#class="ad-src-total"[^>]*>([0-9,.]+)<#', $html, $t) && $t[1] === number_format($sum['survey_total'], 4)
+            && strpos($html, 'data-ad-open="surveys"') !== false;
+    }
+    return strpos($html, 'ยังไม่มีแบบสอบถามในปีนี้') !== false && strpos($html, 'data-ad-open="surveys"') === false;
+})());
 ck('O5 ส่วนร่วมกับคณบดี: แถบกิจกรรม (มีกิจกรรม) + การ์ดอันดับ + กราฟสลับคณะ/มหาวิทยาลัย · ข้อมูลหน้าต่าง mode faculty ตรง overview + escape ชื่อ', is_array($data)
     && ($o['event_count'] === 0 || strpos($html, 'class="ad-evbar oe-rise"') !== false)
     && strpos($html, 'class="oe-panel ad-rank ad-rank-card') !== false && strpos($html, 'data-ad-hist="uni"') !== false && strpos($html, 'id="adHistory"') !== false

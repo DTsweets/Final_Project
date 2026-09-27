@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/officer_entry.php';
+require_once __DIR__ . '/../includes/year_state.php';   // ปีที่ผู้ใช้เลือกไว้ ใช้ต่อข้ามหน้า
 
 require_role(['officer']);
 
@@ -119,6 +120,8 @@ $available_years = officer_available_years($pdo, $affil_id);
 $all_admin_years = $pdo->query("SELECT y.id, y.year FROM admin_year y
     WHERE EXISTS (SELECT 1 FROM admin_item ai WHERE ai.year_id = y.id AND ai.data_source = 'officer') ORDER BY y.year DESC")->fetchAll();
 $creatable       = array_values(array_filter($available_years, fn($y) => $y['items'] > 0));
+// ปีที่ผู้ใช้เลือกไว้ (มาจาก URL หลัง redirect หรือจากหน้าอื่น) — ใช้เป็นปีตั้งต้นของปุ่มไปหน้ากรอกข้อมูล
+$selected_year   = ghg_pick_year($pdo->query('SELECT id AS year_id, year FROM admin_year ORDER BY year DESC')->fetchAll(), $_GET['year'] ?? null, $_SESSION);
 
 $remaining = session_remaining();
 $page_title = "กรอกข้อมูล";
@@ -141,6 +144,7 @@ $arrow = '<span class="oe-arrow"><svg width="16" height="16" viewBox="0 0 24 24"
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 
 <body>
@@ -252,7 +256,7 @@ $arrow = '<span class="oe-arrow"><svg width="16" height="16" viewBox="0 0 24 24"
                 <h3 class="ai-swap-title">สร้างข้อมูลสำเร็จ!</h3>
                 <p class="oe-modal-text">เตรียมรายการที่ต้องกรอกไว้ <?= (int) ($_GET['count'] ?? 0) ?> รายการ</p>
                 <div class="oe-modal-stack">
-                    <a href="data_entry.php?year=<?= (int) $_GET['year'] ?>" class="oe-btn">เริ่มกรอกข้อมูลเลย <?= $arrow ?></a>
+                    <a href="data_entry.php?year=<?= $selected_year ?>" class="oe-btn">เริ่มกรอกข้อมูลเลย <?= $arrow ?></a>
                     <button type="button" class="oe-btn oe-btn-ghost" data-close>ปิดหน้าต่าง</button>
                 </div>
             </div>

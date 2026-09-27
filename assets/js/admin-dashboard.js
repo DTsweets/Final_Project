@@ -8,6 +8,7 @@
  * ข้อความจากผู้ใช้ทุกชิ้นผ่าน esc() ก่อนใส่ innerHTML · ไม่มี onclick ในสตริง (ใช้ data-go + ตัวดักคลิกที่ตัวหน้าต่าง)
  * โหลดซ้ำได้เมื่อ SPA สลับหน้า: ทุกอย่างอยู่ใน IIFE, ตัวดักของ document/window ผูกครั้งเดียว และตรวจว่าองค์ประกอบยังอยู่
  * API เดิม: admin/api/api_reports_list.php, api_affil_detail.php, api_item_detail.php, officer/api/manage_evidence.php
+ * โหมดคณะ (dean/officer) ไม่เรียก API เลย — รวมถึงหน้าต่างแบบสอบถาม (surveysView) ที่อ่านจาก surveyGroups ที่ฝังในหน้า
  * โหมด faculty (คณะเดียว): รายการทั้งหมด / ขอบเขต n → กิจกรรมที่คณะจัด → รายการปล่อย + ดูดกลับของงาน — ข้อมูลฝังในหน้า ไม่เรียก API
  */
 (function (w) {
@@ -462,8 +463,9 @@
             render: function () {
                 var dn = donut(rows, total, 'tCO₂e · ปี ' + D.yearLabel); this._after = dn.after;
                 var trs = rows.map(function (r, i) {
-                    var on = r.kind === 'event' && r.value > 0 && D.eventGroups.length > 0;
-                    return '<tr class="ad-tr' + (on ? ' is-link' : '') + '"' + (on ? ' data-go="events" data-i="' + i + '" tabindex="0"' : '') + '>'
+                    var on = (r.kind === 'event' && r.value > 0 && D.eventGroups.length > 0)
+                        || (r.kind === 'survey' && r.value > 0 && (D.surveyGroups || []).length > 0);
+                    return '<tr class="ad-tr' + (on ? ' is-link' : '') + '"' + (on ? ' data-go="' + r.kind + '" data-i="' + i + '" tabindex="0"' : '') + '>'
                         + '<td><span class="ad-name"><i style="background:' + r.color + ';"></i>' + esc(r.name) + kindTag(r) + '</span></td>'
                         + (scope ? '' : '<td class="ad-c">' + (r.scope ? scopePill(r.scope) : '<span class="ad-muted">หลายขอบเขต</span>') + '</td>')
                         + '<td class="ad-c ad-muted">' + esc(r.unit || '-') + '</td><td class="ad-r">' + dash(r.vol, 0, 4) + '</td>'
@@ -475,7 +477,7 @@
                     + dn.html + search('ค้นหารายการ…') + table(head, trs, 'ยังไม่มีรายการในปีนี้');
             },
             after: function (b) { this._after(b); },
-            go: function () { push(eventsView()); }
+            go: function (name) { push(name === 'survey' ? surveysView() : eventsView()); }
         };
     }
     /** กิจกรรมที่คณะจัด: ยอดปล่อย / ดูดกลับ รายงาน (removal = true → เฉพาะงานที่มีดูดกลับ + โดนัทดูดกลับ) */
@@ -525,6 +527,47 @@
                     + table([{ t: 'รายการ' }, { t: 'ขอบเขต', cls: 'ad-c', w: '110px' }, { t: 'หน่วย', cls: 'ad-c', w: '90px' }, { t: 'ปริมาณ', cls: 'ad-r', w: '100px' }, { t: 'tCO₂e', cls: 'ad-r', w: '110px' }], emit, 'ไม่มีรายการปล่อย')
                     + '<h4 class="ad-section-h">การดูดกลับ</h4>'
                     + table([{ t: 'รายการ' }, { t: 'หน่วย', cls: 'ad-c', w: '90px' }, { t: 'kgCO₂e/หน่วย', cls: 'ad-r', w: '110px' }, { t: 'ปริมาณ', cls: 'ad-r', w: '100px' }, { t: 'tCO₂e', cls: 'ad-r', w: '110px' }], rem, 'ไม่มีรายการดูดกลับ');
+            }
+        };
+    }
+
+    /** แบบสอบถามของคณะ: ชุด (กลุ่มผู้ตอบ) → รายคำถาม · ข้อมูลฝังในหน้า ไม่เรียก API (คณะเห็นเฉพาะชุดของตัวเอง) */
+    function surveysView() {
+        var D = S.data, list = D.surveyGroups || [], total = D.surveyTotal || 0;
+        var slices = colorize(list.map(function (g) { return { kind: 'item', name: g.audience, value: g.total }; }));
+        return {
+            label: 'แบบสอบถามของคณะ — การเดินทางของบุคลากร/นิสิต (นับในขอบเขต 3)',
+            title: D.affilName + ' · ปี ' + D.yearLabel, short: 'แบบสอบถาม', theme: THEME.survey,
+            render: function () {
+                var dn = donut(slices, total, 'tCO₂e · แบบสอบถาม'); this._after = dn.after;
+                var trs = list.map(function (g, i) {
+                    return '<tr class="ad-tr is-link" data-go="survey" data-i="' + i + '" tabindex="0">'
+                        + '<td><span class="ad-name"><i style="background:' + slices[i].color + ';"></i>' + esc(g.audience || '-') + '</span></td>'
+                        + '<td class="ad-r">' + fmt(g.respondents, 0) + ' คน</td>'
+                        + '<td class="ad-c ad-muted">' + g.rows.length + ' คำถาม</td>'
+                        + '<td class="ad-r ad-num">' + dash(g.total, 4) + '</td>' + shareCell(pctOf(g.total, total), slices[i].color) + goCell(true) + '</tr>';
+                });
+                return stats([{ label: 'แบบสอบถาม', value: list.length + ' ชุด' }, { label: 'รวม (tCO₂e)', value: fmt(total, 4) }])
+                    + dn.html + search('ค้นหากลุ่มผู้ตอบ…')
+                    + table([{ t: 'กลุ่มผู้ตอบ' }, { t: 'ผู้ตอบ', cls: 'ad-r', w: '100px' }, { t: 'คำถาม', cls: 'ad-c', w: '90px' }, { t: 'tCO₂e', cls: 'ad-r', w: '120px' }, { t: 'สัดส่วน', cls: 'ad-r', w: '160px' }, { t: '', w: '40px' }], trs, 'ยังไม่มีแบบสอบถามในปีนี้');
+            },
+            after: function (b) { this._after(b); },
+            go: function (n, i) { var g = list[i]; if (g) push(surveyDetailView(g)); }
+        };
+    }
+    /** รายคำถามของแบบสอบถามหนึ่งชุด */
+    function surveyDetailView(g) {
+        return {
+            label: 'แบบสอบถาม · ผู้ตอบ ' + fmt(g.respondents, 0) + ' คน', title: g.audience || '-', short: g.audience || 'แบบสอบถาม', theme: THEME.survey,
+            render: function () {
+                var trs = g.rows.map(function (r) {
+                    return '<tr class="ad-tr"><td><b>' + esc(r.name) + '</b></td><td class="ad-r">' + dash(r.avg, 0, 4) + '</td>'
+                        + '<td class="ad-c ad-muted">' + esc(r.unit || '-') + '</td><td class="ad-r">' + dash(r.qty, 0, 4) + '</td>'
+                        + '<td class="ad-r ad-num">' + dash(r.emission, 4) + '</td></tr>';
+                });
+                return stats([{ label: 'ผู้ตอบ', value: fmt(g.respondents, 0) + ' คน' }, { label: 'คำถาม', value: g.rows.length }, { label: 'รวม (tCO₂e)', value: fmt(g.total, 4) }])
+                    + search('ค้นหาคำถาม…')
+                    + table([{ t: 'คำถาม' }, { t: 'เฉลี่ย/คน', cls: 'ad-r', w: '100px' }, { t: 'หน่วย', cls: 'ad-c', w: '90px' }, { t: 'ปริมาณรวม', cls: 'ad-r', w: '110px' }, { t: 'tCO₂e', cls: 'ad-r', w: '120px' }], trs);
             }
         };
     }
@@ -610,7 +653,7 @@
         // admin: ทั้งมหาวิทยาลัย (เรียก API เมื่อกดลึก) · faculty: Dashboard คณบดี เฉพาะคณะตัวเอง (ข้อมูลฝังในหน้า)
         var faculty = data.mode === 'faculty';
         var views = faculty
-            ? { items: function () { return itemsView(0); }, scope: function (n) { return itemsView(n); }, removal: function () { return eventsView(true); }, events: function () { return eventsView(false); }, ranking: rankingView }
+            ? { items: function () { return itemsView(0); }, scope: function (n) { return itemsView(n); }, removal: function () { return eventsView(true); }, events: function () { return eventsView(false); }, surveys: surveysView, ranking: rankingView }
             : { breakdown: function () { return breakdownView(0); }, scope: breakdownView, removal: removalView, cumulative: cumulativeView, reports: reportsView, ranking: rankingView };
         d.querySelectorAll('.ad-page [data-ad-open]').forEach(function (b) {
             b.addEventListener('click', function () {

@@ -78,6 +78,7 @@ $txtInput = fn(string $name, string $type, string $ph, int $max, bool $req, stri
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/profile.css<?= asset_v('assets/css/profile.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 <body style="background:#F6F4F9;">
     <?php include $SIDEBAR; ?>

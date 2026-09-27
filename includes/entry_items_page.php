@@ -14,7 +14,8 @@ require_once __DIR__ . '/admin_items_entry.php';
 
 $ENTRY_ADMIN = !empty($ENTRY_ADMIN);
 
-$selected_year    = (int) ($_POST['year'] ?? $_GET['year'] ?? 0);
+require_once __DIR__ . '/year_state.php';
+$selected_year    = ghg_pick_year($pdo->query('SELECT id AS year_id, year FROM admin_year ORDER BY year DESC')->fetchAll(), $_POST['year'] ?? $_GET['year'] ?? null, $_SESSION);
 $scope_groups_ids = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['scope_groups'] ?? $_GET['scope_groups'] ?? [])))));
 // query ของหมวดแบบ scope_groups[]=1&scope_groups[]=2 — ไม่ใช้ http_build_query (ได้ scope_groups[0]=1 ซึ่ง JS ที่อ่าน 'scope_groups[]' หาไม่เจอ)
 $groups_qs = implode('&', array_map(fn($id) => 'scope_groups[]=' . $id, $scope_groups_ids));
@@ -163,6 +164,7 @@ $svg_plus  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 
 <body>
@@ -429,7 +431,7 @@ $svg_plus  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke
                 <p class="oe-modal-text">กรอกแล้ว <?= $sum_filled ?> / <?= $sum_count ?> รายการในหมวดที่เลือก</p>
                 <div class="oe-modal-stack">
                     <button type="button" class="oe-btn oe-btn-success" data-close>ตกลง, กรอกต่อ</button>
-                    <a href="index.php" class="oe-btn oe-btn-ghost">กลับหน้า Dashboard</a>
+                    <a href="<?= ghg_year_url('index.php', $selected_year) ?>" class="oe-btn oe-btn-ghost">กลับหน้า Dashboard</a>
                 </div>
             </div>
         </div>

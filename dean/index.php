@@ -3,7 +3,7 @@
  * DEAN DASHBOARD — dean/index.php (คณบดี — เฉพาะคณะของตนเอง ดูอย่างเดียว)
  * ---------------------------------------------------------
  * หน้าตาชุดเดียวกับ Dashboard admin: การ์ดหลัก ปล่อย / ดูดกลับ / Net (+ % ชดเชย, เทียบปีก่อน) → ขอบเขต 1/2/3 (+ ความครบถ้วน)
- *   → แถบกิจกรรมที่คณะจัด → อันดับของคณะ + แถบตำแหน่ง + 3 อันดับแรก (ทั้งหมดในหน้าต่าง) + ภาพรวมทุกปี (สลับ คณะ / ทั้งมหาวิทยาลัย)
+ *   → แถบแบบสอบถาม / กิจกรรมที่คณะจัด → อันดับของคณะ + แถบตำแหน่ง + 3 อันดับแรก (ทั้งหมดในหน้าต่าง) + ภาพรวมทุกปี (สลับ คณะ / ทั้งมหาวิทยาลัย)
  * ยอดทั้งหมดมาจาก ghg_report_summary($year, $affil) ตัวเดียวกับหน้ารายงาน GHG มุมมองคณะ (ข้อมูลจัดใน includes/dean_dashboard.php)
  * หน้าต่างรายละเอียดใช้ assets/js/admin-dashboard.js โหมด 'faculty' (ข้อมูลฝังในหน้า ไม่เรียก API) · สไตล์ admin-dashboard.css (ad-)
  * admin ที่เปิดหน้านี้ถูกส่งไป Dashboard admin (ภาพรวมทั้งมหาวิทยาลัยอยู่ที่นั่น)
@@ -15,9 +15,6 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/dean_dashboard.php';
 require_role(['admin', 'dean']);
 
-$redirect = dean_dash_redirect((string) ($_SESSION['role'] ?? ''), (int) ($_GET['year'] ?? 0));
-if ($redirect !== null) { header('Location: ' . $redirect); exit; }
-
 $pdo  = getDB();
 $root = '../';
 $page_title = 'Dashboard';
@@ -25,10 +22,12 @@ $affil_id   = (int) ($_SESSION['affiliation_id'] ?? 0);
 $affil_name = (string) ($_SESSION['affiliation_name'] ?? '-');
 
 $years = ghg_years($pdo);
-$selected_year = isset($_GET['year']) ? (int) $_GET['year'] : (int) ($years[0]['year_id'] ?? 0);
-$year_label = '';
-foreach ($years as $y) if ((int) $y['year_id'] === $selected_year) $year_label = (string) $y['year'];
-if ($year_label === '' && $years) { $selected_year = (int) $years[0]['year_id']; $year_label = (string) $years[0]['year']; }
+$selected_year = ghg_pick_year($years, $_GET['year'] ?? null, $_SESSION);   // จำปีที่เลือกไว้ข้ามหน้า
+$year_label = ghg_year_label($years, $selected_year);
+
+// admin เปิดหน้านี้ → ส่งไป Dashboard admin พร้อมปีที่เลือกไว้
+$redirect = dean_dash_redirect((string) ($_SESSION['role'] ?? ''), $selected_year);
+if ($redirect !== null) { header('Location: ' . $redirect); exit; }
 
 $o   = ($years && $affil_id > 0) ? dean_dash_overview($pdo, $years, $selected_year, $affil_id) : null;
 $sum = $o['summary'] ?? null;
@@ -44,6 +43,7 @@ $ad_data = $o ? [
     'mode' => 'faculty', 'year' => $selected_year, 'yearLabel' => $year_label, 'affilName' => $affil_name,
     'gross' => $sum['gross'], 'scope' => $sum['scope'], 'removal' => $sum['removal'],
     'eventTotal' => $sum['event_total'], 'eventCount' => $o['event_count'],
+    'surveyTotal' => $sum['survey_total'], 'surveyGroups' => $o['survey_groups'],
     'detailRows' => $o['detail_rows'], 'eventGroups' => $o['event_groups'],
     'history' => $o['history'], 'uniHistory' => $o['uni_history'], 'scopeMeta' => $scope_meta,
     'ranking' => $o['ranking'], 'ownAffil' => $affil_id,
@@ -64,6 +64,7 @@ $ad_data = $o ? [
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/collect.css<?= asset_v('assets/css/collect.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin-dashboard.css<?= asset_v('assets/css/admin-dashboard.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 
 <body>

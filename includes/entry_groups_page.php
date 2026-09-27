@@ -11,9 +11,11 @@
  */
 require_once __DIR__ . '/officer_entry.php';
 require_once __DIR__ . '/admin_items_entry.php';
+require_once __DIR__ . '/year_state.php';
 
 $ENTRY_ADMIN = !empty($ENTRY_ADMIN);
-$selected_year = isset($_GET['year']) ? (int) $_GET['year'] : 0;
+// ไม่ได้ระบุปีมา → ใช้ปีที่ผู้ใช้เลือกไว้ล่าสุด · ไม่มีปีในระบบเลย → กลับไปหน้าเลือกปี
+$selected_year = ghg_pick_year($pdo->query('SELECT id AS year_id, year FROM admin_year ORDER BY year DESC')->fetchAll(), $_GET['year'] ?? null, $_SESSION);
 if ($selected_year <= 0) {
     header('Location: items.php');
     exit;
@@ -60,6 +62,7 @@ $check_svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
     <link rel="stylesheet" href="<?= $root ?>assets/css/admin.css<?= asset_v('assets/css/admin.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar.css<?= asset_v('assets/css/sidebar.css') ?>">
     <link rel="stylesheet" href="<?= $root ?>assets/css/officer-entry.css<?= asset_v('assets/css/officer-entry.css') ?>">
+    <script src="<?= $root ?? '../' ?>assets/js/app-zoom.js<?= asset_v('assets/js/app-zoom.js') ?>"></script>
 </head>
 
 <body>
@@ -70,7 +73,7 @@ $check_svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
         <?php include_once $HEADER; ?>
 
         <div class="oe-page">
-            <a href="items.php" class="oe-back">
+            <a href="<?= ghg_year_url('items.php', $selected_year) ?>" class="oe-back">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                 ย้อนกลับไปหน้าเลือกปีงบประมาณ
             </a>
